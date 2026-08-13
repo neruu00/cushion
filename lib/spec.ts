@@ -15,6 +15,13 @@ export interface Section {
 
 const H2 = /^##[ \t]+(.+?)[ \t]*$/;
 
+/**
+ * CRLF도 받는다. `\r`가 줄 끝에 남으면 `.`가 그걸 매치하지 않아 H2가 통째로 어긋난다 —
+ * 목차가 비어 나오는데 원인이 안 보이는 종류의 버그다. 수신부(sync.schema)에서도 접지만
+ * 이 함수만 따로 불릴 수 있으므로 여기서도 방어한다.
+ */
+const lines = (content: string): string[] => content.split(/\r?\n/);
+
 export function splitSections(content: string): Section[] {
   const sections: Section[] = [];
   let heading: string | null = null;
@@ -25,7 +32,7 @@ export function splitSections(content: string): Section[] {
     if (heading !== null || text) sections.push({ heading, text });
   };
 
-  for (const line of content.split("\n")) {
+  for (const line of lines(content)) {
     const match = H2.exec(line);
     if (match) {
       flush();
