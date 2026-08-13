@@ -18,11 +18,13 @@ export interface Repo {
   github_full_name: string | null;
   /** 쓰기 경로의 알림이 재조회 없이 쓰도록 같이 실어 온다. 클라이언트로는 안 나간다 */
   mattermost_webhook_url: string | null;
+  discord_webhook_url: string | null;
   /** 레포별 최신 이벤트 (D-012 비정규화). [stale] 판단이 추가 쿼리 없이 된다 */
   latest_event_id: number;
 }
 
-const REPO_COLUMNS = "id, slug, name, github_full_name, mattermost_webhook_url, latest_event_id";
+const REPO_COLUMNS =
+  "id, slug, name, github_full_name, mattermost_webhook_url, discord_webhook_url, latest_event_id";
 
 // ─── 정체성 ──────────────────────────────────────────────────────────
 

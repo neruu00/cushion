@@ -38,7 +38,12 @@ export async function recordVersion(input: {
  * 두 번 만들면 두 번 드리프트한다. (SPEC §8)
  */
 export async function recordChange(
-  repo: { id: string; slug: string; mattermost_webhook_url: string | null },
+  repo: {
+    id: string;
+    slug: string;
+    mattermost_webhook_url: string | null;
+    discord_webhook_url: string | null;
+  },
   edit: DocumentEdit,
 ): Promise<number | null> {
   const summary = summarizeEdit(edit);
@@ -69,27 +74,36 @@ export async function recordChange(
     if (latestError) console.error("mirror: latest_event_id", latestError);
   }
 
-  await notifyMattermost(repo.mattermost_webhook_url, `**${repo.slug}**\n${summary}`);
+  const text = `**${repo.slug}**\n${summary}`;
+  await Promise.all([
+    postWebhook(repo.mattermost_webhook_url, { text }),
+    // Discord는 `content`만 읽는다 — `text`를 보내면 400이고, 그 실패는 조용하다.
+    // 2000자가 상한이라 넘치면 통째로 거부당한다. 요약은 짧지만 상한을 믿지 않는다.
+    postWebhook(repo.discord_webhook_url, { content: text.slice(0, 1900) }),
+  ]);
   return eventId;
 }
 
 /**
  * 알림 실패가 편집을 되돌리지 않는다. 문서는 이미 저장됐고, 그게 본질이다.
  * URL은 호출부가 이미 읽어 둔 레포 행에서 온다 — 알림 하나에 조회 하나를 더 쓰지 않는다.
+ *
+ * 페이로드는 호출부가 준다. 여기서 URL을 보고 종류를 추측하지 않는다 —
+ * 어느 칸에 넣었는지가 이미 답이고, 추측은 틀리는 날이 온다.
  */
-async function notifyMattermost(url: string | null, text: string): Promise<void> {
+async function postWebhook(url: string | null, payload: Record<string, string>): Promise<void> {
   if (!url) return;
 
   try {
     const response = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text }),
+      body: JSON.stringify(payload),
       signal: AbortSignal.timeout(5000),
     });
-    if (!response.ok) console.error("mirror: mattermost", response.status);
+    if (!response.ok) console.error("mirror: webhook", response.status, await response.text());
   } catch (cause) {
-    console.error("mirror: mattermost", cause);
+    console.error("mirror: webhook", cause);
   }
 }
 

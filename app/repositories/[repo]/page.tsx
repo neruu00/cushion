@@ -14,6 +14,7 @@ import { addMember, removeMember } from "@/actions/repository";
 import { ActionForm } from "@/components/ActionForm";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { WebhookDialog } from "@/components/WebhookDialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { getAccessibleRepo, getSessionEmail } from "@/lib/authz";
@@ -77,34 +78,48 @@ export default async function RepoPage({ params }: PageProps<"/repositories/[rep
 
   return (
     <main className="mx-auto w-full max-w-3xl space-y-8 p-8">
-      <header className="space-y-1">
-        <h1 className="font-mono text-xl font-semibold">{repo.slug}</h1>
-        <p className="text-sm text-muted-foreground">
-          {repo.name}
-          {repo.github_full_name ? (
-            <>
-              {" · "}
-              <a
-                href={`https://github.com/${repo.github_full_name}`}
-                className="underline underline-offset-4"
-                target="_blank"
-                rel="noreferrer"
-              >
-                {repo.github_full_name}
-              </a>
-            </>
-          ) : null}
-        </p>
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <div className="space-y-1">
+          <h1 className="font-mono text-xl font-semibold">{repo.slug}</h1>
+          <p className="text-sm text-muted-foreground">
+            {repo.name}
+            {repo.github_full_name ? (
+              <>
+                {" · "}
+                <a
+                  href={`https://github.com/${repo.github_full_name}`}
+                  className="underline underline-offset-4"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {repo.github_full_name}
+                </a>
+              </>
+            ) : null}
+            {" · "}
+            {/* 붙어 있으면 어디에 붙었는지 보여준다 — 없을 때만 알리면 확인할 방법이 없다 */}
+            {[
+              repo.mattermost_webhook_url ? "Mattermost" : null,
+              repo.discord_webhook_url ? "Discord" : null,
+            ]
+              .filter(Boolean)
+              .join(" · ") || "알림 채널 없음"}
+          </p>
+        </div>
+        <WebhookDialog
+          repositoryId={repo.id}
+          mattermostWebhookUrl={repo.mattermost_webhook_url}
+          discordWebhookUrl={repo.discord_webhook_url}
+        />
       </header>
 
       {/* 이 도구가 존재하는 이유를 그 레포의 숫자로 보여준다. 추정이라고 명시한다. */}
       {savings && savings.savedTokens > 0 ? (
         <section className="rounded-lg border bg-muted/30 p-4 text-sm">
           <p>
-            에이전트가 이 레포의 문서를 전부 읽으면 <strong>~{fmt(savings.controlTokens)} tok</strong>
-            . 목차 1회 + 작업당 섹션 1개면{" "}
-            <strong>~{fmt(savings.outlineTokens + savings.perTaskTokens)} tok</strong> — 세션당{" "}
-            <strong>~{fmt(savings.savedTokens)} tok</strong> 아낀다.
+            에이전트가 이 레포의 문서를 전부 읽으면 <strong>~{fmt(savings.controlTokens)} tok</strong>.
+            목차 1회 + 작업당 섹션 1개면 <strong>~{fmt(savings.outlineTokens + savings.perTaskTokens)} tok</strong> —
+            세션당 <strong>~{fmt(savings.savedTokens)} tok</strong> 아낀다.
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
             추정 · {savings.ratio.toFixed(1)}배 · 문서 {documents.length}개 기준. 목차는 세션당

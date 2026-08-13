@@ -14,13 +14,27 @@ interface FieldProps {
   placeholder?: string;
   type?: string;
   required?: boolean;
+  defaultValue?: string;
 }
 
-export function Field({ name, label, placeholder, type = "text", required }: FieldProps) {
+export function Field({
+  name,
+  label,
+  placeholder,
+  type = "text",
+  required,
+  defaultValue,
+}: FieldProps) {
   return (
     <Label className="grid gap-1.5">
       <span>{label}</span>
-      <Input name={name} type={type} placeholder={placeholder} required={required} />
+      <Input
+        name={name}
+        type={type}
+        placeholder={placeholder}
+        required={required}
+        defaultValue={defaultValue}
+      />
     </Label>
   );
 }

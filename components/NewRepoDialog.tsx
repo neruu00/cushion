@@ -33,7 +33,7 @@ export function NewRepoDialog() {
           <DialogTitle>새 레포</DialogTitle>
           <DialogDescription>
             slug는 소문자·숫자·하이픈. 만든 사람이 첫 멤버가 되고, 팀원은 레포 화면에서
-            초대한다. 나머지는 나중에 채워도 된다.
+            초대한다. 웹훅은 나중에 채워도 된다.
           </DialogDescription>
         </DialogHeader>
 
@@ -49,6 +49,11 @@ export function NewRepoDialog() {
             name="mattermost_webhook_url"
             label="Mattermost webhook (선택)"
             placeholder="https://…/hooks/…"
+          />
+          <Field
+            name="discord_webhook_url"
+            label="Discord webhook (선택)"
+            placeholder="https://discord.com/api/webhooks/…"
           />
         </ActionForm>
       </DialogContent>

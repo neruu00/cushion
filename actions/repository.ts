@@ -12,7 +12,7 @@ import { revalidatePath } from "next/cache";
 
 import type { SecretState } from "@/lib/action.type";
 import { getSessionEmail, isAdmin, isMember } from "@/lib/authz";
-import { createRepositorySchema, memberSchema } from "@/lib/repository.schema";
+import { createRepositorySchema, memberSchema, webhooksSchema } from "@/lib/repository.schema";
 import { setupFiles } from "@/lib/snippets";
 import { supabase } from "@/lib/supabase";
 
@@ -96,6 +96,50 @@ export async function addMember(_prev: SecretState, formData: FormData): Promise
   revalidatePath("/admin");
   revalidatePath("/dashboard");
   return { success: true };
+}
+
+/** 이미 만든 레포의 알림 채널 갱신. 권한은 멤버 관리와 같은 문턱이다 (그 레포의 멤버). */
+export async function updateWebhooks(
+  _prev: SecretState,
+  formData: FormData,
+): Promise<SecretState> {
+  const email = await getSessionEmail();
+  if (!email) return { success: false, error: "로그인이 필요합니다." };
+
+  const parsed = webhooksSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return { success: false, error: parsed.error.issues[0].message };
+
+  const { repository_id, ...webhooks } = parsed.data;
+  if (!(await canManageMembers(email, repository_id))) {
+    return { success: false, error: "이 레포의 멤버만 바꿀 수 있습니다." };
+  }
+
+  // slug를 되받아 재검증에 쓴다 — 폼이 준 값을 믿고 경로를 만들지 않는다.
+  const { data, error } = await supabase
+    .from("repositories")
+    .update(webhooks)
+    .eq("id", repository_id)
+    .select("slug")
+    .single();
+
+  if (error || !data) {
+    console.error("updateWebhooks", error);
+    return { success: false, error: "저장에 실패했습니다." };
+  }
+
+  revalidatePath(`/repositories/${data.slug}`);
+  revalidatePath("/admin");
+
+  const connected = [
+    webhooks.mattermost_webhook_url ? "Mattermost" : null,
+    webhooks.discord_webhook_url ? "Discord" : null,
+  ].filter(Boolean);
+  return {
+    success: true,
+    data: {
+      hint: connected.length > 0 ? `저장됐다 — ${connected.join(" · ")}` : "저장됐다 — 연결 없음",
+    },
+  };
 }
 
 /**

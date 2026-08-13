@@ -200,6 +200,33 @@ try {
     "멤버 관리가 멤버십 기준이다 (소스)",
     repoActions.includes("canManageMembers") && repoActions.includes("isMember"),
   );
+  check(
+    "웹훅 갱신도 같은 문턱을 쓴다 (소스)",
+    /updateWebhooks[\s\S]*?canManageMembers/.test(repoActions),
+  );
+
+  // 웹훅 — 저장·해제가 실제로 반영되나. 알림 실패는 조용하므로 여기서라도 붙잡는다.
+  await db
+    .from("repositories")
+    .update({
+      mattermost_webhook_url: "https://mm.example.com/hooks/x",
+      discord_webhook_url: "https://discord.com/api/webhooks/1/y",
+    })
+    .eq("id", selfRepo.id);
+  const withHooks = await page(`/repositories/${SLUG_SELF}`, outsiderCookie);
+  check(
+    "레포 화면이 붙은 채널을 보여준다",
+    withHooks.html.includes("Mattermost") && withHooks.html.includes("Discord"),
+  );
+
+  await db
+    .from("repositories")
+    .update({ mattermost_webhook_url: null, discord_webhook_url: null })
+    .eq("id", selfRepo.id);
+  check(
+    "연결이 없으면 없다고 말한다",
+    (await page(`/repositories/${SLUG_SELF}`, outsiderCookie)).html.includes("알림 채널 없음"),
+  );
 
   // ── SPEC §11.2 권한 ─────────────────────────────────────────────
   heading("§11.2 권한");

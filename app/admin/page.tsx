@@ -28,6 +28,7 @@ interface RepoRow {
   name: string;
   github_full_name: string | null;
   mattermost_webhook_url: string | null;
+  discord_webhook_url: string | null;
   repository_members: { email: string }[];
 }
 
@@ -37,7 +38,9 @@ export default async function AdminPage() {
 
   const { data, error } = await supabase
     .from("repositories")
-    .select("id, slug, name, github_full_name, mattermost_webhook_url, repository_members(email)")
+    .select(
+      "id, slug, name, github_full_name, mattermost_webhook_url, discord_webhook_url, repository_members(email)",
+    )
     .order("slug");
 
   if (error) console.error("AdminPage", error);
@@ -69,7 +72,9 @@ export default async function AdminPage() {
               <CardDescription>
                 {repo.name}
                 {repo.github_full_name ? ` · ${repo.github_full_name}` : ""}
-                {repo.mattermost_webhook_url ? " · webhook 설정됨" : " · webhook 없음"}
+                {repo.mattermost_webhook_url ? " · Mattermost" : ""}
+                {repo.discord_webhook_url ? " · Discord" : ""}
+                {!repo.mattermost_webhook_url && !repo.discord_webhook_url ? " · webhook 없음" : ""}
               </CardDescription>
             </CardHeader>
 
