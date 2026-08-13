@@ -5,7 +5,7 @@
  * 원본이 여기 있으므로 편집 링크가 있다 (D-011). GitHub 링크는 문서가 아니라
  * "관련 코드 레포"를 가리킨다 — 문서는 더 이상 그 레포에 없다.
  */
-import { ExternalLink, Pencil } from "lucide-react";
+import { ExternalLink, History, Pencil } from "lucide-react";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
@@ -60,6 +60,12 @@ export default async function DocumentPage({ params }: PageProps<"/[repo]/[...pa
             className="inline-flex items-center gap-1 underline underline-offset-4 hover:text-foreground"
           >
             편집 <Pencil className="size-3" />
+          </Link>
+          <Link
+            href={`/${repo.slug}/history/${doc.path}`}
+            className="inline-flex items-center gap-1 underline underline-offset-4 hover:text-foreground"
+          >
+            이력 <History className="size-3" />
           </Link>
           {source ? (
             <a

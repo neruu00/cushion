@@ -48,6 +48,14 @@ export default async function EditDocumentPage({ params }: PageProps<"/[repo]/ed
           </Link>
         </p>
         <h1 className="text-xl font-semibold">편집</h1>
+        <p className="text-xs text-muted-foreground">
+          <Link
+            href={`/${repo.slug}/history/${doc.path}`}
+            className="underline underline-offset-4 hover:text-foreground"
+          >
+            변경 이력
+          </Link>
+        </p>
       </header>
 
       <DocumentForm repo={repo.slug} path={doc.path} content={doc.content} sha={doc.content_sha} />
@@ -55,7 +63,7 @@ export default async function EditDocumentPage({ params }: PageProps<"/[repo]/ed
       <section className="space-y-2 border-t pt-4">
         <h2 className="text-sm font-medium">삭제</h2>
         <p className="text-sm text-muted-foreground">
-          이전 본문은 이력에 남는다. 목차에서만 사라진다.
+          이전 본문은 이력에 남고, 이력 화면에서 되돌릴 수 있다. 목차에서만 사라진다.
         </p>
         <form action={removeDocument}>
           <input type="hidden" name="repo" value={repo.slug} />

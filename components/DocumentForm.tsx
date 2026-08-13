@@ -4,14 +4,18 @@
  * @file components/DocumentForm.tsx
  * @description 문서 편집 폼. 원본이 Cushion에 있으므로 여기가 저장 지점이다 (D-011).
  *
- * `base_sha`를 숨겨서 들고 다니는 게 이 컴포넌트의 핵심이다. 저장에 성공하면 서버가 돌려준
- * 새 sha로 갈아끼운다 — 안 그러면 연속 저장의 두 번째가 자기 자신과 충돌한다.
+ * 두 가지가 이 컴포넌트의 존재 이유다:
+ *
+ * 1. **`base_sha`를 들고 다닌다.** 저장에 성공하면 서버가 준 새 sha로, 충돌하면 서버가 알려준
+ *    현재 sha로 갈아끼운다. 갈아끼우지 않으면 재시도가 영원히 같은 sha로 실패한다.
+ * 2. **textarea가 제어 컴포넌트다.** React 19는 form action이 끝나면 uncontrolled 입력을
+ *    초기화한다 — 그대로 두면 저장할 때마다 쓰던 글이 사라진다. 충돌했을 때 특히 치명적이다.
  */
 import { CircleAlert } from "lucide-react";
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 
 import { saveDocument } from "@/actions/document";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,7 +31,11 @@ interface DocumentFormProps {
 
 export function DocumentForm({ repo, path, content, sha }: DocumentFormProps) {
   const [state, formAction, pending] = useActionState(saveDocument, null);
-  const currentSha = state?.success ? (state.data?.sha ?? sha) : sha;
+  const [draft, setDraft] = useState(content);
+
+  const currentSha = state?.success
+    ? (state.data?.sha ?? sha)
+    : (state?.conflict?.sha ?? sha);
 
   return (
     <form action={formAction} className="space-y-4">
@@ -47,7 +55,8 @@ export function DocumentForm({ repo, path, content, sha }: DocumentFormProps) {
         <span className="text-sm">내용</span>
         <textarea
           name="content"
-          defaultValue={content}
+          value={draft}
+          onChange={(event) => setDraft(event.target.value)}
           required
           spellCheck={false}
           rows={28}
@@ -72,7 +81,33 @@ export function DocumentForm({ repo, path, content, sha }: DocumentFormProps) {
       {state?.success === false ? (
         <Alert variant="destructive">
           <CircleAlert />
-          <AlertDescription>{state.error}</AlertDescription>
+          <AlertTitle>{state.error}</AlertTitle>
+          {state.conflict ? (
+            <AlertDescription className="space-y-2">
+              {/* 병합하지 않는다. 사람이 두 본문을 보고 정한다 — 그게 유일하게 안전한 방법이다.
+                  base_sha는 이미 갱신됐으므로 지금 그대로 저장하면 내 내용이 이긴다. */}
+              <p>
+                쓰던 내용은 그대로 두었다. 아래 서버 본문과 비교하고, 그대로 저장하면 내 내용으로
+                덮어쓴다.
+              </p>
+              <details className="rounded-lg border bg-background/50">
+                <summary className="cursor-pointer px-3 py-1.5 text-sm">
+                  서버의 현재 내용 보기
+                </summary>
+                <pre className="max-h-80 overflow-auto px-3 pb-3 font-mono text-xs leading-relaxed">
+                  {state.conflict.content}
+                </pre>
+              </details>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setDraft(state.conflict?.content ?? draft)}
+              >
+                서버 내용으로 바꾸기 (내 수정 버림)
+              </Button>
+            </AlertDescription>
+          ) : null}
         </Alert>
       ) : null}
     </form>

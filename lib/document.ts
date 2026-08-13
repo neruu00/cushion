@@ -18,7 +18,14 @@ export type WriteFailure = "not_found" | "conflict" | "invalid" | "failed";
 
 export type WriteResult =
   | { ok: true; sha: string; eventId: number | null }
-  | { ok: false; code: WriteFailure; message: string; currentSha?: string };
+  | {
+      ok: false;
+      code: WriteFailure;
+      message: string;
+      /** 충돌일 때만. 이 둘이 있어야 호출부가 스스로 회복한다 */
+      currentSha?: string;
+      currentContent?: string;
+    };
 
 interface Existing {
   id: string;
@@ -58,6 +65,7 @@ export async function putDocument(input: {
       ok: false,
       code: "conflict",
       currentSha: existing.content_sha,
+      currentContent: existing.content,
       message: input.baseSha
         ? "그 사이 문서가 바뀌었다. spec_get으로 다시 읽고 새 sha로 다시 쓸 것"
         : "이미 있는 문서다. 덮어쓰려면 spec_get으로 받은 base_sha를 함께 보낼 것",
@@ -127,6 +135,7 @@ export async function deleteDocument(input: {
       ok: false,
       code: "conflict",
       currentSha: existing.content_sha,
+      currentContent: existing.content,
       message: "그 사이 문서가 바뀌었다. 다시 읽고 확인한 뒤 지울 것",
     };
   }

@@ -41,3 +41,9 @@ export const deleteDocumentSchema = z.object({
   base_sha: z.string().trim().max(64),
   note,
 });
+
+export const restoreSchema = z.object({
+  repo: z.string().trim().min(1),
+  path: documentPath,
+  version_id: z.coerce.number().int().positive(),
+});

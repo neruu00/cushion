@@ -295,6 +295,15 @@ try {
     (await tool("spec_get", { repo: SLUG_A, path: "TEMP.md" }, pat)).includes("그런 문서가 없다"),
   );
 
+  // 되돌리기 — 이력이 읽히는지까지 확인한다. 쓰기만 하고 못 꺼내면 없는 것과 같다.
+  const { data: restorable } = await db
+    .from("document_versions")
+    .select("id, content_sha")
+    .eq("repository_id", repos[SLUG_A])
+    .eq("path", "TEMP.md")
+    .maybeSingle();
+  check("삭제된 문서의 이력을 찾을 수 있다", Boolean(restorable));
+
   check(
     ".md가 아닌 경로는 거부",
     (await tool("spec_put", { repo: SLUG_A, path: "notes.txt", content: "x" }, pat)).includes(".md"),
