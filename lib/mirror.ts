@@ -43,12 +43,13 @@ export async function recordChange(
 ): Promise<number | null> {
   const summary = summarizeEdit(edit);
 
+  // note는 여기 넣지 않는다 — 원문은 document_versions.note에, 사람이 읽는 형태는
+  // summary 안에 이미 있다. 세 번째 사본은 드리프트 자리만 만든다.
   const { data, error } = await supabase
     .from("sync_events")
     .insert({
       repository_id: repo.id,
       author: edit.author,
-      message: edit.note ?? null,
       changed_paths: edit.after === null ? [] : [edit.path],
       deleted_paths: edit.after === null ? [edit.path] : [],
       summary,

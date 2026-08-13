@@ -58,4 +58,9 @@ alter table document_versions enable row level security;
 -- 레포가 미는 경로가 사라졌다. sync 토큰의 주체가 없다.
 -- alter table repositories drop column if exists sync_token_hash;
 
--- 위 두 줄의 주석을 풀어서 실행한다. 되돌릴 수 없다.
+-- 감사에서 확인: 읽는 곳이 0건인 컬럼.
+-- commit_sha는 D-011 잔재, message는 같은 내용이 document_versions.note와 summary에 있다.
+-- alter table sync_events drop column if exists commit_sha;
+-- alter table sync_events drop column if exists message;
+
+-- 위 주석을 풀어서 실행한다. 되돌릴 수 없다.
