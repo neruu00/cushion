@@ -14,11 +14,26 @@ import { repoFromSyncToken } from "@/lib/authz";
 import { buildSummary, documentTitle, notificationText } from "@/lib/summary";
 import { supabase } from "@/lib/supabase";
 import { syncPayloadSchema } from "@/lib/sync.schema";
-import { sha256 } from "@/lib/token";
+import { hashFromAuthHeader, sha256 } from "@/lib/token";
 
 export async function POST(request: NextRequest) {
-  const repo = await repoFromSyncToken(request.headers.get("authorization"));
-  if (!repo) return Response.json({ error: "unauthorized" }, { status: 401 });
+  const authorization = request.headers.get("authorization");
+  const repo = await repoFromSyncToken(authorization);
+
+  if (!repo) {
+    // CI가 읽을 메시지다. "unauthorized" 한 마디로 뭉개면 Secret이 비었는지, 종류를
+    // 잘못 넣었는지, 재발급 후 안 바꿨는지를 로그만 보고는 구분할 수 없다.
+    // 토큰은 이미 호출자가 들고 있는 값이므로 이 정도 구분은 아무것도 흘리지 않는다.
+    const wellFormed = hashFromAuthHeader(authorization, "sync") !== null;
+    return Response.json(
+      {
+        error: wellFormed
+          ? "이 sync 토큰으로 등록된 레포가 없다. /admin에서 재발급했다면 CI Secret도 갱신할 것"
+          : "Authorization 헤더에 `Bearer cshn_sync_...` 가 필요하다. Secret이 비었거나 access 토큰(cshn_pat_)을 넣었을 수 있다",
+      },
+      { status: 401 },
+    );
+  }
 
   let body: unknown;
   try {

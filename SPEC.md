@@ -87,7 +87,7 @@ Cushion이 GitHub API를 당기면 GitHub App/PAT·권한 설정·레이트리�
 
 ```
 on:
-  push:        paths: ['.specs/**', 'AGENTS.md', 'CLAUDE.md']
+  push:        paths: ['**.md']      # 누락이 소음보다 나쁘다. 시끄러워지면 그때 좁힌다
   workflow_dispatch:   # 전체 동기화용
 
 jobs:
