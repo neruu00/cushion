@@ -26,11 +26,11 @@ interface EventRow {
   deleted_paths: string[] | null;
 }
 
-export default async function RepoPage({ params }: PageProps<"/[repo]">) {
+export default async function RepoPage({ params }: PageProps<"/repositories/[repo]">) {
   const { repo: slug } = await params;
 
   const email = await getSessionEmail();
-  if (!email) redirect(`/api/auth/signin?callbackUrl=${encodeURIComponent(`/${slug}`)}`);
+  if (!email) redirect(`/api/auth/signin?callbackUrl=${encodeURIComponent(`/repositories/${slug}`)}`);
 
   // 권한이 없으면 404다. 403은 "그 레포가 존재한다"를 알려준다 (SPEC §6).
   const repo = await getAccessibleRepo(email, slug);
@@ -82,7 +82,7 @@ export default async function RepoPage({ params }: PageProps<"/[repo]">) {
         <div className="flex items-center justify-between gap-4">
           <h2 className="text-sm font-medium">문서</h2>
           <Link
-            href={`/${repo.slug}/new`}
+            href={`/repositories/${repo.slug}/new`}
             className="text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
           >
             새 문서
@@ -97,7 +97,7 @@ export default async function RepoPage({ params }: PageProps<"/[repo]">) {
             {documents.map((doc) => (
               <li key={doc.path}>
                 <Link
-                  href={`/${repo.slug}/${doc.path}`}
+                  href={`/repositories/${repo.slug}/${doc.path}`}
                   className="flex items-center justify-between gap-4 px-3 py-2 hover:bg-muted/40"
                 >
                   <span className="min-w-0">
@@ -140,7 +140,7 @@ export default async function RepoPage({ params }: PageProps<"/[repo]">) {
                         (path) => (
                           <Link
                             key={path}
-                            href={`/${repo.slug}/history/${path}`}
+                            href={`/repositories/${repo.slug}/history/${path}`}
                             className="font-mono text-muted-foreground underline underline-offset-4 hover:text-foreground"
                           >
                             {path} 변경 내역
@@ -155,6 +155,7 @@ export default async function RepoPage({ params }: PageProps<"/[repo]">) {
           </ul>
         )}
       </section>
+
     </main>
   );
 }

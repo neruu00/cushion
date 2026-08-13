@@ -23,13 +23,13 @@ interface VersionRow {
   created_at: string;
 }
 
-export default async function HistoryPage({ params }: PageProps<"/[repo]/history/[...path]">) {
+export default async function HistoryPage({ params }: PageProps<"/repositories/[repo]/history/[...path]">) {
   const { repo: slug, path } = await params;
   const docPath = path.join("/");
 
   const email = await getSessionEmail();
   if (!email) {
-    redirect(`/api/auth/signin?callbackUrl=${encodeURIComponent(`/${slug}/history/${docPath}`)}`);
+    redirect(`/api/auth/signin?callbackUrl=${encodeURIComponent(`/repositories/${slug}/history/${docPath}`)}`);
   }
 
   const repo = await getAccessibleRepo(email, slug);
@@ -67,12 +67,12 @@ export default async function HistoryPage({ params }: PageProps<"/[repo]/history
     <main className="mx-auto w-full max-w-3xl space-y-6 p-8">
       <header className="space-y-1">
         <p className="text-xs text-muted-foreground">
-          <Link href={`/${repo.slug}`} className="font-mono hover:text-foreground">
+          <Link href={`/repositories/${repo.slug}`} className="font-mono hover:text-foreground">
             {repo.slug}
           </Link>
           {" / "}
           {live ? (
-            <Link href={`/${repo.slug}/${docPath}`} className="font-mono hover:text-foreground">
+            <Link href={`/repositories/${repo.slug}/${docPath}`} className="font-mono hover:text-foreground">
               {docPath}
             </Link>
           ) : (

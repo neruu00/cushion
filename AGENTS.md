@@ -25,7 +25,7 @@ spec_get(repo:"cushion", path:"SPEC.md", heading:"6. 인증 · 권한")
 ```
 
 붙어 있지 않다면 `/settings/tokens`에서 발급하고 명령 한 줄을 실행한다.
-웹으로는 <https://cushion-chi.vercel.app/cushion>.
+웹으로는 <https://cushion-chi.vercel.app/repositories/cushion>.
 
 **이 문서(`AGENTS.md`)와 `CLAUDE.md`는 레포에 남는다.** Claude Code가 세션 시작에 자동으로
 읽는 파일이라 Cushion에 두면 아무도 규칙을 안 읽는다 — 붙기 *전에* 필요한 문서다.
