@@ -9,7 +9,7 @@
  * `spec_get`의 `if_none_match`와 정확히 대칭이다.
  */
 import { getAccessibleRepo } from "@/lib/authz";
-import { recordChange, recordVersion } from "@/lib/mirror";
+import { advanceCursor, recordChange, recordVersion } from "@/lib/mirror";
 import { supabase } from "@/lib/supabase";
 import { documentTitle } from "@/lib/summary";
 import { sha256 } from "@/lib/token";
@@ -17,7 +17,7 @@ import { sha256 } from "@/lib/token";
 export type WriteFailure = "not_found" | "conflict" | "invalid" | "failed";
 
 export type WriteResult =
-  | { ok: true; sha: string; eventId: number | null }
+  | { ok: true; sha: string; eventId: number | null; repositoryId: string }
   | {
       ok: false;
       code: WriteFailure;
@@ -56,6 +56,8 @@ export async function putDocument(input: {
   content: string;
   baseSha?: string;
   note?: string | null;
+  /** MCP로 들어온 경우의 토큰 id. 주면 쓴 사람의 커서를 같이 전진시킨다 */
+  tokenId?: string;
 }): Promise<WriteResult> {
   const { repo, existing } = await resolve(input.email, input.repo, input.path);
   if (!repo) return { ok: false, code: "not_found", message: `그런 레포가 없다: ${input.repo}` };
@@ -115,8 +117,9 @@ export async function putDocument(input: {
     author: input.email,
     note: input.note,
   });
+  if (input.tokenId && eventId !== null) await advanceCursor(input.tokenId, repo.id, eventId);
 
-  return { ok: true, sha, eventId };
+  return { ok: true, sha, eventId, repositoryId: repo.id };
 }
 
 export async function deleteDocument(input: {
@@ -125,6 +128,7 @@ export async function deleteDocument(input: {
   path: string;
   baseSha: string;
   note?: string | null;
+  tokenId?: string;
 }): Promise<WriteResult> {
   const { repo, existing } = await resolve(input.email, input.repo, input.path);
   if (!repo) return { ok: false, code: "not_found", message: `그런 레포가 없다: ${input.repo}` };
@@ -163,6 +167,7 @@ export async function deleteDocument(input: {
     author: input.email,
     note: input.note,
   });
+  if (input.tokenId && eventId !== null) await advanceCursor(input.tokenId, repo.id, eventId);
 
-  return { ok: true, sha: existing.content_sha, eventId };
+  return { ok: true, sha: existing.content_sha, eventId, repositoryId: repo.id };
 }

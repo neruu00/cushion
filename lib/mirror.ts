@@ -92,3 +92,29 @@ async function notifyMattermost(repositoryId: string, text: string): Promise<voi
     console.error("mirror: mattermost", cause);
   }
 }
+
+/**
+ * 쓴 사람의 구독 커서를 방금 만든 이벤트까지 밀어 준다.
+ *
+ * 안 하면 **자기가 쓴 변경 때문에 자기 다음 호출에 `[stale]`이 붙는다.** 에이전트는 편집할
+ * 때마다 헛되이 `spec_changes_since`를 부르게 되는데, 그게 정확히 이 도구가 없애려는 낭비다.
+ * "안 밀렸으면 그 줄이 아예 없다"(D-005)를 지키려면 쓰기도 커서를 전진시켜야 한다.
+ *
+ * 웹 편집에는 토큰이 없다 — 그때는 부르지 않는다.
+ */
+export async function advanceCursor(
+  tokenId: string,
+  repositoryId: string,
+  eventId: number,
+): Promise<void> {
+  const { error } = await supabase.from("token_cursors").upsert(
+    {
+      token_id: tokenId,
+      repository_id: repositoryId,
+      last_event_id: eventId,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "token_id,repository_id" },
+  );
+  if (error) console.error("mirror: advanceCursor", error);
+}

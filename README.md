@@ -11,7 +11,7 @@ AI 스펙주도 개발용 **스펙 공유 계층**. 여러 레포가 함께 보�
 (작업 3건 기준, 목차 1회 + 필요한 섹션 1개씩). 목차는 세션당 한 번이라 작업이 늘수록 더 벌어진다.
 
 숫자를 여기 박아 두지 않는다 — 측정 대상이 이 레포의 문서라 문서가 자라면 같이 움직인다.
-`pnpm acceptance`가 그때그때 다시 잰다. 방법은 `PLAN.md` T-601.
+`pnpm acceptance`가 그때그때 다시 잰다. 방법은 Cushion의 `PLAN.md` T-601.
 
 ---
 
@@ -60,7 +60,7 @@ pnpm dev
 |---|---|
 | 개발 서버 | `pnpm dev` |
 | 전체 검증 | `pnpm verify` — 타입 + 린트 + 테스트 + 빌드 |
-| 인수 검증 | `pnpm acceptance` — `SPEC.md` §11을 실 DB로 관통 (dev 서버 필요) |
+| 인수 검증 | `pnpm acceptance` — SPEC §11을 실 DB로 관통 (dev 서버 필요) |
 
 ---
 
@@ -119,14 +119,19 @@ Next.js **16** App Router · Tailwind v4 + shadcn/ui · Supabase(Postgres) · Ne
 
 ## 문서
 
-| 문서 | 담는 것 |
-|---|---|
-| [`SPEC.md`](SPEC.md) | 무엇을·왜. 데이터 모델, MCP 툴 명세, 검증 항목 |
-| [`AGENTS.md`](AGENTS.md) | 코드를 읽어선 알기 어려운 규칙과 함정 |
-| [`PLAN.md`](PLAN.md) | 현재 상태, 다음 작업, **결정 로그** |
-| [`supabase/migrations/`](supabase/migrations) | DB 스키마의 원본 |
+**`SPEC.md`와 `PLAN.md`는 이 레포에 없다.** Cushion 자신이 갖고 있다 — 이 도구가
+실제로 쓸 만한지 스스로 겪어 보려고 그렇게 뒀다(dogfooding, D-011).
 
-기능을 제안하기 전에 `PLAN.md`의 결정 로그를 먼저 읽는다. LLM 요약·임베딩 검색·폴링 구독·
+| 문서 | 어디에 | 담는 것 |
+|---|---|---|
+| `SPEC.md` | [Cushion](https://cushion-chi.vercel.app/cushion/SPEC.md) | 무엇을·왜. 데이터 모델, MCP 툴 명세, 검증 항목 |
+| `PLAN.md` | [Cushion](https://cushion-chi.vercel.app/cushion/PLAN.md) | 현재 상태, 다음 작업, **결정 로그** |
+| [`AGENTS.md`](AGENTS.md) | 레포 | 코드를 읽어선 알기 어려운 규칙과 함정 |
+| [`supabase/migrations/`](supabase/migrations) | 레포 | DB 스키마의 원본 |
+
+**둘을 보려면 접근 권한이 필요하다.** 이게 이 설계의 비용이다 — 클론만으로는 스펙을 못 읽는다.
+
+기능을 제안하기 전에 Cushion의 `PLAN.md` 결정 로그를 먼저 읽는다. LLM 요약·임베딩 검색·폴링 구독·
 자동 병합은 이미 기각됐고, 각 항목에 근거와 재검토 조건이 같이 적혀 있다.
 **뒤집힌 결정(D-001 → D-011)도 지우지 않고 남겨 뒀다** — 무엇을 근거로 정했고 그 근거의
 어디가 틀렸는지가 남아야 같은 자리에서 같은 실수를 반복하지 않는다.

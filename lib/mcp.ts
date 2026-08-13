@@ -419,6 +419,14 @@ async function specChangesSince(context: McpContext, rawArgs: unknown): Promise<
 
 // ─── 쓰기 ────────────────────────────────────────────────────────────
 
+/** 방금 내가 만든 이벤트는 이미 본 것으로 친다. `advanceCursor`의 메모리 쪽 짝. */
+function markSeen(context: McpContext, repositoryId: string, eventId: number | null): void {
+  const state = context.state.get(repositoryId);
+  if (!state || eventId === null) return;
+  state.latest = Math.max(state.latest, eventId);
+  state.cursor = state.latest;
+}
+
 /**
  * 충돌은 에러로 돌려주되 **현재 sha를 같이 준다.** 그래야 에이전트가 사람을 부르지 않고
  * spec_get → 다시 편집 → spec_put 으로 스스로 회복한다.
@@ -434,12 +442,15 @@ async function specPut(context: McpContext, rawArgs: unknown): Promise<ToolResul
     content: args.data.content,
     baseSha: args.data.base_sha,
     note: args.data.note,
+    tokenId: context.identity.id,
   });
 
   if (!result.ok) {
     const current = result.currentSha ? ` 현재 sha:${result.currentSha}` : "";
     return { text: `${result.message}${current}`, isError: true };
   }
+  // DB뿐 아니라 이번 요청의 컨텍스트도 밀어 준다 — 안 그러면 방금 쓴 응답에 [stale]이 붙는다
+  markSeen(context, result.repositoryId, result.eventId);
   return { text: `저장했다 ${args.data.repo}/${args.data.path} sha:${result.sha}` };
 }
 
@@ -453,11 +464,13 @@ async function specDelete(context: McpContext, rawArgs: unknown): Promise<ToolRe
     path: args.data.path,
     baseSha: args.data.base_sha,
     note: args.data.note,
+    tokenId: context.identity.id,
   });
 
   if (!result.ok) {
     const current = result.currentSha ? ` 현재 sha:${result.currentSha}` : "";
     return { text: `${result.message}${current}`, isError: true };
   }
+  markSeen(context, result.repositoryId, result.eventId);
   return { text: `지웠다 ${args.data.repo}/${args.data.path}` };
 }

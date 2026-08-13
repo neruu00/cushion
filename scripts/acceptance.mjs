@@ -109,12 +109,17 @@ async function seed() {
   return byslug;
 }
 
-const docs = ["SPEC.md", "AGENTS.md", "PLAN.md"].map((path) => ({
+// 절감 실측의 대조군. SPEC·PLAN은 Cushion으로 옮겼으므로(D-011) 레포에 남은 실제 문서를 쓴다 —
+// 장난감 문서로 재면 숫자가 거짓말을 한다.
+const docs = ["README.md", "AGENTS.md"].map((path) => ({
   path,
   content: readFileSync(path, "utf8"),
 }));
 
 // ── 본편 ──────────────────────────────────────────────────────────────
+
+// 검증에 쓸 대표 문서. 파일 이름을 여기저기 박으면 fixture를 바꿀 때마다 같이 깨진다.
+const MAIN = docs[0].path;
 
 const repos = await seed();
 const memberCookie = await cookieFor(MEMBER);
@@ -218,28 +223,28 @@ try {
     .eq("repository_id", repos[SLUG_A]);
   check("spec_put으로 넣은 문서가 남아 있다", seeded === docs.length, `${seeded}건`);
 
-  const readBack = await tool("spec_get", { repo: SLUG_A, path: "SPEC.md" }, pat);
+  const readBack = await tool("spec_get", { repo: SLUG_A, path: MAIN }, pat);
   const seedSha = /sha:([0-9a-f]+)/.exec(readBack)?.[1] ?? "";
   check("sha를 돌려준다", seedSha.length === 64);
 
   // 낙관적 잠금 — 이 검사가 이 모델 전체를 지탱한다
   const stale = await tool(
     "spec_put",
-    { repo: SLUG_A, path: "SPEC.md", content: "덮어쓰기", base_sha: "0".repeat(64) },
+    { repo: SLUG_A, path: MAIN, content: "덮어쓰기", base_sha: "0".repeat(64) },
     pat,
   );
   const { data: untouched } = await db
     .from("documents")
     .select("content_sha")
     .eq("repository_id", repos[SLUG_A])
-    .eq("path", "SPEC.md")
+    .eq("path", MAIN)
     .maybeSingle();
   check("낡은 base_sha → 거부하고 현재 sha를 알려준다", stale.includes(seedSha), stale.slice(0, 60));
   check("거부됐으면 본문이 그대로다", untouched?.content_sha === seedSha);
 
   check(
     "base_sha 없이 기존 문서를 덮으려 하면 거부",
-    (await tool("spec_put", { repo: SLUG_A, path: "SPEC.md", content: "x" }, pat)).includes("base_sha"),
+    (await tool("spec_put", { repo: SLUG_A, path: MAIN, content: "x" }, pat)).includes("base_sha"),
   );
 
   // 정상 수정 → 이력이 남는다
@@ -251,14 +256,14 @@ try {
 `;
   await tool(
     "spec_put",
-    { repo: SLUG_A, path: "SPEC.md", content: edited, base_sha: seedSha, note: "섹션 추가" },
+    { repo: SLUG_A, path: MAIN, content: edited, base_sha: seedSha, note: "섹션 추가" },
     pat,
   );
   const { data: versions } = await db
     .from("document_versions")
     .select("content_sha, author, note")
     .eq("repository_id", repos[SLUG_A])
-    .eq("path", "SPEC.md")
+    .eq("path", MAIN)
     .order("id", { ascending: false });
   check("수정하면 이전 본문이 이력에 남는다", versions?.[0]?.content_sha === seedSha, `${versions?.length ?? 0}건`);
   check("이력에 작성자와 메모가 있다", versions?.[0]?.author === MEMBER && versions?.[0]?.note === "섹션 추가");
@@ -267,7 +272,7 @@ try {
     .from("documents")
     .select("content, updated_by")
     .eq("repository_id", repos[SLUG_A])
-    .eq("path", "SPEC.md")
+    .eq("path", MAIN)
     .maybeSingle();
   check("본문이 실제로 바뀌었다", afterEdit?.content === edited);
   check("누가 고쳤는지 남는다", afterEdit?.updated_by === MEMBER);
@@ -327,13 +332,13 @@ try {
   );
 
   const outline = await tool("spec_outline", {}, pat);
-  const full = await tool("spec_get", { repo: SLUG_A, path: "SPEC.md" }, pat);
+  const full = await tool("spec_get", { repo: SLUG_A, path: MAIN }, pat);
   const sha = /sha:([0-9a-f]+)/.exec(full)?.[1] ?? "";
   check(
     "if_none_match 일치 → 본문 대신 unchanged",
-    (await tool("spec_get", { repo: SLUG_A, path: "SPEC.md", if_none_match: sha }, pat)).trim() === "unchanged",
+    (await tool("spec_get", { repo: SLUG_A, path: MAIN, if_none_match: sha }, pat)).trim() === "unchanged",
   );
-  check("spec_search가 섹션을 짚는다", (await tool("spec_search", { query: "데이터 모델" }, pat)).includes("SPEC.md"));
+  check("spec_search가 섹션을 짚는다", (await tool("spec_search", { query: "코드 규칙" }, pat)).includes("/"));
 
   // ── SPEC §11.4 구독 ─────────────────────────────────────────────
   heading("§11.4 구독");
@@ -341,12 +346,12 @@ try {
   check("최신 상태에서는 [stale]이 없다", !outline.includes("[stale]"));
 
   // 다른 세션(editorPat)이 고친다 — pat의 커서는 그대로이므로 밀린 상태가 된다
-  const beforeEdit = await tool("spec_get", { repo: SLUG_A, path: "SPEC.md" }, editorPat);
+  const beforeEdit = await tool("spec_get", { repo: SLUG_A, path: MAIN }, editorPat);
   await tool(
     "spec_put",
     {
       repo: SLUG_A,
-      path: "SPEC.md",
+      path: MAIN,
       content: `${edited}\n\n## 남이 고친 섹션\n\n추가.\n`,
       base_sha: /sha:([0-9a-f]+)/.exec(beforeEdit)?.[1],
       note: "다른 사람이 스펙을 고쳤다",
@@ -356,7 +361,7 @@ try {
   check("남이 고친 뒤 → 다음 툴 응답에 [stale]", (await tool("spec_outline", {}, pat)).includes("[stale]"));
 
   const changes = await tool("spec_changes_since", {}, pat);
-  check("spec_changes_since가 요약을 준다", changes.includes("SPEC.md"));
+  check("spec_changes_since가 요약을 준다", changes.includes(MAIN));
   check("커서 전진 → [stale]이 사라진다", !(await tool("spec_outline", {}, pat)).includes("[stale]"));
 
   // ── 내보내기 (git을 버린 뒤의 유일한 탈출구) ────────────────────
@@ -382,7 +387,7 @@ try {
   heading("§11.1 토큰 절감 (T-601)");
 
   const control = docs.reduce((sum, d) => sum + d.content.length, 0);
-  console.log(`  대조군: 스펙 3개 전량 로드  ${control.toLocaleString()}자`);
+  console.log(`  대조군: 문서 ${docs.length}개 전량 로드  ${control.toLocaleString()}자  (${docs.map((d) => d.path).join(", ")})`);
   console.log(`  실험군: spec_outline 1회 + 작업당 필요한 섹션 1개  (outline ${outline.length.toLocaleString()}자)\n`);
 
   // 헤딩 문자열을 박아 두지 않는다 — 문서가 바뀌면 같이 틀어진다. outline에서 찾는다.
@@ -394,9 +399,9 @@ try {
   }
 
   const tasks = [
-    ["토큰 발급 규칙을 확인한다", "인증"],
-    ["MCP 툴 인자를 확인한다", "MCP 서버"],
     ["파일명 규칙을 확인한다", "코드 규칙"],
+    ["커밋해도 되는지 확인한다", "작업 방식"],
+    ["에이전트를 붙이는 법을 확인한다", "에이전트 붙이기"],
   ];
 
   let experiment = outline.length;

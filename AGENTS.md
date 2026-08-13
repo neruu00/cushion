@@ -16,7 +16,19 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 AI 스펙주도 개발용 스펙 공유 계층. 여러 레포가 함께 보는 스펙 문서를 한곳에 두고, 팀에는 변경 알림을 보내고 에이전트에는 MCP로 **필요한 조각만** 읽고 쓰게 한다. 목적은 하나 — **에이전트가 같은 문서를 반복해서 컨텍스트에 싣느라 태우는 토큰을 줄이는 것.**
 
-무엇을 왜 만드는지는 `SPEC.md`. 현재 상태와 다음 작업은 `PLAN.md`. 이 문서는 **코드에서 읽어낼 수 없는 규칙과 함정**만 담는다.
+**`SPEC.md`와 `PLAN.md`는 이 레포에 없다.** Cushion 자신이 갖고 있다(D-011) —
+MCP 서버 `cushion`으로 읽는다. 이 문서는 **코드에서 읽어낼 수 없는 규칙과 함정**만 담는다.
+
+```
+spec_outline               # 목차부터
+spec_get(repo:"cushion", path:"SPEC.md", heading:"6. 인증 · 권한")
+```
+
+붙어 있지 않다면 `/settings/tokens`에서 발급하고 명령 한 줄을 실행한다.
+웹으로는 <https://cushion-chi.vercel.app/cushion>.
+
+**이 문서(`AGENTS.md`)와 `CLAUDE.md`는 레포에 남는다.** Claude Code가 세션 시작에 자동으로
+읽는 파일이라 Cushion에 두면 아무도 규칙을 안 읽는다 — 붙기 *전에* 필요한 문서다.
 
 ---
 
@@ -113,7 +125,7 @@ export async function createRepository(formData: FormData) {
 
 ## 들여오지 않는 것
 
-기각 이유는 `PLAN.md` 결정 로그에 있다. **다시 제안하기 전에 그걸 읽어라.**
+기각 이유는 Cushion의 `PLAN.md` 결정 로그에 있다. **다시 제안하기 전에 `spec_get`으로 읽어라.**
 
 - **LLM diff 요약** — 요약 모델은 본문만 보므로 "어느 코드가 영향받는지" 판단이 추측이 된다. 구조적 요약(경로 + 섹션 + 증감)으로 간다 (D-002)
 - **git 동기화 / sync 토큰** — 원본이 Cushion이다. 되살리면 원본이 둘이 된다 (D-011)
@@ -192,14 +204,17 @@ UI는 shadcn/ui(base·nova = Base UI + Lucide + Geist). 아이콘은 **`lucide-r
 
 - **이 문서와 어긋나는 코드를 발견하면 고치기 전에 알린다.** 문서가 틀렸을 수도 있다
 - **SPEC과 코드가 다르면 코드가 정답이다.** 문서를 고치고, 고쳤다고 알린다
-- 즉석에서 해결하기 어려운 문제를 발견하면 `PLAN.md`에 항목으로 남긴다. 조용히 넘기지 않는다
+- 즉석에서 해결하기 어려운 문제를 발견하면 **Cushion의 `PLAN.md`에** 항목으로 남긴다(`spec_put`). 조용히 넘기지 않는다
 - 규칙에 예외를 두어야 한다면 **이유를 코드 주석에 남긴다**
 
 ## 참고 문서
 
-| 문서 | 내용 |
-|---|---|
-| `SPEC.md` | 무엇을·왜. 데이터 모델, MCP 툴 명세, 검증 항목 |
-| `PLAN.md` | 현재 상태, 다음 작업, **결정 로그** |
-| `supabase/migrations/` | **DB 스키마의 원본** |
-| `node_modules/next/dist/docs/` | 설치된 버전에 맞는 Next.js 문서 |
+| 문서 | 어디에 | 내용 |
+|---|---|---|
+| `SPEC.md` | **Cushion** | 무엇을·왜. 데이터 모델, MCP 툴 명세, 검증 항목 |
+| `PLAN.md` | **Cushion** | 현재 상태, 다음 작업, **결정 로그** |
+| `README.md` | 레포 | 클론한 사람이 보는 첫 화면 |
+| `supabase/migrations/` | 레포 | **DB 스키마의 원본** |
+| `node_modules/next/dist/docs/` | 레포 | 설치된 버전에 맞는 Next.js 문서 |
+
+코드 주석의 `(SPEC §6)`·`(D-011)` 같은 인용은 그대로 유효하다 — 섹션 번호는 Cushion에서도 같다.
