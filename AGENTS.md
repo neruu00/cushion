@@ -27,8 +27,10 @@ AI 스펙주도 개발용 스펙 공유 계층. 각 프로젝트 git 레포의 `
 | 개발 서버 | `pnpm dev` (Turbopack, :3000) |
 | 타입 검사 | `pnpm typecheck` |
 | 린트 | `pnpm lint` |
+| 테스트 | `pnpm test` — `node --test`. 러너 없음, `*.test.ts` 직접 실행 |
+| 인수 검증 | `pnpm acceptance` — SPEC §11을 실 DB로 관통한다. **dev 서버가 떠 있어야 한다** |
 | 빌드 | `pnpm build` |
-| **전체 검증** | `pnpm verify` — 타입 + 린트 + 빌드 |
+| **전체 검증** | `pnpm verify` — 타입 + 린트 + 테스트 + 빌드 |
 
 패키지 매니저는 **pnpm 고정**. `pnpm verify`가 통과해야 작업이 끝난 것이다. 빌드가 깨진 채로 완료라고 보고하지 않는다.
 
