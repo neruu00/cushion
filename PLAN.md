@@ -250,13 +250,16 @@ plain Node가 import를 못 한다). 러너를 추가하는 대신 파일을 나
       한 줄로 내는 이유: 백슬래시 줄바꿈이 PowerShell·cmd에서 깨진다.
       `.mcp.json`(환경변수 확장) 경로는 팀 배포용으로 남겨 뒀다.
 
-- [ ] **T-701** Vercel 배포. **사람이 한다** — GitHub 연동 import.
-      Production 환경변수 7개(`.env.example`)와 GCP 리디렉션 URI
-      `https://<도메인>/api/auth/callback/google` 추가.
-      **`NEXTAUTH_URL`을 배포 도메인으로 반드시 넣을 것** — `baseUrl()`이 이 값으로
-      연결 명령·`.mcp.json`·워크플로의 `CUSHION_URL`을 만든다. 빠뜨리면 프로덕션 화면이
-      `localhost:3000`이 박힌 명령을 태연히 출력한다.
-      Preview는 URL이 매번 달라 OAuth 콜백이 어긋난다 — 환경변수는 Production 스코프에만.
+- [x] **T-701** Vercel 배포 완료 — **https://cushion-chi.vercel.app**
+      `CUSHION_URL=https://cushion-chi.vercel.app pnpm acceptance` 전부 통과.
+      배포본에서 확인한 것: `/api/mcp` GET 405 · 무토큰 POST 401, `/api/sync` 401,
+      `/admin` → signin 302, Google 콜백 URL이 배포 도메인.
+
+      **여기서 잡은 것 둘**:
+      ① 인수 스크립트가 HTTP 전용이었다. Auth.js는 HTTPS면 쿠키 이름에 `__Secure-`를
+      붙이고 그 이름을 JWT salt로도 쓴다 — 스킴에 따라 고르도록 고쳤다.
+      ② `NEXTAUTH_URL`을 빠뜨려도 NextAuth는 요청 호스트로 잘 돌아서 **스니펫만 조용히
+      localhost가 된다.** `baseUrl()`이 `VERCEL_PROJECT_PRODUCTION_URL`로 떨어지게 했다.
 
 - [ ] **T-703** 실 Claude Code로 접속 확인 (SPEC §11.5의 마지막 항목).
       **cushion 레포와 무관한 빈 디렉터리**에서 명령 실행 → `claude mcp list` → "스펙 목차 보여줘".
@@ -271,5 +274,6 @@ plain Node가 import를 못 한다). 러너를 추가하는 대신 파일을 나
 ## ❓ 미해결 질문
 
 1. **Cushion 자체의 스펙도 Cushion으로 관리하나?** (dogfooding) — T-3까지 끝나면 이 레포를 첫 등록 대상으로 삼는 게 자연스럽다
-2. **배포 도메인** — 정해지면 `NEXTAUTH_URL`, Google OAuth 리디렉션 URI, `.mcp.json` 템플릿 URL 3곳을 같이 갱신해야 한다
+2. ~~**배포 도메인**~~ — `https://cushion-chi.vercel.app` (T-701). 문서에는 도메인을 박지 않는다.
+   스니펫 URL은 `baseUrl()`이 런타임에 만들고, 다른 사람이 자기 인스턴스를 띄울 수 있어야 한다
 3. **레포가 여러 개가 아니면 Cushion이 필요한가?** — `SPEC.md` §2 전제 참조. ①교차 조회 ②GitHub 접근권 없는 독자, 둘 다 아니면 로컬 MCP + GitHub Action으로 충분하다
