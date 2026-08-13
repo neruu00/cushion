@@ -345,8 +345,12 @@ npx shadcn@latest add button input card table badge dialog dropdown-menu sonner 
 
 ### 마크다운 렌더는 서버에서
 
-`react-markdown` + `remark-gfm` + `rehype-highlight`를 **서버 컴포넌트**에서 실행 → 클라이언트 번들 0.
+`react-markdown` + `remark-gfm`을 **서버 컴포넌트**에서 실행 → 클라이언트 번들 0.
 본문 타이포는 `@tailwindcss/typography`의 `prose`.
+
+**`rehype-highlight`는 v1에 넣지 않는다.** 스펙 문서는 대부분 산문이고, 코드 하이라이팅을 켜면
+highlight.js와 테마 CSS가 값어치보다 먼저 딸려온다. 코드 블록이 실제로 읽기 힘들어지면 그때
+플러그인 한 줄로 붙인다.
 
 ### 그 외
 

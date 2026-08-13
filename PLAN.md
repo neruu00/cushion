@@ -15,6 +15,7 @@
 **결정**: 문서 CRUD API·편집 UI·버전 이력 테이블·낙관적 잠금·충돌 해결을 만들지 않는다.
 
 **근거**:
+
 - 버전관리·diff·이력·리뷰(PR)·병합을 git이 이미 공짜로 한다. DB 기반 문서 저장소를 얹으면 git을 더 못하게 다시 만드는 것이다
 - 스펙 작성자가 전원 개발자다. 웹 에디터의 수요가 없다
 - 에이전트 쓰기 = 파일 편집 + PR. 이미 되는 것이라 만들 게 없다
@@ -27,6 +28,7 @@
 **결정**: `sync_events.summary`는 **변경 경로 + 바뀐 `##` 헤딩 + 증감 줄 수 + 커밋 메시지**로 구조적으로 생성한다.
 
 **근거**:
+
 - 요약 모델이 보는 건 diff 텍스트뿐이다. **"어느 코드가 영향받는지"를 알 수 없다** — 판단이 추측이 되고, 틀린 추측 한 번이면 알림을 안 읽게 된다
 - 에이전트 쪽은 더 분명하다. `spec_changes_since`가 산문 요약을 줘도 실제 내용은 `spec_get`으로 다시 가져와야 한다. **경로+헤딩 목록이 요약보다 싸고 더 유용하다** — outline-first와 같은 논리
 - 스펙 diff는 산문이라 짧으면 원문이 그 자체로 읽힌다
@@ -89,21 +91,22 @@ plain Node가 import를 못 한다). 러너를 추가하는 대신 파일을 나
 
 ## ✅ 완료 (2026-08-13)
 
-| 항목 | 산출물 |
-|---|---|
-| 스펙 확정 | `SPEC.md` |
-| 규칙 문서화 | `AGENTS.md` (`CLAUDE.md`가 import) |
-| Next 16 스캐폴딩 | App Router / TS / Tailwind v4, `pnpm verify` 통과 |
-| shadcn/ui 초기화 | base·nova (Base UI + Lucide + Geist), `components.json` |
-| 의존성 | `@supabase/supabase-js`, `next-auth@5.0.0-beta.32`, `zod@4` |
-| 스크립트 | `typecheck`, `verify` 추가 |
-| 초기 스키마 SQL | `supabase/migrations/0001_init.sql` |
-| 환경변수 | `.env.local` 전 항목 채움, `.env.example` 커밋 |
-| DB 마이그레이션 실행 | 6개 테이블 실재 확인 (T-001) |
-| 기반 레이어 | `lib/supabase.ts` · `auth.ts` · `authz.ts` · `token.ts` · `proxy.ts` (T-101~105) |
-| 관리 화면 | `/admin` · `/settings/tokens` · 설치 스니펫 출력 (T-201~203) |
-| 동기화 수신 | `POST /api/sync` · 구조적 요약 · 전체 동기화 (T-301·302·304) |
-| MCP 서버 | `POST /api/mcp` · 툴 4종 · 커서 구독 (T-401~404) |
+| 항목                 | 산출물                                                                           |
+| -------------------- | -------------------------------------------------------------------------------- |
+| 스펙 확정            | `SPEC.md`                                                                        |
+| 규칙 문서화          | `AGENTS.md` (`CLAUDE.md`가 import)                                               |
+| Next 16 스캐폴딩     | App Router / TS / Tailwind v4, `pnpm verify` 통과                                |
+| shadcn/ui 초기화     | base·nova (Base UI + Lucide + Geist), `components.json`                          |
+| 의존성               | `@supabase/supabase-js`, `next-auth@5.0.0-beta.32`, `zod@4`                      |
+| 스크립트             | `typecheck`, `verify` 추가                                                       |
+| 초기 스키마 SQL      | `supabase/migrations/0001_init.sql`                                              |
+| 환경변수             | `.env.local` 전 항목 채움, `.env.example` 커밋                                   |
+| DB 마이그레이션 실행 | 6개 테이블 실재 확인 (T-001)                                                     |
+| 기반 레이어          | `lib/supabase.ts` · `auth.ts` · `authz.ts` · `token.ts` · `proxy.ts` (T-101~105) |
+| 관리 화면            | `/admin` · `/settings/tokens` · 설치 스니펫 출력 (T-201~203)                     |
+| 동기화 수신          | `POST /api/sync` · 구조적 요약 · 전체 동기화 (T-301·302·304)                     |
+| MCP 서버             | `POST /api/mcp` · 툴 4종 · 커서 구독 (T-401~404)                                 |
+| 읽기 화면            | `/` · `/[repo]` · `/[repo]/[...path]` · 헤더 (T-501·502)                         |
 
 ---
 
@@ -126,9 +129,9 @@ plain Node가 import를 못 한다). 러너를 추가하는 대신 파일을 나
       `jwt` 콜백에서 이메일 lowercase, `name`·`picture`는 쿠키에서 제거
 - [x] **T-103** `lib/authz.ts` — `getSessionEmail()`, `isAdminEmail()`/`isAdmin()`(**비면 false**),
       `getMemberRepoIds()`, `getAccessibleRepos()`, `getAccessibleRepo()`,
-      `emailFromAccessToken()`, `repoFromSyncToken()`
-      *`assertRepoAccess()` 대신 `getAccessibleRepo(email, slug) → Repo | null`.*
-      *호출부가 null을 404로 처리한다 — 던지면 403/404 구분이 호출부에서 사라진다*
+      `identityFromAccessToken()`(T-4에서 개명 — 커서가 토큰 id에 매달린다), `repoFromSyncToken()`
+      _`assertRepoAccess()` 대신 `getAccessibleRepo(email, slug) → Repo | null`._
+      _호출부가 null을 404로 처리한다 — 던지면 403/404 구분이 호출부에서 사라진다_
 - [x] **T-104** `lib/token.ts` — 발급(`cshn_pat_`/`cshn_sync_`) · `sha256` · `hashFromAuthHeader()`.
       평문은 `generateToken` 반환값에만 존재. DB 조회·`last_used_at`은 `authz.ts` (D-008).
       `lib/token.test.ts`가 종류 분리를 검증한다
@@ -157,7 +160,7 @@ plain Node가 import를 못 한다). 러너를 추가하는 대신 파일을 나
 - [ ] **T-303** `cushion-sync.yml` **실측 검증** (템플릿은 T-202에서 `lib/snippets.ts`에 썼다).
       배포 URL이 있어야 하고 GitHub Actions에서만 돌릴 수 있다. 확인할 것:
       `fetch-depth: 0`, `changed`+`deleted` 둘 다, `before` all-zeros 폴백, diff 40KB 상한.
-      *로컬에 `jq`가 없어 워크플로 스크립트는 이 기계에서 돌려보지 못했다*
+      _로컬에 `jq`가 없어 워크플로 스크립트는 이 기계에서 돌려보지 못했다_
 
 ## 🔌 T-4. MCP
 
@@ -171,15 +174,21 @@ plain Node가 import를 못 한다). 러너를 추가하는 대신 파일을 나
 
 ## 🎨 T-5. 읽기 화면
 
-- [ ] **T-501** `/` 레포 목록 · `/[repo]` 문서 목록 + 변경 타임라인
-- [ ] **T-502** `/[repo]/[...path]` — 서버 컴포넌트에서 `react-markdown` 렌더, GitHub 원본 링크
+- [x] **T-501** `/` 레포 목록 · `/[repo]` 문서 목록 + 변경 타임라인.
+      타임라인은 `sync_events.summary`를 그대로 쓴다 — 알림·MCP 델타와 같은 문자열이다.
+      루트 레이아웃에 헤더(로그인·토큰·관리) 추가. 로그인/아웃은 링크가 아니라 폼 액션이다
+      (`/api/auth/*`는 페이지가 아니고, 로그아웃은 CSRF 보호되는 POST여야 한다)
+- [x] **T-502** `/[repo]/[...path]` — 서버 컴포넌트 `react-markdown` + `remark-gfm`.
+      GitHub 링크는 `blob/HEAD/…` — 브랜치를 저장하지 않으므로 기본 브랜치를 따라간다.
+      **`rehype-highlight`는 넣지 않았다** — 스펙은 대부분 산문이라 highlight.js + 테마 CSS가
+      값어치보다 먼저 온다. SPEC §9도 같이 고쳤다
 
 ## 🧪 T-6. 검증
 
 `SPEC.md` §11이 검증 항목의 원본이다. 특히:
 
 - [ ] **T-601** **토큰 절감 실측** — 대조군(전량 로드) vs 실험군(`spec_outline` + 필요한 섹션). **숫자가 안 나오면 이 도구는 존재 이유가 없다**
-- [ ] **T-602** 권한 매트릭스 손검증 8종 (SPEC §11.2) — 특히 *멤버 제거 → 기존 토큰 즉시 차단*, *sync 토큰으로 `/api/mcp` 호출 거부*
+- [ ] **T-602** 권한 매트릭스 손검증 8종 (SPEC §11.2) — 특히 _멤버 제거 → 기존 토큰 즉시 차단_, _sync 토큰으로 `/api/mcp` 호출 거부_
 - [ ] **T-603** 삭제 동기화 — 스펙 파일 삭제 push 후 미러에서도 사라지는지
 
 ---
