@@ -48,7 +48,7 @@ cp .env.example .env.local     # 값을 채운다
 RLS 정책이 0개라 모든 읽기가 빈 결과, 모든 쓰기가 거부되는데 **에러 없이 조용하다.**
 "화면이 비었다 / 아무 일도 안 일어난다"면 이 키부터 본다.
 
-`supabase/migrations/`의 SQL을 번호 순서대로 Supabase SQL Editor에서 실행한다. 그다음:
+`supabase/migrations/0001_schema.sql`을 Supabase SQL Editor에서 실행한다(멱등하다). 그다음:
 
 ```bash
 pnpm dev
