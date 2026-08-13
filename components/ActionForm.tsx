@@ -44,13 +44,20 @@ export function ActionForm({ action, submitLabel, children, className }: ActionF
 
       {state?.success && state.data && (
         <div className="space-y-3">
-          <Alert>
-            <AlertTitle>지금 한 번만 보인다</AlertTitle>
-            <AlertDescription>
-              서버는 해시만 저장한다. 이 화면을 벗어나면 다시 볼 수 없고, 재발급만 가능하다.
-            </AlertDescription>
-          </Alert>
-          <CopyBlock value={state.data.secret} label={state.data.hint} />
+          {/* 보여줄 비밀값이 없는 액션도 있다 — 그때 "한 번만 보인다"는 거짓말이 된다 */}
+          {state.data.secret ? (
+            <>
+              <Alert>
+                <AlertTitle>지금 한 번만 보인다</AlertTitle>
+                <AlertDescription>
+                  서버는 해시만 저장한다. 이 화면을 벗어나면 다시 볼 수 없고, 재발급만 가능하다.
+                </AlertDescription>
+              </Alert>
+              <CopyBlock value={state.data.secret} label={state.data.hint} />
+            </>
+          ) : (
+            <p className="text-sm text-muted-foreground">{state.data.hint}</p>
+          )}
           {state.data.files?.map((file) => (
             <CopyBlock key={file.name} value={file.content} label={file.name} />
           ))}

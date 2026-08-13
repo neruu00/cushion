@@ -5,15 +5,14 @@
  * 평문은 `generateToken`의 반환값으로만 존재한다. 저장하는 건 sha256 해시뿐이고,
  * 발급 순간 1회 노출 후 재조회 경로가 없다. (SPEC §6)
  *
- * 두 종류를 절대 섞지 않는다:
- *   `cshn_sync_` = 레포(CI)의 쓰기 토큰,  `cshn_pat_` = 사람의 읽기 토큰.
- *   섞이면 CI 토큰 유출이 곧 전체 스펙 열람이 된다.
+ * 종류는 `cshn_pat_` 하나다. 원본이 Cushion에 있어 레포가 미는 경로가 없어졌고,
+ * 그래서 CI용 sync 토큰도 사라졌다 (D-011). 접두사는 남겨 둔다 — 다른 시스템의 키와
+ * 섞였을 때 한눈에 갈리고, 종류가 다시 늘면 그대로 확장된다.
  */
 import { createHash, randomBytes } from "node:crypto";
 
 export const TOKEN_PREFIX = {
   access: "cshn_pat_",
-  sync: "cshn_sync_",
 } as const;
 
 export type TokenKind = keyof typeof TOKEN_PREFIX;
@@ -30,7 +29,8 @@ export function generateToken(kind: TokenKind): { plaintext: string; hash: strin
 
 /**
  * `Authorization: Bearer <token>` 에서 **요청한 종류의** 토큰 해시만 뽑는다.
- * 종류가 다르면 null — 이 한 줄이 sync 토큰으로 /api/mcp를 부르는 걸 막는다. (SPEC §11.2)
+ * 접두사가 다르면 해시조차 뜨지 않는다 — 남의 시스템 키를 실수로 보냈을 때
+ * DB를 한 번 더 두드리지 않고 그 자리에서 걸러진다.
  */
 export function hashFromAuthHeader(
   header: string | null | undefined,

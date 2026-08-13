@@ -67,6 +67,45 @@ export function findSection(content: string, heading: string): string | null {
 }
 
 /**
+ * `heading` 섹션만 `replacement`로 바꾼 전문을 돌려준다. 섹션이 없으면 null.
+ *
+ * `spec_put(heading)`의 본체다 — 에이전트가 섹션 하나 고치는 데 문서 전체를 보내지 않게 한다.
+ * `replacement`는 `spec_get(heading)`이 돌려주는 모양 그대로, 즉 `## 헤딩` 줄을 포함한
+ * 섹션 전체다.
+ *
+ * `splitSections()`로 재조립하지 않는다 — 그건 섹션을 trim해서 손대지 않은 부분의
+ * 바이트가 바뀌고, sha가 흔들리고, 이력 diff가 시끄러워진다. 원본 줄을 그대로 잇는다.
+ */
+export function replaceSection(
+  content: string,
+  heading: string,
+  replacement: string,
+): string | null {
+  const wanted = normalize(heading);
+  const lines = content.split(/\r?\n/);
+
+  let start = -1;
+  let end = lines.length;
+  for (let i = 0; i < lines.length; i += 1) {
+    const match = H2.exec(lines[i]);
+    if (!match) continue;
+    if (start === -1) {
+      if (normalize(match[1]) === wanted) start = i;
+    } else {
+      end = i;
+      break;
+    }
+  }
+  if (start === -1) return null;
+
+  // 교체 텍스트 꼬리의 공백·빈 줄은 접는다. 다음 섹션과의 이음매(빈 줄 하나)는
+  // 우리가 넣는다 — 에이전트마다 꼬리 줄바꿈이 제각각이라 여기서 고정해야 sha가 안정된다.
+  const body = replacement.replace(/\s+$/, "").split(/\r?\n/);
+
+  return [...lines.slice(0, start), ...body, "", ...lines.slice(end)].join("\n");
+}
+
+/**
  * substring 스코어링. 임베딩·벡터DB를 쓰지 않는다 — 스펙 수십 개 규모에서 정당화되지 않는다 (D-004).
  * 헤딩에 맞으면 가중치를 준다. 문서를 찾는 사람은 대개 섹션 이름을 떠올리고 있다.
  */

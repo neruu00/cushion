@@ -16,9 +16,13 @@ export interface Repo {
   slug: string;
   name: string;
   github_full_name: string | null;
+  /** 쓰기 경로의 알림이 재조회 없이 쓰도록 같이 실어 온다. 클라이언트로는 안 나간다 */
+  mattermost_webhook_url: string | null;
+  /** 레포별 최신 이벤트 (D-012 비정규화). [stale] 판단이 추가 쿼리 없이 된다 */
+  latest_event_id: number;
 }
 
-const REPO_COLUMNS = "id, slug, name, github_full_name";
+const REPO_COLUMNS = "id, slug, name, github_full_name, mattermost_webhook_url, latest_event_id";
 
 // ─── 정체성 ──────────────────────────────────────────────────────────
 
@@ -46,7 +50,7 @@ export async function identityFromAccessToken(
 
   const { data, error } = await supabase
     .from("access_tokens")
-    .select("id, email")
+    .select("id, email, last_used_at")
     .eq("token_hash", hash)
     .is("revoked_at", null)
     .maybeSingle();
@@ -58,36 +62,19 @@ export async function identityFromAccessToken(
   if (!data) return null;
 
   // 유출됐을 때 "이 토큰이 아직 살아있나"를 판단할 유일한 수단이다. (SPEC §6)
-  const { error: touchError } = await supabase
-    .from("access_tokens")
-    .update({ last_used_at: new Date().toISOString() })
-    .eq("id", data.id);
-  if (touchError) console.error("identityFromAccessToken:last_used_at", touchError);
+  // 그 판단에 초 단위 정밀도는 필요 없다 — 5분 안에 또 왔으면 UPDATE를 건너뛴다.
+  // 에이전트는 툴을 연달아 부르므로 이 스로틀이 호출당 쓰기 하나를 지운다.
+  const staleMs = 5 * 60_000;
+  const touchedAt = data.last_used_at ? new Date(data.last_used_at as string).getTime() : 0;
+  if (Date.now() - touchedAt > staleMs) {
+    const { error: touchError } = await supabase
+      .from("access_tokens")
+      .update({ last_used_at: new Date().toISOString() })
+      .eq("id", data.id);
+    if (touchError) console.error("identityFromAccessToken:last_used_at", touchError);
+  }
 
   return { id: data.id as string, email: data.email as string };
-}
-
-/**
- * sync token(`cshn_sync_`) → 그 토큰이 속한 레포. 유효하지 않으면 null.
- * 스코프가 레포 하나이므로 "레포 A의 토큰으로 레포 B 갱신"은 여기서 이미 불가능하다.
- */
-export async function repoFromSyncToken(
-  authorizationHeader: string | null | undefined,
-): Promise<Repo | null> {
-  const hash = hashFromAuthHeader(authorizationHeader, "sync");
-  if (!hash) return null;
-
-  const { data, error } = await supabase
-    .from("repositories")
-    .select(REPO_COLUMNS)
-    .eq("sync_token_hash", hash)
-    .maybeSingle();
-
-  if (error) {
-    console.error("repoFromSyncToken", error);
-    return null;
-  }
-  return data;
 }
 
 // ─── 권한 ────────────────────────────────────────────────────────────

@@ -12,10 +12,19 @@ export type ActionResult<T = void> =
  * `files`는 함께 보여줄 붙여넣기용 설정 파일 (T-202).
  */
 export interface SecretPayload {
-  secret: string;
+  /** 1회 노출할 비밀값. 보여줄 게 없으면 생략한다 (설정 파일만 주는 경우) */
+  secret?: string;
   hint: string;
   files?: { name: string; content: string }[];
 }
 
 /** `useActionState` 초기값이 null이라 union에 포함한다. */
 export type SecretState = ActionResult<SecretPayload> | null;
+
+/**
+ * 문서 저장 결과. 충돌은 단순 실패가 아니다 — **회복에 필요한 것을 같이 줘야 한다.**
+ * 현재 sha가 폼까지 돌아오지 않으면 재시도가 영원히 같은 sha로 실패한다.
+ */
+export type SaveResult =
+  | { success: true; data: { sha: string } }
+  | { success: false; error: string; conflict?: { sha: string; content: string } };

@@ -1,6 +1,6 @@
 /**
  * @file app/admin/page.tsx
- * @description 레포 등록 · sync 토큰 재발급 · 멤버 관리. admin 전용 (T-201, T-202).
+ * @description 레포 등록 · 멤버 관리 · 전체 내보내기. admin 전용.
  *
  * proxy.ts는 로그인 여부만 본다. admin 판정은 여기서 한다.
  */
@@ -10,7 +10,6 @@ import { notFound } from "next/navigation";
 import {
   addMember,
   createRepository,
-  regenerateSyncToken,
   removeMember,
 } from "@/actions/repository";
 import { ActionForm } from "@/components/ActionForm";
@@ -53,7 +52,13 @@ export default async function AdminPage() {
       <header className="space-y-1">
         <h1 className="text-xl font-semibold">관리</h1>
         <p className="text-sm text-muted-foreground">
-          레포를 등록하면 sync 토큰과 붙여넣을 설정 파일이 그 자리에서 한 번 나온다.
+          레포를 등록하고 멤버를 넣는다. 문서는 각 레포 화면에서 만든다.{" "}
+          {/* git이 없으므로 이게 유일한 백업이다 (D-011).
+              라우트 핸들러가 파일을 내려주므로 <Link>의 클라이언트 이동으로는 다운로드가 안 된다. */}
+          {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
+          <a href="/api/export" className="underline underline-offset-4 hover:text-foreground">
+            전체 내보내기
+          </a>
         </p>
       </header>
 
@@ -132,15 +137,6 @@ export default async function AdminPage() {
                 </ActionForm>
               </section>
 
-              <section className="space-y-2">
-                <h2 className="text-sm font-medium">sync 토큰</h2>
-                <p className="text-sm text-muted-foreground">
-                  재발급하면 기존 토큰이 즉시 죽는다. CI Secret을 같이 갱신할 것.
-                </p>
-                <ActionForm action={regenerateSyncToken} submitLabel="재발급">
-                  <input type="hidden" name="repository_id" value={repo.id} />
-                </ActionForm>
-              </section>
             </CardContent>
           </Card>
         ))

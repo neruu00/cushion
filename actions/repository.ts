@@ -11,14 +11,9 @@ import { revalidatePath } from "next/cache";
 
 import type { SecretState } from "@/lib/action.type";
 import { isAdmin } from "@/lib/authz";
-import {
-  createRepositorySchema,
-  memberSchema,
-  repositoryIdSchema,
-} from "@/lib/repository.schema";
+import { createRepositorySchema, memberSchema } from "@/lib/repository.schema";
 import { setupFiles } from "@/lib/snippets";
 import { supabase } from "@/lib/supabase";
-import { generateToken } from "@/lib/token";
 
 const DENIED = "관리자 권한이 필요합니다." as const;
 
@@ -33,10 +28,7 @@ export async function createRepository(
     return { success: false, error: parsed.error.issues[0].message };
   }
 
-  const token = generateToken("sync");
-  const { error } = await supabase
-    .from("repositories")
-    .insert({ ...parsed.data, sync_token_hash: token.hash });
+  const { error } = await supabase.from("repositories").insert(parsed.data);
 
   if (error) {
     console.error("createRepository", error);
@@ -48,45 +40,12 @@ export async function createRepository(
   }
 
   revalidatePath("/admin");
+  // 노출할 비밀이 없다 — 문서는 이 화면에서 바로 만든다. 붙여넣을 설정만 준다.
   return {
     success: true,
     data: {
-      secret: token.plaintext,
-      hint: `${parsed.data.slug} 의 sync token — GitHub Secret \`CUSHION_SYNC_TOKEN\` 에 넣는다`,
+      hint: `${parsed.data.slug} 등록됨. 문서는 /${parsed.data.slug} 에서 만든다`,
       files: setupFiles(),
-    },
-  };
-}
-
-/** 재발급 = 새 해시로 덮어쓰기. 구 토큰은 그 순간 죽는다. */
-export async function regenerateSyncToken(
-  _prev: SecretState,
-  formData: FormData,
-): Promise<SecretState> {
-  if (!(await isAdmin())) return { success: false, error: DENIED };
-
-  const parsed = repositoryIdSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return { success: false, error: "잘못된 요청입니다." };
-
-  const token = generateToken("sync");
-  const { data, error } = await supabase
-    .from("repositories")
-    .update({ sync_token_hash: token.hash })
-    .eq("id", parsed.data.repository_id)
-    .select("slug")
-    .maybeSingle();
-
-  if (error || !data) {
-    console.error("regenerateSyncToken", error);
-    return { success: false, error: "재발급에 실패했습니다." };
-  }
-
-  revalidatePath("/admin");
-  return {
-    success: true,
-    data: {
-      secret: token.plaintext,
-      hint: `${data.slug} 의 새 sync token — 기존 토큰은 방금 죽었다. CI Secret을 갱신할 것`,
     },
   };
 }

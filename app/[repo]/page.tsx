@@ -22,6 +22,8 @@ interface EventRow {
   id: number;
   summary: string | null;
   created_at: string;
+  changed_paths: string[] | null;
+  deleted_paths: string[] | null;
 }
 
 export default async function RepoPage({ params }: PageProps<"/[repo]">) {
@@ -42,7 +44,7 @@ export default async function RepoPage({ params }: PageProps<"/[repo]">) {
       .order("path"),
     supabase
       .from("sync_events")
-      .select("id, summary, created_at")
+      .select("id, summary, created_at, changed_paths, deleted_paths")
       .eq("repository_id", repo.id)
       .order("id", { ascending: false })
       .limit(10),
@@ -77,10 +79,18 @@ export default async function RepoPage({ params }: PageProps<"/[repo]">) {
       </header>
 
       <section className="space-y-2">
-        <h2 className="text-sm font-medium">문서</h2>
+        <div className="flex items-center justify-between gap-4">
+          <h2 className="text-sm font-medium">문서</h2>
+          <Link
+            href={`/${repo.slug}/new`}
+            className="text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
+          >
+            새 문서
+          </Link>
+        </div>
         {documents.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            아직 동기화된 문서가 없다. 레포에서 <code>cushion-sync</code> 워크플로를 한 번 돌릴 것.
+            아직 문서가 없다. 위의 &quot;새 문서&quot;로 만들거나, 에이전트가 <code>spec_put</code>으로 만든다.
           </p>
         ) : (
           <ul className="divide-y rounded-lg border">
@@ -122,8 +132,22 @@ export default async function RepoPage({ params }: PageProps<"/[repo]">) {
                       {event.created_at.slice(0, 10)}
                     </CardTitle>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="space-y-2">
                     <p className="text-sm whitespace-pre-line">{event.summary ?? "요약 없음"}</p>
+                    {/* 요약만 보이고 상세로 갈 길이 없으면 "뭐가 바뀌었나"를 못 본다 */}
+                    <p className="flex flex-wrap gap-3 text-xs">
+                      {[...(event.changed_paths ?? []), ...(event.deleted_paths ?? [])].map(
+                        (path) => (
+                          <Link
+                            key={path}
+                            href={`/${repo.slug}/history/${path}`}
+                            className="font-mono text-muted-foreground underline underline-offset-4 hover:text-foreground"
+                          >
+                            {path} 변경 내역
+                          </Link>
+                        ),
+                      )}
+                    </p>
                   </CardContent>
                 </Card>
               </li>
