@@ -97,6 +97,21 @@ export async function isAdmin(): Promise<boolean> {
   return isAdminEmail(await getSessionEmail());
 }
 
+/** 이 이메일이 이 레포의 멤버인가. 셀프서브 멤버 관리의 권한 판정용 (D-013). */
+export async function isMember(email: string, repositoryId: string): Promise<boolean> {
+  const { count, error } = await supabase
+    .from("repository_members")
+    .select("email", { count: "exact", head: true })
+    .eq("repository_id", repositoryId)
+    .eq("email", email.toLowerCase());
+
+  if (error) {
+    console.error("isMember", error);
+    return false; // 조회 실패는 권한 없음 (fail-closed)
+  }
+  return Boolean(count);
+}
+
 /** 이 이메일이 멤버로 등록된 레포 id 목록. admin 여부는 보지 않는다. */
 export async function getMemberRepoIds(email: string): Promise<string[]> {
   const { data, error } = await supabase

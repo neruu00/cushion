@@ -2,7 +2,8 @@
 
 /**
  * @file actions/repository.ts
- * @description 레포 등록 · sync 토큰 재발급 · 멤버 관리. 전부 admin 전용.
+ * @description 레포 등록 · 멤버 관리. 셀프서브다 (D-013) —
+ *              생성은 로그인만으로, 멤버 관리는 그 레포의 멤버면 된다. admin은 어디나.
  *
  * proxy.ts는 서버 액션 호출을 막지 못한다. 그래서 모든 액션이 첫 줄에서 스스로 권한을 본다.
  * 순서를 지킨다: 권한 확인 → Zod 검증 → 로직 → 재검증
@@ -10,51 +11,78 @@
 import { revalidatePath } from "next/cache";
 
 import type { SecretState } from "@/lib/action.type";
-import { isAdmin } from "@/lib/authz";
+import { getSessionEmail, isAdmin, isMember } from "@/lib/authz";
 import { createRepositorySchema, memberSchema } from "@/lib/repository.schema";
 import { setupFiles } from "@/lib/snippets";
 import { supabase } from "@/lib/supabase";
-
-const DENIED = "관리자 권한이 필요합니다." as const;
 
 export async function createRepository(
   _prev: SecretState,
   formData: FormData,
 ): Promise<SecretState> {
-  if (!(await isAdmin())) return { success: false, error: DENIED };
+  // 로그인이면 누구나 만든다 (D-013). 열람·쓰기는 여전히 멤버만이다.
+  const email = await getSessionEmail();
+  if (!email) return { success: false, error: "로그인이 필요합니다." };
 
   const parsed = createRepositorySchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) {
     return { success: false, error: parsed.error.issues[0].message };
   }
 
-  const { error } = await supabase.from("repositories").insert(parsed.data);
+  const { data: repo, error } = await supabase
+    .from("repositories")
+    .insert(parsed.data)
+    .select("id")
+    .single();
 
-  if (error) {
+  if (error || !repo) {
     console.error("createRepository", error);
     return {
       success: false,
       // 23505 = unique_violation. 그 외는 내부 사정이므로 사용자에게 말하지 않는다.
-      error: error.code === "23505" ? "이미 있는 slug입니다." : "레포 생성에 실패했습니다.",
+      error: error?.code === "23505" ? "이미 있는 slug입니다." : "레포 생성에 실패했습니다.",
     };
   }
 
-  revalidatePath("/admin");
-  // 노출할 비밀이 없다 — 문서는 이 화면에서 바로 만든다. 붙여넣을 설정만 준다.
+  // 만든 사람이 첫 멤버다. 실패하면 레포를 지워 보상한다 —
+  // 안 그러면 만든 사람이 자기 레포를 못 보는 고아가 태어난다.
+  const { error: memberError } = await supabase
+    .from("repository_members")
+    .insert({ repository_id: repo.id, email });
+
+  if (memberError) {
+    console.error("createRepository: 첫 멤버 등록 실패, 보상 삭제", memberError);
+    await supabase.from("repositories").delete().eq("id", repo.id);
+    return { success: false, error: "레포 생성에 실패했습니다." };
+  }
+
+  revalidatePath("/dashboard");
   return {
     success: true,
     data: {
-      hint: `${parsed.data.slug} 등록됨. 문서는 /${parsed.data.slug} 에서 만든다`,
+      hint: `${parsed.data.slug} 등록됨. 문서는 /repositories/${parsed.data.slug} 에서 만든다`,
       files: setupFiles(),
     },
   };
 }
 
+/** 멤버 관리 권한: 그 레포의 멤버거나 admin. 셀프서브에서 팀원을 못 부르면 반쪽이다. */
+async function canManageMembers(email: string, repositoryId: string): Promise<boolean> {
+  if (await isAdmin()) return true;
+  return isMember(email, repositoryId);
+}
+
 export async function addMember(_prev: SecretState, formData: FormData): Promise<SecretState> {
-  if (!(await isAdmin())) return { success: false, error: DENIED };
+  // 세션부터 — 레포 단위 판정은 repository_id를 알아야 해서 Zod 뒤에 온다
+  const email = await getSessionEmail();
+  if (!email) return { success: false, error: "로그인이 필요합니다." };
 
   const parsed = memberSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { success: false, error: parsed.error.issues[0].message };
+
+  if (!(await canManageMembers(email, parsed.data.repository_id))) {
+    return { success: false, error: "이 레포의 멤버만 초대할 수 있습니다." };
+  }
 
   const { error } = await supabase.from("repository_members").insert(parsed.data);
   if (error) {
@@ -66,18 +94,22 @@ export async function addMember(_prev: SecretState, formData: FormData): Promise
   }
 
   revalidatePath("/admin");
+  revalidatePath("/dashboard");
   return { success: true };
 }
 
 /**
  * 삭제는 결과 표시 없이 재렌더로 끝낸다 — 실패하면 행이 그대로 남아 눈에 보인다.
- * 되돌리기가 "다시 추가"라 확인 다이얼로그도 두지 않는다.
+ * 자기 자신 제거 = 나가기. 마지막 멤버가 나가면 admin만 보는 레포가 된다 — 막지 않는다.
  */
 export async function removeMember(formData: FormData): Promise<void> {
-  if (!(await isAdmin())) return;
+  const email = await getSessionEmail();
+  if (!email) return;
 
   const parsed = memberSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return;
+
+  if (!(await canManageMembers(email, parsed.data.repository_id))) return;
 
   const { error } = await supabase
     .from("repository_members")
@@ -87,4 +119,5 @@ export async function removeMember(formData: FormData): Promise<void> {
 
   if (error) console.error("removeMember", error);
   revalidatePath("/admin");
+  revalidatePath("/dashboard");
 }

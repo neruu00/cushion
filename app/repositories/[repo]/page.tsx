@@ -8,7 +8,14 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
+import { Trash2 } from "lucide-react";
+
+import { addMember, removeMember } from "@/actions/repository";
+import { ActionForm } from "@/components/ActionForm";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { getAccessibleRepo, getSessionEmail } from "@/lib/authz";
 import { supabase } from "@/lib/supabase";
 
@@ -36,7 +43,7 @@ export default async function RepoPage({ params }: PageProps<"/repositories/[rep
   const repo = await getAccessibleRepo(email, slug);
   if (!repo) notFound();
 
-  const [docs, events] = await Promise.all([
+  const [docs, events, memberRows] = await Promise.all([
     supabase
       .from("documents")
       .select("path, title, updated_at")
@@ -48,7 +55,13 @@ export default async function RepoPage({ params }: PageProps<"/repositories/[rep
       .eq("repository_id", repo.id)
       .order("id", { ascending: false })
       .limit(10),
+    supabase
+      .from("repository_members")
+      .select("email")
+      .eq("repository_id", repo.id)
+      .order("email"),
   ]);
+  const members: { email: string }[] = memberRows.data ?? [];
 
   if (docs.error) console.error("RepoPage: documents", docs.error);
   if (events.error) console.error("RepoPage: events", events.error);
@@ -156,6 +169,43 @@ export default async function RepoPage({ params }: PageProps<"/repositories/[rep
         )}
       </section>
 
+      {/* 이 페이지 자체가 멤버만 보므로, 멤버 관리의 권한 문턱과 정확히 일치한다 (D-013) */}
+      <section className="space-y-2 border-t pt-6">
+        <h2 className="text-sm font-medium">멤버</h2>
+        <p className="text-sm text-muted-foreground">
+          멤버는 이 레포의 문서를 읽고 쓸 수 있고, 다른 멤버를 초대할 수 있다.
+          자기 자신을 지우면 나가기다 — 마지막 멤버가 나가면 아무도 못 보게 된다.
+        </p>
+        <ul className="divide-y rounded-lg border">
+          {members.map((member) => (
+            <li key={member.email} className="flex items-center justify-between gap-2 px-3 py-1.5">
+              <span className="truncate font-mono text-sm">
+                {member.email}
+                {member.email === email ? " (나)" : ""}
+              </span>
+              <form action={removeMember}>
+                <input type="hidden" name="repository_id" value={repo.id} />
+                <input type="hidden" name="email" value={member.email} />
+                <Button
+                  type="submit"
+                  variant="destructive"
+                  size="xs"
+                  aria-label={`${member.email} 제거`}
+                >
+                  <Trash2 />
+                </Button>
+              </form>
+            </li>
+          ))}
+        </ul>
+        <ActionForm action={addMember} submitLabel="초대">
+          <input type="hidden" name="repository_id" value={repo.id} />
+          <Label className="grid gap-1.5">
+            <span>이메일</span>
+            <Input name="email" type="email" placeholder="teammate@example.com" required />
+          </Label>
+        </ActionForm>
+      </section>
     </main>
   );
 }
