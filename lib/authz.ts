@@ -28,13 +28,19 @@ export async function getSessionEmail(): Promise<string | null> {
   return session?.user?.email?.toLowerCase() ?? null;
 }
 
+export interface TokenIdentity {
+  /** `token_cursors`가 이 id로 구독 커서를 매단다 */
+  id: string;
+  email: string;
+}
+
 /**
- * access token(`cshn_pat_`) → 이메일. 유효하지 않으면 null.
+ * access token(`cshn_pat_`) → 토큰 id + 이메일. 유효하지 않으면 null.
  * 여기서 레포 권한을 판단하지 않는다 — 호출부가 아래 함수들로 요청 시점에 조회한다.
  */
-export async function emailFromAccessToken(
+export async function identityFromAccessToken(
   authorizationHeader: string | null | undefined,
-): Promise<string | null> {
+): Promise<TokenIdentity | null> {
   const hash = hashFromAuthHeader(authorizationHeader, "access");
   if (!hash) return null;
 
@@ -46,7 +52,7 @@ export async function emailFromAccessToken(
     .maybeSingle();
 
   if (error) {
-    console.error("emailFromAccessToken", error);
+    console.error("identityFromAccessToken", error);
     return null;
   }
   if (!data) return null;
@@ -56,9 +62,9 @@ export async function emailFromAccessToken(
     .from("access_tokens")
     .update({ last_used_at: new Date().toISOString() })
     .eq("id", data.id);
-  if (touchError) console.error("emailFromAccessToken:last_used_at", touchError);
+  if (touchError) console.error("identityFromAccessToken:last_used_at", touchError);
 
-  return data.email as string;
+  return { id: data.id as string, email: data.email as string };
 }
 
 /**
