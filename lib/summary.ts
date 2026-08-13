@@ -42,7 +42,7 @@ export function parseDiff(diff: string): Map<string, DiffStat> {
   let inHunk = false;
   let fallbackPath: string | null = null;
 
-  for (const line of diff.split("\n")) {
+  for (const line of diff.split(/\r?\n/)) {
     if (line.startsWith("diff --git ")) {
       stat = { added: 0, removed: 0, hunkStarts: [] };
       inHunk = false;
@@ -82,10 +82,16 @@ export function parseDiff(diff: string): Map<string, DiffStat> {
   return stats;
 }
 
-/** 첫 `# ` 헤딩. 문서 제목으로 쓴다. */
+/**
+ * 첫 `# ` 헤딩. 문서 제목으로 쓴다.
+ * 줄 단위로 보는 이유: CRLF면 `\r`가 남는데 정규식 `.`가 그걸 매치하지 않아 통째로 어긋난다.
+ */
 export function documentTitle(content: string): string | null {
-  const match = /^#[ \t]+(.+?)[ \t]*$/m.exec(content);
-  return match ? match[1] : null;
+  for (const line of content.split(/\r?\n/)) {
+    const match = /^#[ \t]+(.+?)[ \t]*$/.exec(line);
+    if (match) return match[1];
+  }
+  return null;
 }
 
 /**
@@ -94,7 +100,7 @@ export function documentTitle(content: string): string | null {
  */
 export function changedHeadings(content: string, hunkStarts: number[]): string[] {
   const headings: { line: number; text: string }[] = [];
-  content.split("\n").forEach((line, index) => {
+  content.split(/\r?\n/).forEach((line, index) => {
     const match = /^##[ \t]+(.+?)[ \t]*$/.exec(line);
     if (match) headings.push({ line: index + 1, text: match[1] });
   });

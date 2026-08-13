@@ -82,6 +82,13 @@ test("제목은 첫 # 헤딩. ## 은 제목이 아니다", () => {
   assert.equal(documentTitle("본문뿐"), null);
 });
 
+test("CRLF 문서도 제목과 섹션을 찾는다", () => {
+  const crlf = FEATURES.replace(/\n/g, "\r\n");
+
+  assert.equal(documentTitle(crlf), "기능");
+  assert.deepEqual(changedHeadings(crlf, [8]), ["인증"]);
+});
+
 test("요약은 경로 + 바뀐 헤딩 + 증감 + 커밋 + 링크", () => {
   const summary = buildSummary({
     changed: [{ path: ".specs/features.md", content: FEATURES }],

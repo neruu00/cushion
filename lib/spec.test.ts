@@ -38,6 +38,15 @@ test("헤딩 목록이 outline의 전부다", () => {
   assert.deepEqual(headings("본문뿐"), []);
 });
 
+test("CRLF 문서도 헤딩을 찾는다", () => {
+  // Windows 체크아웃에서 온 문서. \r가 남으면 정규식 `.`가 그걸 못 먹어서
+  // 목차가 통째로 비어 나온다 — 원인이 안 보이는 종류의 버그다.
+  const crlf = DOC.replace(/\n/g, "\r\n");
+
+  assert.deepEqual(headings(crlf), ["인증", "댓글"]);
+  assert.equal(findSection(crlf, "인증"), "## 인증\n\n세션은 30일이다.");
+});
+
 test("섹션은 '## 인증'으로 주든 '인증'으로 주든 찾는다", () => {
   const wanted = "## 인증\n\n세션은 30일이다.";
 
