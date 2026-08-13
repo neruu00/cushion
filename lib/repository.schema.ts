@@ -11,6 +11,29 @@ const optionalText = z
   .optional()
   .transform((v) => v || null);
 
+/**
+ * `org/repo`만 저장한다. 클론 URL을 그대로 붙여넣는 일이 잦은데, 그러면 문서 화면의
+ * 원본 링크가 `https://github.com/https://github.com/org/repo.git/blob/HEAD/...`가 된다 —
+ * 저장할 땐 아무 소리도 안 나고 링크를 눌러야 알게 된다. 여기서 접고, 형태도 확인한다.
+ */
+const githubFullName = z
+  .string()
+  .trim()
+  .optional()
+  .transform((value) => {
+    const trimmed = (value ?? "")
+      .replace(/^https?:\/\/(www\.)?github\.com\//i, "")
+      .replace(/\.git$/i, "")
+      .replace(/\/+$/, "");
+    return trimmed || null;
+  })
+  .pipe(
+    z
+      .string()
+      .regex(/^[\w.-]+\/[\w.-]+$/, "GitHub은 org/repo 형태로 입력하세요.")
+      .nullable(),
+  );
+
 export const createRepositorySchema = z.object({
   // 0001_init.sql의 repositories_slug_format CHECK와 같은 규칙. 어긋나면 DB가 거부한다.
   slug: z
@@ -18,7 +41,7 @@ export const createRepositorySchema = z.object({
     .trim()
     .regex(/^[a-z0-9][a-z0-9-]{0,62}$/, "slug는 소문자·숫자·하이픈만 쓸 수 있습니다."),
   name: z.string().trim().min(1, "이름을 입력하세요.").max(100),
-  github_full_name: optionalText,
+  github_full_name: githubFullName,
   mattermost_webhook_url: optionalText,
 });
 
