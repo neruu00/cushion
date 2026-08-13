@@ -1,6 +1,6 @@
 /**
- * @file app/[repo]/page.tsx
- * @description 문서 목록 + 최근 변경 타임라인 (T-501).
+ * @file app/repositories/[repo]/page.tsx
+ * @description 문서 목록 + 최근 변경 타임라인 + 예측 절약 (T-501).
  *
  * 타임라인은 `sync_events.summary`를 그대로 보여준다 — 알림·에이전트 델타와 같은 문자열이다.
  * 두 번 만들면 두 번 드리프트한다 (SPEC §8).
@@ -17,12 +17,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { getAccessibleRepo, getSessionEmail } from "@/lib/authz";
+import { estimateSavings } from "@/lib/savings";
 import { supabase } from "@/lib/supabase";
 
 interface DocRow {
   path: string;
   title: string | null;
   updated_at: string;
+  content: string;
 }
 
 interface EventRow {
@@ -46,7 +48,9 @@ export default async function RepoPage({ params }: PageProps<"/repositories/[rep
   const [docs, events, memberRows] = await Promise.all([
     supabase
       .from("documents")
-      .select("path, title, updated_at")
+      // ponytail: 절약 추정 때문에 본문까지 읽는다. 레포 하나에 문서 수십 개면 충분하고,
+      // 무거워지면 documents에 문자수 컬럼을 비정규화한다.
+      .select("path, title, updated_at, content")
       .eq("repository_id", repo.id)
       .order("path"),
     supabase
@@ -68,6 +72,8 @@ export default async function RepoPage({ params }: PageProps<"/repositories/[rep
 
   const documents: DocRow[] = docs.data ?? [];
   const timeline: EventRow[] = events.data ?? [];
+  const savings = estimateSavings(documents);
+  const fmt = (n: number) => n.toLocaleString();
 
   return (
     <main className="mx-auto w-full max-w-3xl space-y-8 p-8">
@@ -90,6 +96,22 @@ export default async function RepoPage({ params }: PageProps<"/repositories/[rep
           ) : null}
         </p>
       </header>
+
+      {/* 이 도구가 존재하는 이유를 그 레포의 숫자로 보여준다. 추정이라고 명시한다. */}
+      {savings && savings.savedTokens > 0 ? (
+        <section className="rounded-lg border bg-muted/30 p-4 text-sm">
+          <p>
+            에이전트가 이 레포의 문서를 전부 읽으면 <strong>~{fmt(savings.controlTokens)} tok</strong>
+            . 목차 1회 + 작업당 섹션 1개면{" "}
+            <strong>~{fmt(savings.outlineTokens + savings.perTaskTokens)} tok</strong> — 세션당{" "}
+            <strong>~{fmt(savings.savedTokens)} tok</strong> 아낀다.
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            추정 · {savings.ratio.toFixed(1)}배 · 문서 {documents.length}개 기준. 목차는 세션당
+            한 번이라 작업이 늘수록 더 벌어진다.
+          </p>
+        </section>
+      ) : null}
 
       <section className="space-y-2">
         <div className="flex items-center justify-between gap-4">
