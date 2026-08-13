@@ -1,0 +1,84 @@
+name: cushion-sync
+
+on:
+  push:
+    paths:
+      # 문서를 빠뜨리는 쪽이 시끄러운 쪽보다 나쁘다 — 누락되면 에이전트가 로컬 사본을 읽는다.
+      # 목차가 길어지거나 알림이 시끄러워지면 여기서 좁힌다 (예: '.specs/**', '!CHANGELOG.md')
+      - "**.md"
+  workflow_dispatch: {} # 전체 동기화 (신규 등록 직후 1회 실행할 것)
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0 # diff를 뜨려면 히스토리가 필요하다
+
+      - name: 스펙 변경 수집 후 Cushion으로 전송
+        env:
+          CUSHION_URL: https://cushion-chi.vercel.app
+          CUSHION_SYNC_TOKEN: ${{ secrets.CUSHION_SYNC_TOKEN }}
+          BEFORE: ${{ github.event.before }}
+          EVENT: ${{ github.event_name }}
+          # 커밋 메시지를 run 안에 직접 보간하면 스크립트 인젝션이 된다. 환경변수로 받는다.
+          AUTHOR: ${{ github.event.head_commit.author.name || github.actor }}
+          MESSAGE: ${{ github.event.head_commit.message || '' }}
+        run: |
+          set -euo pipefail
+          SPEC='\.md$'
+
+          # before가 all-zeros면 신규 브랜치/force push다. HEAD~1로 대체하지 않는다
+          # — 한 push에 커밋이 여러 개일 수 있다. 전체 스냅샷으로 폴백한다.
+          if [ "$EVENT" = "workflow_dispatch" ] || [ -z "${BEFORE//0/}" ]; then
+            FULL=true
+          else
+            FULL=false
+          fi
+
+          if [ "$FULL" = true ]; then
+            git ls-files | grep -E "$SPEC" > changed.txt || true
+            : > deleted.txt
+            : > diff.txt
+          else
+            git diff --name-only --diff-filter=d "$BEFORE" "$GITHUB_SHA" | grep -E "$SPEC" > changed.txt || true
+            # 삭제 동기화. 이걸 빠뜨리면 에이전트가 지워진 스펙을 계속 읽는다.
+            git diff --name-only --diff-filter=D "$BEFORE" "$GITHUB_SHA" | grep -E "$SPEC" > deleted.txt || true
+            git diff "$BEFORE" "$GITHUB_SHA" -- '*.md' > diff.txt || true
+          fi
+
+          # 페이로드 상한. 알림 하나가 토큰을 태우면 본말전도다.
+          TRUNCATED=false
+          if [ "$(wc -c < diff.txt)" -gt 40000 ]; then
+            head -c 40000 diff.txt > diff.trim && mv diff.trim diff.txt
+            TRUNCATED=true
+          fi
+
+          while IFS= read -r p; do
+            [ -n "$p" ] || continue
+            jq -n --arg path "$p" --rawfile content "$p" '{path: $path, content: $content}'
+          done < changed.txt | jq -s '.' > changed.json
+
+          jq -n \
+            --argjson full "$FULL" \
+            --argjson truncated "$TRUNCATED" \
+            --arg sha "$GITHUB_SHA" \
+            --arg author "$AUTHOR" \
+            --arg message "$MESSAGE" \
+            --rawfile diff diff.txt \
+            --rawfile deletedRaw deleted.txt \
+            --slurpfile changed changed.json \
+            '{
+               full: $full,
+               truncated: $truncated,
+               commit: { sha: $sha, author: $author, message: $message },
+               changed: $changed[0],
+               deleted: ($deletedRaw | split("\n") | map(select(length > 0))),
+               diff: $diff
+             }' > payload.json
+
+          curl -sS --fail-with-body -X POST "$CUSHION_URL/api/sync" \
+            -H "Authorization: Bearer $CUSHION_SYNC_TOKEN" \
+            -H 'Content-Type: application/json' \
+            --data-binary @payload.json
