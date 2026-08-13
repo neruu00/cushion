@@ -9,6 +9,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { restoreVersion } from "@/actions/document";
+import { DiffView } from "@/components/DiffView";
 import { Button } from "@/components/ui/button";
 import { getAccessibleRepo, getSessionEmail } from "@/lib/authz";
 import { supabase } from "@/lib/supabase";
@@ -44,7 +45,7 @@ export default async function HistoryPage({ params }: PageProps<"/[repo]/history
       .limit(50),
     supabase
       .from("documents")
-      .select("content_sha, updated_at, updated_by")
+      .select("content, content_sha, updated_at, updated_by")
       .eq("repository_id", repo.id)
       .eq("path", docPath)
       .maybeSingle(),
@@ -53,6 +54,14 @@ export default async function HistoryPage({ params }: PageProps<"/[repo]/history
   if (history.error) console.error("HistoryPage", history.error);
   const versions: VersionRow[] = history.data ?? [];
   const live = current.data;
+
+  /**
+   * `document_versions`에는 **이전 본문**이 담긴다. 그래서 i번째 행이 만든 결과는
+   * 한 칸 앞 버전이고, 가장 최근 변경의 결과는 현재 문서다.
+   * 삭제된 문서면 결과가 빈 문자열 — 전면 삭제로 보이는 게 맞다.
+   */
+  const resultOf = (index: number) =>
+    index === 0 ? (live?.content ?? "") : versions[index - 1].content;
 
   return (
     <main className="mx-auto w-full max-w-3xl space-y-6 p-8">
@@ -84,7 +93,7 @@ export default async function HistoryPage({ params }: PageProps<"/[repo]/history
         </p>
       ) : (
         <ul className="space-y-3">
-          {versions.map((version) => (
+          {versions.map((version, index) => (
             <li key={version.id} className="rounded-lg border">
               <div className="flex flex-wrap items-center justify-between gap-3 border-b px-3 py-2">
                 <span className="min-w-0 text-sm">
@@ -102,9 +111,11 @@ export default async function HistoryPage({ params }: PageProps<"/[repo]/history
                   </Button>
                 </form>
               </div>
-              <details>
+              <DiffView before={version.content} after={resultOf(index)} />
+
+              <details className="border-t">
                 <summary className="cursor-pointer px-3 py-1.5 text-xs text-muted-foreground">
-                  이때의 내용 보기 ({version.content.split("\n").length}줄)
+                  이때의 전문 보기 ({version.content.split("\n").length}줄)
                 </summary>
                 <pre className="max-h-96 overflow-auto px-3 pb-3 font-mono text-xs leading-relaxed">
                   {version.content}

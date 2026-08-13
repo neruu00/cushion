@@ -107,7 +107,9 @@ export async function createRepository(formData: FormData) {
 - **본문을 덮기 전에 `document_versions`에 이전 것을 남긴다.** append-only.
   삭제할 때도 남긴다 — 삭제야말로 되돌릴 수 있어야 한다
 - **이력은 읽히는 경로가 있어야 한다.** 쓰기만 하고 못 꺼내면 없는 것보다 나쁘다 —
-  해결된 것처럼 보이기 때문이다. `/[repo]/history/[...path]`가 그 리더다
+  해결된 것처럼 보이기 때문이다. `/[repo]/history/[...path]`가 그 리더고,
+  거기서 `lib/diff.ts`가 버전 사이 변경을 hunk로 보여준다. 전문 보기도 남겨 둔다 —
+  diff가 상한에 걸려 생략될 때 그게 유일한 수단이다
 - **되돌리기는 덮어쓰기가 아니라 새 저장이다.** append-only를 지켜야
   "언제 무엇으로 되돌렸나"가 남는다
 - **`/api/export`가 유일한 백업이다.** 이걸 깨뜨리면 탈출구가 없어진다

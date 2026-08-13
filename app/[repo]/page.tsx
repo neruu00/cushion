@@ -22,6 +22,8 @@ interface EventRow {
   id: number;
   summary: string | null;
   created_at: string;
+  changed_paths: string[] | null;
+  deleted_paths: string[] | null;
 }
 
 export default async function RepoPage({ params }: PageProps<"/[repo]">) {
@@ -42,7 +44,7 @@ export default async function RepoPage({ params }: PageProps<"/[repo]">) {
       .order("path"),
     supabase
       .from("sync_events")
-      .select("id, summary, created_at")
+      .select("id, summary, created_at, changed_paths, deleted_paths")
       .eq("repository_id", repo.id)
       .order("id", { ascending: false })
       .limit(10),
@@ -130,8 +132,22 @@ export default async function RepoPage({ params }: PageProps<"/[repo]">) {
                       {event.created_at.slice(0, 10)}
                     </CardTitle>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="space-y-2">
                     <p className="text-sm whitespace-pre-line">{event.summary ?? "요약 없음"}</p>
+                    {/* 요약만 보이고 상세로 갈 길이 없으면 "뭐가 바뀌었나"를 못 본다 */}
+                    <p className="flex flex-wrap gap-3 text-xs">
+                      {[...(event.changed_paths ?? []), ...(event.deleted_paths ?? [])].map(
+                        (path) => (
+                          <Link
+                            key={path}
+                            href={`/${repo.slug}/history/${path}`}
+                            className="font-mono text-muted-foreground underline underline-offset-4 hover:text-foreground"
+                          >
+                            {path} 변경 내역
+                          </Link>
+                        ),
+                      )}
+                    </p>
                   </CardContent>
                 </Card>
               </li>
