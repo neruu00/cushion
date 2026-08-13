@@ -4,9 +4,22 @@
  *              별도 설치 가이드 문서를 만들지 않기 위해 존재한다.
  */
 
-/** 앱의 공개 base URL. 배포 도메인이 정해지면 NEXTAUTH_URL 하나만 바꾸면 된다. */
+/**
+ * 앱의 공개 base URL.
+ *
+ * NextAuth는 `NEXTAUTH_URL` 없이도 요청 호스트로 잘 돈다. 그래서 배포할 때 이 값을
+ * 빠뜨려도 로그인은 멀쩡하고 **여기서 만드는 스니펫만 조용히 `localhost`가 된다** —
+ * 화면은 정상으로 보이는데 팀원에게 나눠 준 연결 명령이 아무 데서도 안 되는 식이다.
+ * 그래서 Vercel이 늘 넣어 주는 배포 도메인을 두 번째 후보로 둔다.
+ */
 function baseUrl(): string {
-  return (process.env.NEXTAUTH_URL ?? "http://localhost:3000").replace(/\/+$/, "");
+  const explicit = process.env.NEXTAUTH_URL;
+  if (explicit) return explicit.replace(/\/+$/, "");
+
+  const vercel = process.env.VERCEL_PROJECT_PRODUCTION_URL;
+  if (vercel) return `https://${vercel}`;
+
+  return "http://localhost:3000";
 }
 
 /**
