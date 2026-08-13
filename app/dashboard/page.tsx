@@ -8,17 +8,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
-import { createRepository } from "@/actions/repository";
-import { ActionForm } from "@/components/ActionForm";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { NewRepoDialog } from "@/components/NewRepoDialog";
+import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getAccessibleRepos, getSessionEmail } from "@/lib/authz";
 
 export default async function DashboardPage() {
@@ -28,43 +19,20 @@ export default async function DashboardPage() {
   const repos = await getAccessibleRepos(email);
 
   return (
-    <main className="mx-auto w-full max-w-3xl space-y-8 p-8">
-      <header className="space-y-1">
-        <h1 className="text-xl font-semibold">대시보드</h1>
-        <p className="text-sm text-muted-foreground">
-          문서 원본은 Cushion에 있다. 여기서 만들고, 에이전트는 MCP로 읽고 쓴다.
-        </p>
+    <main className="mx-auto w-full max-w-3xl space-y-6 p-8">
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <div className="space-y-1">
+          <h1 className="text-xl font-semibold">대시보드</h1>
+          <p className="text-sm text-muted-foreground">
+            문서 원본은 Cushion에 있다. 여기서 만들고, 에이전트는 MCP로 읽고 쓴다.
+          </p>
+        </div>
+        <NewRepoDialog />
       </header>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>새 레포</CardTitle>
-          <CardDescription>
-            slug는 소문자·숫자·하이픈. 만든 사람이 첫 멤버가 되고, 멤버는 레포 화면에서
-            초대한다.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ActionForm
-            action={createRepository}
-            submitLabel="만들기"
-            className="grid gap-3 sm:grid-cols-2"
-          >
-            <Field name="slug" label="slug" placeholder="my-project" required />
-            <Field name="name" label="이름" placeholder="My Project" required />
-            <Field name="github_full_name" label="관련 GitHub (org/repo, 선택)" placeholder="org/repo" />
-            <Field
-              name="mattermost_webhook_url"
-              label="Mattermost webhook (선택)"
-              placeholder="https://…/hooks/…"
-            />
-          </ActionForm>
-        </CardContent>
-      </Card>
 
       {repos.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          아직 레포가 없다. 위에서 만들거나, 팀원에게 초대를 부탁할 것.
+          아직 레포가 없다. &quot;새 레포&quot;로 만들거나, 팀원에게 초대를 부탁할 것.
         </p>
       ) : (
         <ul className="space-y-3">
@@ -86,22 +54,5 @@ export default async function DashboardPage() {
         </ul>
       )}
     </main>
-  );
-}
-
-interface FieldProps {
-  name: string;
-  label: string;
-  placeholder?: string;
-  required?: boolean;
-}
-
-// 같은 name의 필드가 반복될 수 있어 id 대신 label로 감싼다 — 중복 id의 여지를 없앤다.
-function Field({ name, label, placeholder, required }: FieldProps) {
-  return (
-    <Label className="grid gap-1.5">
-      <span>{label}</span>
-      <Input name={name} placeholder={placeholder} required={required} />
-    </Label>
   );
 }

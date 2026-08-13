@@ -7,12 +7,10 @@
 import { Trash2 } from "lucide-react";
 import { notFound } from "next/navigation";
 
-import {
-  addMember,
-  createRepository,
-  removeMember,
-} from "@/actions/repository";
+import { addMember, removeMember } from "@/actions/repository";
 import { ActionForm } from "@/components/ActionForm";
+import { Field } from "@/components/Field";
+import { NewRepoDialog } from "@/components/NewRepoDialog";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -21,8 +19,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { isAdmin } from "@/lib/authz";
 import { supabase } from "@/lib/supabase";
 
@@ -61,28 +57,7 @@ export default async function AdminPage() {
         </p>
       </header>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>레포 등록</CardTitle>
-          <CardDescription>slug는 소문자·숫자·하이픈. 나머지는 나중에 채워도 된다.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ActionForm
-            action={createRepository}
-            submitLabel="등록"
-            className="grid gap-3 sm:grid-cols-2"
-          >
-            <Field name="slug" label="slug" placeholder="cushion" required />
-            <Field name="name" label="이름" placeholder="Cushion" required />
-            <Field name="github_full_name" label="GitHub (org/repo)" placeholder="neruu00/cushion" />
-            <Field
-              name="mattermost_webhook_url"
-              label="Mattermost webhook"
-              placeholder="https://…/hooks/…"
-            />
-          </ActionForm>
-        </CardContent>
-      </Card>
+      <NewRepoDialog />
 
       {repos.length === 0 ? (
         <p className="text-sm text-muted-foreground">등록된 레포가 없다.</p>
@@ -141,24 +116,5 @@ export default async function AdminPage() {
         ))
       )}
     </main>
-  );
-}
-
-interface FieldProps {
-  name: string;
-  label: string;
-  placeholder?: string;
-  type?: string;
-  required?: boolean;
-}
-
-// 같은 name의 필드가 레포 카드마다 반복되므로 id를 쓰지 않는다.
-// label로 감싸면 id 없이도 연결된다 — 중복 id를 만들 여지가 아예 없어진다.
-function Field({ name, label, placeholder, type = "text", required }: FieldProps) {
-  return (
-    <Label className="grid gap-1.5">
-      <span>{label}</span>
-      <Input name={name} type={type} placeholder={placeholder} required={required} />
-    </Label>
   );
 }
