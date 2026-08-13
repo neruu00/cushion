@@ -28,6 +28,7 @@ AI 스펙주도 개발용 스펙 공유 계층. 각 프로젝트 git 레포의 `
 | 타입 검사 | `pnpm typecheck` |
 | 린트 | `pnpm lint` |
 | 테스트 | `pnpm test` — `node --test`. 러너 없음, `*.test.ts` 직접 실행 |
+| 인수 검증 | `pnpm acceptance` — SPEC §11을 실 DB로 관통한다. **dev 서버가 떠 있어야 한다** |
 | 빌드 | `pnpm build` |
 | **전체 검증** | `pnpm verify` — 타입 + 린트 + 테스트 + 빌드 |
 
