@@ -58,6 +58,17 @@
 
 **근거**: Cushion이 GitHub API를 당기면 GitHub App/PAT·권한 설정·레이트리밋·토큰 회전이 전부 딸려온다. 반대로 하면 전부 사라진다 — CI는 이미 파일을 체크아웃해 놨다. **Cushion은 GitHub 자격증명을 하나도 갖지 않는다.**
 
+### D-008. 토큰 파싱(순수)과 토큰 조회(DB)를 다른 파일에 둔다 (2026-08-13)
+
+**결정**: `lib/token.ts`는 `node:crypto`만 쓰는 순수 함수(발급·sha256·접두사 파싱), DB를 타는
+`emailFromAccessToken` / `repoFromSyncToken`은 `lib/authz.ts`에 둔다.
+
+**근거**: 토큰 종류 분리(`cshn_pat_` vs `cshn_sync_`)가 보안의 핵심인데, 같은 파일에 Supabase
+클라이언트가 있으면 `node --test`로 그 한 줄을 검증할 수 없다(환경변수 + `@/` 별칭 때문에
+plain Node가 import를 못 한다). 러너를 추가하는 대신 파일을 나눴다 — 의존성 0개.
+
+**재검토 조건**: 테스트 러너를 어차피 들이게 될 때. 그때도 나눠 둬서 손해는 없다.
+
 ### D-007. Next.js 16을 쓴다 (블로그 프로젝트는 15) (2026-08-13)
 
 **근거**: 신규 프로젝트라 최신을 유지한다. 대신 `middleware.ts` → `proxy.ts`, 동기 요청 API 제거, `revalidateTag` 2인자 등 실제 차이가 있으므로 **코드 작성 전 `node_modules/next/dist/docs/` 확인이 필수**다. `AGENTS.md` §1 참조.
@@ -74,26 +85,35 @@
 | shadcn/ui 초기화 | base·nova (Base UI + Lucide + Geist), `components.json` |
 | 의존성 | `@supabase/supabase-js`, `next-auth@5.0.0-beta.32`, `zod@4` |
 | 스크립트 | `typecheck`, `verify` 추가 |
-| 초기 스키마 SQL | `supabase/migrations/0001_init.sql` — **실행 대기** |
+| 초기 스키마 SQL | `supabase/migrations/0001_init.sql` |
 | 환경변수 | `.env.local` 전 항목 채움, `.env.example` 커밋 |
+| DB 마이그레이션 실행 | 6개 테이블 실재 확인 (T-001) |
+| 기반 레이어 | `lib/supabase.ts` · `auth.ts` · `authz.ts` · `token.ts` · `proxy.ts` (T-101~105) |
 
 ---
 
 ## 🚧 T-0. 착수 전 차단 항목
 
-- [ ] **T-001** `supabase/migrations/0001_init.sql`을 Supabase SQL Editor에서 실행.
-      **사람이 실행한다** — 에이전트는 SQL만 작성한다.
-      실행 후 `repositories` / `repository_members` / `documents` / `sync_events` / `access_tokens` / `token_cursors` 6개 테이블 존재 확인.
+- [x] **T-001** `supabase/migrations/0001_init.sql` 실행 완료.
+      6개 테이블(`repositories` / `repository_members` / `documents` / `sync_events` /
+      `access_tokens` / `token_cursors`) 실재 확인함.
 
 ---
 
 ## 🔨 T-1. 기반
 
-- [ ] **T-101** `lib/supabase.ts` — service_role 단일 클라이언트. **파일 상단에 "RLS 없음, 호출부가 권한 검사" 주석 필수**
-- [ ] **T-102** `lib/auth.ts` — NextAuth v5 Google. 세션에 이메일(lowercase)만 담는다
-- [ ] **T-103** `lib/authz.ts` — `isAdmin()`(ADMIN_EMAILS, **비면 false**), `getMemberRepoIds(email)`, `assertRepoAccess()`
-- [ ] **T-104** `lib/token.ts` — 발급(`cshn_pat_`/`cshn_sync_`) · `sha256` 해시 · 검증 · `last_used_at` 갱신. **평문 저장 경로가 존재하지 않게 설계**
-- [ ] **T-105** `proxy.ts` — `/admin`, `/settings` 세션 게이트. **이건 UX용이고 권한의 실체가 아니다**(서버 액션을 못 막는다)
+- [x] **T-101** `lib/supabase.ts` — service_role 단일 클라이언트(`supabase`). 상단에 RLS 경고 주석
+- [x] **T-102** `lib/auth.ts` — NextAuth v5 Google + `app/api/auth/[...nextauth]/route.ts`.
+      `jwt` 콜백에서 이메일 lowercase, `name`·`picture`는 쿠키에서 제거
+- [x] **T-103** `lib/authz.ts` — `getSessionEmail()`, `isAdminEmail()`/`isAdmin()`(**비면 false**),
+      `getMemberRepoIds()`, `getAccessibleRepos()`, `getAccessibleRepo()`,
+      `emailFromAccessToken()`, `repoFromSyncToken()`
+      *`assertRepoAccess()` 대신 `getAccessibleRepo(email, slug) → Repo | null`.*
+      *호출부가 null을 404로 처리한다 — 던지면 403/404 구분이 호출부에서 사라진다*
+- [x] **T-104** `lib/token.ts` — 발급(`cshn_pat_`/`cshn_sync_`) · `sha256` · `hashFromAuthHeader()`.
+      평문은 `generateToken` 반환값에만 존재. DB 조회·`last_used_at`은 `authz.ts` (D-008).
+      `lib/token.test.ts`가 종류 분리를 검증한다
+- [x] **T-105** `proxy.ts` — `/admin`, `/settings` 세션 게이트. **UX용이고 권한의 실체가 아니다**
 
 ## 🖥 T-2. 관리 화면
 
