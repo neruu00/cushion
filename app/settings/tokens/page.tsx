@@ -67,7 +67,12 @@ export default async function TokensPage() {
       <Card>
         <CardHeader>
           <CardTitle>새 토큰</CardTitle>
-          <CardDescription>이름은 어디에 꽂았는지 나중에 알아보려고 쓴다.</CardDescription>
+          <CardDescription>
+            발급하면 붙여넣을 <code>claude mcp add</code> 명령이 같이 나온다. 아무 디렉터리에서
+            한 번 실행하면 끝 — 레포를 받을 필요도, 환경변수를 심을 필요도 없다.
+            토큰은 <code>~/.claude.json</code> 에 평문으로 남는다(환경변수를 dotfile에 두는 것과
+            같은 등급이다). 새면 재발급하면 되고, 그 순간 옛 토큰은 죽는다.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <ActionForm action={createAccessToken} submitLabel="발급">

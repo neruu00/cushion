@@ -81,20 +81,19 @@ pnpm dev
 
 ## 에이전트 붙이기
 
-`/settings/tokens`에서 access token을 발급받아 개인 환경변수 `CUSHION_TOKEN`에 넣는다.
-`.mcp.json`은 커밋되므로 토큰을 박지 않고 환경변수 확장을 쓴다.
+`/settings/tokens`에서 발급하면 붙여넣을 명령이 토큰이 박힌 채로 같이 나온다.
+아무 디렉터리에서 한 번 실행하면 끝 — **레포를 받을 필요도, 환경변수를 심을 필요도 없다.**
 
-```json
-{
-  "mcpServers": {
-    "cushion": {
-      "type": "http",
-      "url": "https://<cushion>/api/mcp",
-      "headers": { "Authorization": "Bearer ${CUSHION_TOKEN}" }
-    }
-  }
-}
 ```
+claude mcp add --transport http --scope user cushion https://<cushion>/api/mcp --header "Authorization: Bearer cshn_pat_..."
+```
+
+여기에 토큰을 직접 넣는 이유는 이 명령이 쓰는 `~/.claude.json`이 커밋되지 않기 때문이다.
+평문으로 남으므로 새면 재발급한다 — 그 순간 옛 토큰은 죽는다.
+
+레포에 커밋해 팀 전체에 배포하고 싶으면 `.mcp.json`을 쓴다. 그건 커밋되는 파일이라
+토큰을 박지 않고 환경변수(`CUSHION_TOKEN`) 확장을 쓴다. `/admin`의 레포 등록 화면이 그
+스니펫을 낸다.
 
 | 툴 | 하는 일 |
 |---|---|

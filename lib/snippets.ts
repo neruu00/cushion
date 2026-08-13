@@ -101,6 +101,18 @@ jobs:
 `;
 }
 
+/**
+ * 발급 직후 1회만 보여주는 연결 명령. **여기엔 토큰을 직접 넣는다** —
+ * `claude mcp add`가 쓰는 파일(`~/.claude.json`)은 커밋되지 않기 때문이다.
+ * 커밋되는 `.mcp.json`에는 절대 박지 않는다 (SPEC §7).
+ *
+ * 한 줄로 낸다. 백슬래시 줄바꿈은 PowerShell·cmd에서 깨진다 —
+ * 큰따옴표 하나만 쓰면 bash·PowerShell·cmd 셋 다에 그대로 붙는다.
+ */
+export function connectCommand(token: string): string {
+  return `claude mcp add --transport http --scope user cushion ${baseUrl()}/api/mcp --header "Authorization: Bearer ${token}"\n`;
+}
+
 /** `.mcp.json`은 커밋되므로 토큰을 박지 않는다. 환경변수 확장을 쓴다. (SPEC §7) */
 function mcpJson(): string {
   return `${JSON.stringify(

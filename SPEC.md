@@ -280,6 +280,23 @@ Next.js 라우트 핸들러(`/api/mcp`)로 Streamable HTTP MCP를 서빙. 인증
 
 ### 팀원 설정
 
+**기본 경로는 명령 한 줄이다.** `/settings/tokens`에서 토큰을 발급하면 아래 명령이 토큰이
+박힌 채로 같이 나온다. 아무 디렉터리에서 실행하면 끝 — 레포를 받을 필요도, 환경변수를
+심을 필요도 없다.
+
+```
+claude mcp add --transport http --scope user cushion https://<cushion>/api/mcp --header "Authorization: Bearer cshn_pat_..."
+```
+
+여기에 토큰을 직접 넣어도 되는 이유는 이 명령이 쓰는 파일(`~/.claude.json`)이 **커밋되지
+않기 때문이다.** 대신 평문으로 남으므로 유출 시 대응은 재발급이다(구 토큰 즉시 사망).
+프로젝트별로 격리하고 싶으면 `--scope project`로 바꾼다.
+
+읽으려는 문서가 있는 레포를 클론하지 않는 게 이 도구를 쓰는 이유다. 연결에 클론을
+요구하면 앞뒤가 안 맞는다.
+
+#### 레포에 커밋해 공유하고 싶을 때
+
 `.mcp.json`은 커밋되므로 **토큰을 박지 않는다**, 환경변수 확장을 쓴다:
 
 ```json
@@ -293,6 +310,8 @@ Next.js 라우트 핸들러(`/api/mcp`)로 Streamable HTTP MCP를 서빙. 인증
   }
 }
 ```
+
+이 경로는 각자가 `CUSHION_TOKEN`을 따로 심어야 한다. 팀에 한 번에 배포할 때만 쓴다.
 
 ---
 
