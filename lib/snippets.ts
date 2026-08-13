@@ -56,6 +56,23 @@ jobs:
           MESSAGE: \${{ github.event.head_commit.message || '' }}
         run: |
           set -euo pipefail
+
+          # 토큰을 먼저 본다. 안 그러면 curl이 401만 뱉고 끝나서
+          # Secret이 비었는지, 종류가 틀렸는지, 값이 깨졌는지를 로그로 구분할 수 없다.
+          if [ -z "\${CUSHION_SYNC_TOKEN:-}" ]; then
+            echo "::error::CUSHION_SYNC_TOKEN Secret이 비어 있다. Settings > Secrets and variables > Actions 에 추가할 것. Environment secret으로 넣었다면 job에 environment: 를 선언해야 보인다"
+            exit 1
+          fi
+          case "$CUSHION_SYNC_TOKEN" in
+            cshn_sync_*) ;;
+            cshn_pat_*)
+              echo "::error::access 토큰(cshn_pat_)이 들어갔다. /admin이 주는 sync 토큰(cshn_sync_)이어야 한다"
+              exit 1 ;;
+            *)
+              echo "::error::sync 토큰 형식이 아니다. cshn_sync_ 로 시작해야 한다 — 값에 따옴표·공백·'Bearer '가 섞였는지 확인"
+              exit 1 ;;
+          esac
+
           SPEC='\\.md$'
 
           # before가 all-zeros면 신규 브랜치/force push다. HEAD~1로 대체하지 않는다
