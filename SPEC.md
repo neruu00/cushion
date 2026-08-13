@@ -27,8 +27,8 @@ AI 스펙주도 개발에서 실제로 지불하는 비용은 문서 작성이 �
 
 | # | 원칙 | 귀결 |
 |---|---|---|
-| P1 | **스펙 원본은 각 프로젝트 git 레포의 `.md`** | Cushion은 읽기 전용 거울 |
-| P2 | 문서 수정은 PR로 한다 | 편집 UI·문서 CRUD API 없음 |
+| P1 | **스펙 원본은 Cushion에 있다** (D-011) | 되돌릴 git이 없다 → 이력·잠금·내보내기가 필수 |
+| P2 | 수정은 웹 화면과 MCP 쓰기 툴로 한다 | 동시 편집은 `base_sha`로 거부. 병합하지 않는다 |
 | P3 | 접근 가능 유저는 **이메일로 사전 등록** | 미등록자는 로그인해도 아무것도 못 본다 |
 | P4 | admin은 **환경변수**로 지정 | DB에 role 컬럼 없음 |
 | P5 | 에이전트는 **AccessToken**으로 붙는다 | 재발급 가능 |
@@ -36,15 +36,14 @@ AI 스펙주도 개발에서 실제로 지불하는 비용은 문서 작성이 �
 | P7 | 에이전트가 항상 최신을 구독하되 **토큰 소모 최소** | 폴링·상시연결 금지, 커서 방식 |
 | P8 | 스펙 작성자는 전원 개발자 | UI는 얇게 |
 
-### P1이 지우는 것 (만들지 않는다)
+### P1이 요구하는 것 (git이 하던 일을 대신한다)
 
-| 안 만듦 | 이유 |
+| 잃은 것 | 대신 두는 것 |
 |---|---|
-| 문서 CRUD | git이 한다. **에이전트 쓰기 = 파일 편집 + PR**, 이미 되는 것 |
-| 버전 이력 테이블 | git history가 이력이다 |
-| 낙관적 잠금 / 충돌 해결 | git merge가 처리한다 |
-| 편집 UI | PR로 고친다 |
-| "변경 끌어오기" 기능 | 같은 레포면 `git pull`이 공짜로, 다른 레포는 `spec_get`이 바로 준다 |
+| git history · blame | `document_versions` (append-only, 삭제해도 남는다) |
+| 브랜치 · 머지 | 없음. `base_sha` 낙관적 잠금으로 **거부만** 한다 |
+| PR 리뷰 | 없음. 이게 이 결정의 실제 대가다 |
+| "서비스가 죽어도 로컬 파일" | `/api/export` — **유일한 탈출구다** |
 
 그 외 제외: 브라우저 푸시, SMS, Notion 연동, 임베딩·벡터 검색, 개인별 알림 구독, 다크모드 토글.
 
@@ -76,47 +75,27 @@ Next.js **16** App Router / Tailwind v4 + shadcn/ui(base·nova) / Supabase(Postg
 
 ---
 
-## 4. 동기화 — 레포가 민다 (Cushion이 당기지 않는다)
+## 4. 문서 수명주기
 
-Cushion이 GitHub API를 당기면 GitHub App/PAT·권한 설정·레이트리밋·토큰 회전이 전부 딸려온다. 반대로 하면 전부 사라진다 — CI는 이미 파일을 체크아웃해 놨다.
-**Cushion은 GitHub 자격증명을 하나도 갖지 않는다.**
-
-### 각 프로젝트 레포에 넣는 파일
-
-`.github/workflows/cushion-sync.yml`
+문서는 Cushion에서 만들어지고 고쳐지고 지워진다. 외부에서 밀어 넣는 경로는 없다.
 
 ```
-on:
-  push:        paths: ['**.md']      # 누락이 소음보다 나쁘다. 시끄러워지면 그때 좁힌다
-  workflow_dispatch:   # 전체 동기화용
-
-jobs:
-  checkout (fetch-depth: 0)
-  → 변경 파일 내용 + 삭제 경로 + git diff + 커밋 메타 수집
-  → POST {CUSHION_URL}/api/sync
-     Authorization: Bearer ${{ secrets.CUSHION_SYNC_TOKEN }}
+편집(웹 화면 | spec_put)
+  → base_sha 확인 (어긋나면 409, 병합 안 함)
+  → document_versions 에 이전 본문 적재
+  → documents 갱신
+  → sync_events 적재  (요약: 경로 + 바뀐 ## 섹션 + 증감)
+  → Mattermost POST
 ```
 
-### 서버 수신 처리
+쓰기는 `lib/document.ts` 하나를 지나고, 뒷정리는 `lib/mirror.ts`가 한다.
+**외부 API 의존성 0.** 요약 경로에 LLM을 심으면 LLM이 죽을 때 편집이 같이 죽는다.
 
-1. sync 토큰 검증 → 레포 식별
-2. `documents` upsert / 삭제 경로 제거
-3. 변경 경로 + 바뀐 `##` 헤딩으로 **구조적 요약** 생성 (LLM 없음 — §8 참조)
-4. `sync_events` 적재
-5. Mattermost webhook POST
+### 반드시 처리할 3가지
 
-**외부 API 의존성 0.** 미러 갱신 경로에 LLM을 심으면 LLM이 죽을 때 동기화가 같이 죽는다.
-
-### 반드시 처리할 4가지
-
-1. **삭제 동기화** — 파일이 지워졌는데 미러에 남으면 에이전트가 삭제된 스펙을 읽는다. 이 도구가 없애려는 드리프트를 이 도구가 만든다. `changed`와 **`deleted` 경로를 둘 다** 전송
-2. **최초 전체 동기화** — 레포 등록 직후엔 문서가 0건. `workflow_dispatch` + `full=true`로 전량 전송
-3. **diff는 Action이 만든다** — Cushion에 git이 없다. 요약과 델타의 원본이 diff이므로 CI에서 떠서 실어 보낸다
-4. **`github.event.before`가 all-zeros**(신규 브랜치/force push)면 diff 대신 전체 스냅샷 폴백. `HEAD~1`은 쓰지 않는다 — 한 push에 커밋이 여러 개일 수 있다
-
-페이로드가 크면 잘라내고 "일부 생략" 표기. 알림 하나가 토큰을 태우면 본말전도다.
-
----
+1. **`base_sha` 없는 덮어쓰기 금지** — 조용한 덮어쓰기가 제일 나쁘다. 거부하고 현재 sha를 알려준다
+2. **덮기 전에 이력** — 삭제할 때도 남긴다. 되돌릴 근거가 그것뿐이다
+3. **내보내기를 살려 둔다** — git이 없으므로 `/api/export`가 끊기면 탈출구가 사라진다
 
 ## 5. 데이터 모델
 
@@ -127,7 +106,6 @@ repositories (
   name text,
   github_full_name text,              -- 'org/repo'. 원본 링크 + 후일 드리프트 감지
   mattermost_webhook_url text,        -- 레포당 채널 1개
-  sync_token_hash text,
   created_at timestamptz
 )
 
@@ -140,20 +118,33 @@ repository_members (
   primary key (repository_id, email)
 )
 
--- 미러. 원본이 아니므로 version 컬럼도 이력 테이블도 없다
+-- 원본이다. 캐시가 아니다 (D-011)
 documents (
   id uuid pk,
   repository_id uuid references repositories(id) on delete cascade,
-  path text,
+  path text,                          -- .md 로 끝난다
   title text,
   content text,
-  content_sha text,                   -- 조건부 조회(if_none_match)용
-  commit_sha text,
+  content_sha text,                   -- if_none_match(읽기)와 base_sha(쓰기)가 같이 쓴다
   updated_at timestamptz,
+  updated_by text,                    -- lowercase
   unique (repository_id, path)
 )
 
--- 델타 피드 + 알림 원본. git history의 스펙 관련 부분만 캐시
+-- git history를 대신한다. append-only.
+-- documents(id)를 참조하지 않는다 — 참조하면 문서 삭제 시 이력이 같이 사라진다
+document_versions (
+  id bigserial pk,
+  repository_id uuid references repositories(id) on delete cascade,
+  path text,
+  content text,
+  content_sha text,
+  author text,                        -- lowercase
+  note text,
+  created_at timestamptz
+)
+
+-- 델타 피드 + 알림 원본. 편집 한 번이 한 행
 sync_events (
   id bigserial pk,
   repository_id uuid references repositories(id) on delete cascade,
@@ -202,14 +193,13 @@ token_cursors (
 
 **핵심**: 토큰에 권한을 굽지 않는다. 토큰은 이메일까지만 해석하고, 레포 권한은 **요청 시점에 조회**한다. 멤버에서 빼면 토큰 재발급 없이 즉시 차단된다.
 
-### 두 종류의 토큰은 섞지 않는다
+### 토큰은 읽기 전용이 아니다 (D-011로 바뀐 지점)
 
-| | 접두사 | 주체 | 방향 | 스코프 | 보관 |
-|---|---|---|---|---|---|
-| **sync token** | `cshn_sync_` | 레포(CI) | 쓰기 (미러 갱신) | 그 레포 하나 | GitHub Secret |
-| **access token** | `cshn_pat_` | 사람 | 읽기 (스펙 조회) | 그 사람의 모든 레포 | 개인 환경변수 |
+`cshn_pat_` 한 종류이고 **읽기와 쓰기를 모두 한다.** 원본이 Cushion에 있으므로
+유출된 토큰은 열람뿐 아니라 **스펙 훼손**도 할 수 있다.
 
-섞으면 CI 토큰 유출이 곧 전체 스펙 열람이 된다.
+완화 수단은 두 가지뿐이다: `document_versions`로 되돌릴 수 있게 해 두는 것,
+그리고 `last_used_at` + 즉시 폐기. 이 둘을 깨뜨리면 남는 방어가 없다.
 
 ### 반드시 지킬 것
 
@@ -228,7 +218,7 @@ token_cursors (
 
 ### 부트스트랩
 
-`ADMIN_EMAILS`에 든 사람이 첫 로그인 → 레포 생성 → sync 토큰 발급 → 멤버 등록.
+`ADMIN_EMAILS`에 든 사람이 첫 로그인 → 레포 생성 → 멤버 등록 → 문서 작성.
 
 ### 반환 규약
 
@@ -247,7 +237,7 @@ type ActionResult<T = void> =
 ## 7. MCP 서버 (원격 HTTP) — 토큰 절감의 본체
 
 Next.js 라우트 핸들러(`/api/mcp`)로 Streamable HTTP MCP를 서빙. 인증은 Bearer access token.
-**읽기 전용 — 쓰기 툴 없음.**
+읽기 4종 + 쓰기 2종.
 
 | 툴 | 인자 | 반환 | 목적 |
 |---|---|---|---|
@@ -256,8 +246,12 @@ Next.js 라우트 핸들러(`/api/mcp`)로 Streamable HTTP MCP를 서빙. 인증
 | `spec_search` | `repo?, query` | 매칭된 섹션 상위 N개 | substring 스코어링. **임베딩·벡터DB 금지** — 스펙 수십 개 규모에서 정당화 안 된다 |
 | `spec_changes_since` | `repo?, since?` | 커서 이후 `sync_events` 요약 | `since` 생략 시 저장된 커서 사용 후 전진 |
 
+| `spec_put` | `repo, path, content, base_sha?, note?` | 새 sha 또는 충돌 | 생성·수정. **기존 문서는 `base_sha` 필수** — 어긋나면 거부하고 현재 sha를 준다 |
+| `spec_delete` | `repo, path, base_sha, note?` | 결과 | 삭제. 이전 본문은 이력에 남는다 |
+
 - 섹션 분할은 `^## ` 기준 문자열 split. 마크다운 파서 의존성 불필요
-- 권한 없는 레포는 응답에 애초에 등장하지 않는다
+- 권한 없는 레포는 응답에 애초에 등장하지 않는다. **읽기와 쓰기의 문턱이 같다** — 보이면 고칠 수 있다
+- 충돌 응답에 현재 sha를 실어 주는 이유: 에이전트가 사람을 부르지 않고 스스로 회복하게
 
 ### 구독 — 폴링도 커넥션도 없이 (P7)
 
@@ -351,7 +345,8 @@ diff가 짧으면(예: 40줄 이하) 원문 diff를 그대로 덧붙인다. 스�
 | `/[repo]` | 문서 목록 + 최근 변경(`sync_events`) 타임라인 |
 | `/[repo]/[...path]` | 문서 보기 + GitHub 원본 링크 |
 | `/settings/tokens` | access token 발급·재생성 (직후 1회 노출) |
-| `/admin` | 레포 생성, sync 토큰 발급, 멤버 등록/삭제, webhook URL — admin만 |
+| `/[repo]/new`, `/[repo]/edit/[...path]` | 문서 작성·편집·삭제 |
+| `/admin` | 레포 생성, 멤버 등록/삭제, webhook URL, 전체 내보내기 — admin만 |
 
 ### 셋업
 
@@ -376,7 +371,7 @@ highlight.js와 테마 CSS가 값어치보다 먼저 딸려온다. 코드 블록
 - **서버 컴포넌트가 기본.** `'use client'`는 토큰 복사 버튼, 삭제 확인 다이얼로그 같은 최소 리프에만
 - shadcn 기본 토큰을 그대로 쓴다. 커스텀 팔레트를 새로 만들지 않는다
 - 다크모드 토글은 v1에서 뺀다 (`next-themes` 미도입)
-- **`/admin`의 레포 생성 직후 화면에 `cushion-sync.yml`과 `.mcp.json`을 복붙 가능한 형태로 그대로 출력한다.** 별도 설치 가이드 문서를 만들지 않아도 된다
+- **토큰 발급 화면이 `claude mcp add` 명령을 통째로 출력한다.** 별도 설치 가이드가 필요 없다
 
 ---
 
@@ -396,7 +391,7 @@ highlight.js와 테마 CSS가 값어치보다 먼저 딸려온다. 코드 블록
 
 Google OAuth는 블로그 프로젝트의 클라이언트를 재사용한다 — GCP 콘솔에서 승인된 리디렉션 URI에 `http://localhost:3000/api/auth/callback/google`(및 배포 도메인)을 추가하면 끝.
 
-**DB에 있고 환경변수가 아닌 것**: Mattermost webhook URL(레포별), sync 토큰(앱이 발급), access 토큰(앱이 발급).
+**DB에 있고 환경변수가 아닌 것**: Mattermost webhook URL(레포별), access 토큰(앱이 발급).
 
 `.env.local`은 커밋하지 않는다.
 
@@ -420,21 +415,24 @@ Google OAuth는 블로그 프로젝트의 클라이언트를 재사용한다 —
 - `ADMIN_EMAILS` 빈 값 → `/admin` 거부 (fail-closed)
 - `A@x.com` 등록 후 `a@x.com` 로그인 → 접근됨 (정규화)
 - 토큰 재생성 후 구 토큰 → 401
-- **sync 토큰으로 `/api/mcp` 호출 → 거부** (토큰 종류 분리)
-- 레포 A의 sync 토큰으로 레포 B 갱신 시도 → 거부
+- 접두사가 다른 키(`ghp_…` 등)로 `/api/mcp` 호출 → 거부
+- 멤버가 아닌 레포에 쓰기 시도 → 거부
 - 서버 액션을 세션 없이 직접 호출 → 거부
 
-### 3. 동기화
+### 3. 쓰기
 
-- 스펙 1개 수정 push → 미러 반영 + Mattermost 수신
-- **스펙 파일 삭제 push → 미러에서도 사라지는지**
-- `workflow_dispatch` 전체 동기화 → 신규 레포가 전량 채워지는지
-- 신규 브랜치 push(`before` all-zeros) → 죽지 않고 스냅샷 폴백
-- 스펙 외 파일만 바뀐 push → 트리거 안 됨
+- 새 문서 → 목차에 뜨는지
+- 수정 → 이전 본문이 `document_versions`에 남는지, `updated_by`가 찍히는지
+- **낡은 `base_sha`로 수정 → 거부되고 본문이 그대로인지** (이 모델 전체가 여기 걸려 있다)
+- `base_sha` 없이 기존 문서 덮기 → 거부
+- 삭제 → 목차에서 사라지고 **이력은 남는지**
+- `.md`가 아닌 경로 → 거부
+- 멤버 아닌 레포에 `spec_put` → 거부
+- **내보내기에 모든 문서와 본문이 담기는지** (git이 없으니 이게 백업의 전부다)
 
 ### 4. 구독
 
-- 에이전트가 `spec_get` 호출 → 다른 사람이 push → 다음 툴 호출 응답에 `[stale]` 등장
+- 에이전트가 `spec_get` 호출 → 다른 사람이 `spec_put` → 다음 툴 호출 응답에 `[stale]` 등장
 - `spec_changes_since()` 호출 → 요약 반환 후 커서 전진 → 다음 호출에 `[stale]` 사라짐
 - `if_none_match`에 현재 sha → `{unchanged:true}`
 
@@ -456,6 +454,7 @@ Google OAuth는 블로그 프로젝트의 클라이언트를 재사용한다 —
 | 구조적 요약으로 "뭐가 바뀐지 모르겠다"가 나올 때 | LLM diff 요약 — `summary` 생성 함수만 교체, 실패 시 fail-open (§8) |
 | 알림이 시끄러워졌을 때 | 개인별 구독 규칙 |
 | 코드-스펙 드리프트를 잡고 싶을 때 | `github_full_name` 활용 — 코드 변경 있고 연결된 스펙 변경 없으면 PR 코멘트 |
+| 동시 편집 거부가 잦아질 때 | 섹션 단위 잠금. 그래도 **자동 병합은 하지 않는다** |
 | 클라이언트 지원이 확인됐을 때 | MCP `resources/subscribe` 실시간 푸시 (지금은 커서로 충분) |
 | 비개발자가 스펙을 **써야** 할 때 | 제안 → PR 자동 생성 (원본은 계속 git) |
 | substring 검색이 부족해질 때 | `to_tsvector` + GIN → 그래도 안 되면 임베딩 |

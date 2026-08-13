@@ -12,7 +12,8 @@ export type ActionResult<T = void> =
  * `files`는 함께 보여줄 붙여넣기용 설정 파일 (T-202).
  */
 export interface SecretPayload {
-  secret: string;
+  /** 1회 노출할 비밀값. 보여줄 게 없으면 생략한다 (설정 파일만 주는 경우) */
+  secret?: string;
   hint: string;
   files?: { name: string; content: string }[];
 }

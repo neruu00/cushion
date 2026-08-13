@@ -2,7 +2,8 @@
  * @file lib/mcp.ts
  * @description MCP 툴 4종과 구독 커서 (T-402, T-403, T-404). 전송 계층은 app/api/mcp/route.ts.
  *
- * **읽기 전용이다. 쓰기 툴을 만들지 않는다** — 원본은 git이고 여기는 미러다 (D-001).
+ * **원본이 여기 있으므로 쓰기 툴이 있다** (D-011). 그래서 유출된 PAT는 열람뿐 아니라
+ * 훼손도 할 수 있다 — 복구 근거는 `document_versions`뿐이다. (SPEC §6)
  *
  * 절감의 본체가 여기다: 목차 먼저(spec_outline) → 필요한 섹션만(spec_get) →
  * 안 바뀌었으면 본문 대신 5토큰(if_none_match) → 밀렸을 때만 한 줄([stale]).
@@ -10,6 +11,8 @@
 import { z } from "zod";
 
 import { getAccessibleRepos, type Repo, type TokenIdentity } from "@/lib/authz";
+import { deleteDocument, putDocument } from "@/lib/document";
+import { deleteDocumentSchema, putDocumentSchema } from "@/lib/document.schema";
 import { findSection, headings, scoreSection, snippet, splitSections } from "@/lib/spec";
 import { supabase } from "@/lib/supabase";
 
@@ -21,7 +24,8 @@ export const SERVER_INFO = { name: "cushion", version: "0.1.0" } as const;
  */
 export const INSTRUCTIONS =
   "스펙 파일을 통째로 읽지 말 것. spec_outline으로 목차를 본 뒤 필요한 섹션만 spec_get(heading). " +
-  "재조회는 if_none_match에 직전 sha를 넣는다. 응답 끝에 [stale]이 있으면 spec_changes_since.";
+  "재조회는 if_none_match에 직전 sha. 응답 끝에 [stale]이 있으면 spec_changes_since. " +
+  "고칠 땐 spec_get으로 받은 sha를 spec_put의 base_sha에 그대로 넘긴다.";
 
 export const TOOLS = [
   {
@@ -67,6 +71,36 @@ export const TOOLS = [
         repo: { type: "string" },
         since: { type: "number", description: "이벤트 id. 주면 커서를 움직이지 않는다" },
       },
+    },
+  },
+  {
+    name: "spec_put",
+    description:
+      "문서를 만들거나 고친다. 고칠 때는 spec_get으로 받은 sha를 base_sha에 넣어야 한다 — 그 사이 남이 고쳤으면 거부되고 현재 sha를 돌려준다. 새 문서면 base_sha를 생략한다. 내용은 전체를 보낸다(부분 수정 아님).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        repo: { type: "string" },
+        path: { type: "string", description: "레포 루트 기준 경로. .md 로 끝나야 한다" },
+        content: { type: "string", description: "문서 전체 내용" },
+        base_sha: { type: "string", description: "직전 spec_get의 sha. 새 문서면 생략" },
+        note: { type: "string", description: "무엇을 왜 바꿨는지 한 줄" },
+      },
+      required: ["repo", "path", "content"],
+    },
+  },
+  {
+    name: "spec_delete",
+    description: "문서를 지운다. base_sha가 필요하다. 이전 본문은 이력에 남아 되돌릴 수 있다.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        repo: { type: "string" },
+        path: { type: "string" },
+        base_sha: { type: "string" },
+        note: { type: "string" },
+      },
+      required: ["repo", "path", "base_sha"],
     },
   },
 ] as const;
@@ -238,6 +272,10 @@ export async function callTool(
       return specSearch(context, rawArgs);
     case "spec_changes_since":
       return specChangesSince(context, rawArgs);
+    case "spec_put":
+      return specPut(context, rawArgs);
+    case "spec_delete":
+      return specDelete(context, rawArgs);
     default:
       return { text: `그런 툴이 없다: ${name}`, isError: true };
   }
@@ -377,4 +415,49 @@ async function specChangesSince(context: McpContext, rawArgs: unknown): Promise<
   }
 
   return { text: blocks.length > 0 ? blocks.join("\n\n") : "변경 없음" };
+}
+
+// ─── 쓰기 ────────────────────────────────────────────────────────────
+
+/**
+ * 충돌은 에러로 돌려주되 **현재 sha를 같이 준다.** 그래야 에이전트가 사람을 부르지 않고
+ * spec_get → 다시 편집 → spec_put 으로 스스로 회복한다.
+ */
+async function specPut(context: McpContext, rawArgs: unknown): Promise<ToolResult> {
+  const args = putDocumentSchema.safeParse(rawArgs ?? {});
+  if (!args.success) return badArgs(args.error.issues[0].message);
+
+  const result = await putDocument({
+    email: context.identity.email,
+    repo: args.data.repo,
+    path: args.data.path,
+    content: args.data.content,
+    baseSha: args.data.base_sha,
+    note: args.data.note,
+  });
+
+  if (!result.ok) {
+    const current = result.currentSha ? ` 현재 sha:${result.currentSha}` : "";
+    return { text: `${result.message}${current}`, isError: true };
+  }
+  return { text: `저장했다 ${args.data.repo}/${args.data.path} sha:${result.sha}` };
+}
+
+async function specDelete(context: McpContext, rawArgs: unknown): Promise<ToolResult> {
+  const args = deleteDocumentSchema.safeParse(rawArgs ?? {});
+  if (!args.success) return badArgs(args.error.issues[0].message);
+
+  const result = await deleteDocument({
+    email: context.identity.email,
+    repo: args.data.repo,
+    path: args.data.path,
+    baseSha: args.data.base_sha,
+    note: args.data.note,
+  });
+
+  if (!result.ok) {
+    const current = result.currentSha ? ` 현재 sha:${result.currentSha}` : "";
+    return { text: `${result.message}${current}`, isError: true };
+  }
+  return { text: `지웠다 ${args.data.repo}/${args.data.path}` };
 }

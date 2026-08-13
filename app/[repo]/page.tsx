@@ -77,10 +77,18 @@ export default async function RepoPage({ params }: PageProps<"/[repo]">) {
       </header>
 
       <section className="space-y-2">
-        <h2 className="text-sm font-medium">문서</h2>
+        <div className="flex items-center justify-between gap-4">
+          <h2 className="text-sm font-medium">문서</h2>
+          <Link
+            href={`/${repo.slug}/new`}
+            className="text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
+          >
+            새 문서
+          </Link>
+        </div>
         {documents.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            아직 동기화된 문서가 없다. 레포에서 <code>cushion-sync</code> 워크플로를 한 번 돌릴 것.
+            아직 문서가 없다. 위의 &quot;새 문서&quot;로 만들거나, 에이전트가 <code>spec_put</code>으로 만든다.
           </p>
         ) : (
           <ul className="divide-y rounded-lg border">

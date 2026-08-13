@@ -2,8 +2,8 @@
 
 > 쿠션이 완충해 토큰을 줄인다.
 
-AI 스펙주도 개발용 **스펙 공유 계층**. 각 프로젝트 git 레포의 `.md`를 미러링해서
-팀에는 변경 알림을 보내고, 에이전트에는 MCP로 **필요한 조각만** 준다.
+AI 스펙주도 개발용 **스펙 공유 계층**. 여러 레포가 함께 보는 스펙을 한곳에 두고,
+팀에는 변경 알림을 보내고, 에이전트에는 MCP로 **필요한 조각만** 읽고 쓰게 한다.
 
 목적은 하나 — 에이전트가 같은 문서를 반복해서 컨텍스트에 싣느라 태우는 토큰을 줄이는 것.
 
@@ -18,20 +18,22 @@ AI 스펙주도 개발용 **스펙 공유 계층**. 각 프로젝트 git 레포�
 ## 어떻게 동작하나
 
 ```
-프로젝트 레포                    Cushion                        읽는 쪽
-─────────────                  ─────────                      ────────
-.specs/**  ─push→  GitHub Action ─POST /api/sync→  documents ─MCP→ 에이전트
-AGENTS.md          (sync token)                    sync_events ─→ Mattermost
-CLAUDE.md                                                      └─→ 웹 화면
+                        Cushion
+                    ─────────────
+사람  ─웹 편집→     documents  (원본)          ─MCP→  에이전트
+에이전트 ─spec_put→  document_versions (이력)   ─→    웹 화면
+                    sync_events                ─→    Mattermost
 ```
 
-**레포가 민다. Cushion이 GitHub을 당기지 않는다.** 그래서 Cushion은 GitHub 자격증명을
-하나도 갖지 않는다. CI는 이미 파일을 체크아웃해 놨으니 그쪽이 보내는 게 싸다.
+**문서의 원본이 여기 있다.** 예전엔 git 레포의 `.md`를 비추는 미러였지만, 남의 레포 문서를
+고치려면 클론이 필요했다 — 읽으려고 클론을 피하는 도구가 쓰려면 클론을 요구하는 셈이라
+방향을 뒤집었다(PLAN `D-011`).
 
-**원본은 git이다. 여기는 읽기 전용 거울이다.** 문서 수정은 각 프로젝트에서 PR로 한다.
-편집 UI도 문서 쓰기 API도 없고, 앞으로도 만들지 않는다.
+그래서 git이 공짜로 주던 것을 대신할 장치가 있다:
 
----
+- **이력** — 덮어쓰기 전에 이전 본문을 남긴다. 지워도 남는다
+- **동시 편집** — 읽을 때 받은 `sha`를 쓸 때 되돌려 준다. 어긋나면 **거부**한다. 병합하지 않는다
+- **내보내기** — `/api/export`. git이 없으니 이게 유일한 백업이다
 
 ## 시작하기
 
@@ -46,7 +48,7 @@ cp .env.example .env.local     # 값을 채운다
 RLS 정책이 0개라 모든 읽기가 빈 결과, 모든 쓰기가 거부되는데 **에러 없이 조용하다.**
 "화면이 비었다 / 아무 일도 안 일어난다"면 이 키부터 본다.
 
-`supabase/migrations/0001_init.sql`을 Supabase SQL Editor에서 실행한다. 그다음:
+`supabase/migrations/`의 SQL을 번호 순서대로 Supabase SQL Editor에서 실행한다. 그다음:
 
 ```bash
 pnpm dev
@@ -64,20 +66,13 @@ pnpm dev
 
 ## 레포 등록하기
 
-`/admin`에서 레포를 만들면 그 자리에서 한 번만 보이는 **sync 토큰**과, 그대로 복사해 갈
-`cushion-sync.yml` · `.mcp.json` · `AGENTS.md` 3줄이 같이 나온다. 별도 설치 가이드는 없다 —
-그 화면이 가이드다.
+`/admin`에서 레포를 만들고 볼 사람들의 이메일을 멤버로 등록한다.
+**등록되지 않은 이메일은 로그인해도 아무것도 못 본다.**
 
-프로젝트 레포에서 할 일:
+문서는 `/[repo]` 화면의 "새 문서"로 만들거나 에이전트가 `spec_put`으로 만든다.
+경로는 `.md`로 끝나야 한다 — 목차·섹션 조회가 전부 마크다운을 전제한다.
 
-1. `.github/workflows/cushion-sync.yml` 붙여넣기
-2. GitHub Secret `CUSHION_SYNC_TOKEN`에 sync 토큰 넣기
-3. Actions에서 `workflow_dispatch`로 한 번 돌려 전체 동기화
-
-그다음 `/admin`에서 볼 사람들의 이메일을 멤버로 등록한다. **등록되지 않은 이메일은
-로그인해도 아무것도 못 본다.**
-
----
+**읽기와 쓰기의 문턱이 같다.** 볼 수 있는 사람은 고칠 수 있다. 역할을 나누지 않는다.
 
 ## 에이전트 붙이기
 
@@ -101,13 +96,15 @@ claude mcp add --transport http --scope user cushion https://<cushion>/api/mcp -
 | `spec_get` | 문서 또는 섹션 하나. `if_none_match`로 안 바뀌면 본문 대신 `unchanged` |
 | `spec_search` | 매칭된 섹션 상위 N개 |
 | `spec_changes_since` | 커서 이후 변경 요약. 커서는 서버가 기억한다 |
+| `spec_put` | 생성·수정. 기존 문서는 `base_sha` 필수 — 어긋나면 거부하고 현재 sha를 준다 |
+| `spec_delete` | 삭제. 이전 본문은 이력에 남는다 |
 
 구독은 폴링도 상시 연결도 쓰지 않는다. 밀렸을 때만 아무 툴 응답 끝에 한 줄이 붙는다:
 `[stale] <repo>: <path> changed — call spec_changes_since`. 안 밀렸으면 그 줄이 아예 없으므로
 **추가 비용 0**이다.
 
-**툴이 있다고 에이전트가 쓰지 않는다.** 프로젝트 `AGENTS.md`에 3줄을 넣어야 로컬 파일을
-통째로 읽는 대신 이걸 쓴다. 그 3줄도 `/admin`이 출력해 준다.
+**툴이 있다고 에이전트가 쓰지 않는다.** 프로젝트 `AGENTS.md`에 몇 줄을 넣어야 이걸 쓴다.
+그 문구도 `/admin`의 레포 등록 화면이 출력해 준다.
 
 ---
 
@@ -115,8 +112,8 @@ claude mcp add --transport http --scope user cushion https://<cushion>/api/mcp -
 
 Next.js **16** App Router · Tailwind v4 + shadcn/ui · Supabase(Postgres) · NextAuth v5 Google · Vercel.
 
-**LLM API 키가 없다.** 변경 요약은 경로 + 바뀐 `##` 헤딩 + 증감 줄 수로 구조적으로 만든다.
-미러 갱신 경로에 LLM을 심으면 LLM이 죽을 때 동기화가 같이 죽는다.
+**LLM API 키가 없다.** 변경 요약은 경로 + 바뀐 `##` 섹션 + 증감 줄 수로 구조적으로 만든다.
+쓰기 경로에 LLM을 심으면 LLM이 죽을 때 편집이 같이 죽는다.
 
 ---
 
@@ -129,5 +126,7 @@ Next.js **16** App Router · Tailwind v4 + shadcn/ui · Supabase(Postgres) · Ne
 | [`PLAN.md`](PLAN.md) | 현재 상태, 다음 작업, **결정 로그** |
 | [`supabase/migrations/`](supabase/migrations) | DB 스키마의 원본 |
 
-기능을 제안하기 전에 `PLAN.md`의 결정 로그를 먼저 읽는다. 문서 CRUD·LLM 요약·임베딩 검색·
-폴링 구독은 이미 기각됐고, 각 항목에 근거와 재검토 조건이 같이 적혀 있다.
+기능을 제안하기 전에 `PLAN.md`의 결정 로그를 먼저 읽는다. LLM 요약·임베딩 검색·폴링 구독·
+자동 병합은 이미 기각됐고, 각 항목에 근거와 재검토 조건이 같이 적혀 있다.
+**뒤집힌 결정(D-001 → D-011)도 지우지 않고 남겨 뒀다** — 무엇을 근거로 정했고 그 근거의
+어디가 틀렸는지가 남아야 같은 자리에서 같은 실수를 반복하지 않는다.

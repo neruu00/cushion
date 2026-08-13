@@ -1,131 +1,102 @@
 /**
  * @file lib/summary.test.ts
- * @description 요약 생성기 검증. diff 파싱이 틀리면 알림도 델타도 같이 틀어진다.
+ * @description 편집 요약 검증. 여기가 틀리면 알림도 델타 피드도 같이 틀어진다.
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import {
-  buildSummary,
-  changedHeadings,
-  documentTitle,
-  notificationText,
-  parseDiff,
-} from "./summary.ts";
+import { changedSections, documentTitle, summarizeEdit } from "./summary.ts";
 
-const FEATURES = [
-  "# 기능", // 1
-  "", // 2
-  "## 인증", // 3
-  "", // 4
-  "a", // 5
-  "b", // 6
-  "c", // 7
-  "기존 줄", // 8
-  "새 내용", // 9
-  "또 한 줄", // 10
-  "", // 11
-  "## 댓글", // 12
-  "손대지 않았다", // 13
+const BEFORE = [
+  "# 기능",
+  "",
+  "머리말.",
+  "",
+  "## 인증",
+  "",
+  "세션은 30일이다.",
+  "",
+  "## 댓글",
+  "",
+  "대댓글은 1단계.",
 ].join("\n");
 
-const DIFF = [
-  "diff --git a/.specs/features.md b/.specs/features.md",
-  "index 1111111..2222222 100644",
-  "--- a/.specs/features.md",
-  "+++ b/.specs/features.md",
-  "@@ -8,3 +8,4 @@",
-  " 기존 줄",
-  "-옛 내용",
-  "----",
-  "+새 내용",
-  "+또 한 줄",
-  "diff --git a/.specs/editor.md b/.specs/editor.md",
-  "deleted file mode 100644",
-  "index 3333333..0000000",
-  "--- a/.specs/editor.md",
-  "+++ /dev/null",
-  "@@ -1,2 +0,0 @@",
-  "-# 에디터",
-  "-내용",
-].join("\n");
+test("바뀐 섹션만 정확히 집는다", () => {
+  const after = BEFORE.replace("세션은 30일이다.", "세션은 7일이다.");
 
-test("hunk 안의 ---- 를 헤더로 오인하지 않는다", () => {
-  const stats = parseDiff(DIFF);
-  const features = stats.get(".specs/features.md");
-
-  assert.ok(features);
-  assert.equal(features.added, 2);
-  assert.equal(features.removed, 2); // '옛 내용' + 마크다운 구분선 '---'
-  assert.deepEqual(features.hunkStarts, [8]);
+  assert.deepEqual(changedSections(BEFORE, after), ["인증"]);
+  assert.deepEqual(changedSections(BEFORE, BEFORE), []);
 });
 
-test("삭제된 파일은 +++ 가 /dev/null이라 --- 쪽 경로로 잡는다", () => {
-  const editor = parseDiff(DIFF).get(".specs/editor.md");
+test("섹션 추가·삭제도 잡는다", () => {
+  const added = `${BEFORE}\n\n## 알림\n\n이메일로 보낸다.`;
+  const removed = BEFORE.split("## 댓글")[0].trimEnd();
 
-  assert.ok(editor);
-  assert.equal(editor.added, 0);
-  assert.equal(editor.removed, 2);
+  assert.deepEqual(changedSections(BEFORE, added), ["알림"]);
+  assert.deepEqual(changedSections(BEFORE, removed), ["댓글"]);
 });
 
-test("hunk 위치를 감싸는 ## 섹션을 되짚는다", () => {
-  assert.deepEqual(changedHeadings(FEATURES, [8]), ["인증"]);
-  assert.deepEqual(changedHeadings(FEATURES, [13]), ["댓글"]);
-  assert.deepEqual(changedHeadings(FEATURES, [8, 13]), ["인증", "댓글"]);
-  // 첫 ## 앞의 변경은 걸칠 섹션이 없다
-  assert.deepEqual(changedHeadings(FEATURES, [1]), []);
+test("머리말만 고치면 섹션 이름이 없다 — 대신 수치로 보인다", () => {
+  const after = BEFORE.replace("머리말.", "머리말을 고쳤다.");
+
+  assert.deepEqual(changedSections(BEFORE, after), []);
+  assert.match(summarizeEdit({ path: "a.md", before: BEFORE, after, author: "n" }), /^a\.md \(\+1 −1\)/);
 });
 
-test("제목은 첫 # 헤딩. ## 은 제목이 아니다", () => {
-  assert.equal(documentTitle(FEATURES), "기능");
-  assert.equal(documentTitle("## 소제목만 있다"), null);
-  assert.equal(documentTitle("본문뿐"), null);
-});
+test("CRLF 문서도 같은 결과", () => {
+  const crlf = BEFORE.replace(/\n/g, "\r\n");
+  const after = crlf.replace("세션은 30일이다.", "세션은 7일이다.");
 
-test("CRLF 문서도 제목과 섹션을 찾는다", () => {
-  const crlf = FEATURES.replace(/\n/g, "\r\n");
-
+  assert.deepEqual(changedSections(crlf, after), ["인증"]);
   assert.equal(documentTitle(crlf), "기능");
-  assert.deepEqual(changedHeadings(crlf, [8]), ["인증"]);
 });
 
-test("요약은 경로 + 바뀐 헤딩 + 증감 + 커밋 + 링크", () => {
-  const summary = buildSummary({
-    changed: [{ path: ".specs/features.md", content: FEATURES }],
-    deleted: [".specs/editor.md"],
-    diff: DIFF,
-    commit: { sha: "abc123", author: "neruu00", message: "세션 만료 정책 변경\n\n본문은 버린다" },
-    truncated: false,
-    githubFullName: "neruu00/cushion",
+test("옮겨 적기만 한 줄은 변경으로 세지 않는다", () => {
+  // 섹션 순서를 바꿨을 뿐 내용은 그대로 — diff였다면 크게 잡혔을 자리다.
+  const swapped = ["# 기능", "", "머리말.", "", "## 댓글", "", "대댓글은 1단계.", "", "## 인증", "", "세션은 30일이다."].join("\n");
+
+  assert.match(summarizeEdit({ path: "a.md", before: BEFORE, after: swapped, author: "n" }), /\(\+0 −0\)/);
+});
+
+test("새 문서 · 수정 · 삭제의 첫 줄이 다르다", () => {
+  const author = "neruu00";
+
+  assert.match(
+    summarizeEdit({ path: "a.md", before: null, after: BEFORE, author }),
+    /^a\.md 새 문서 \(\+11\)/,
+  );
+  assert.match(
+    summarizeEdit({ path: "a.md", before: BEFORE, after: null, author }),
+    /^삭제: a\.md/,
+  );
+  assert.match(
+    summarizeEdit({
+      path: "a.md",
+      before: BEFORE,
+      after: BEFORE.replace("30일", "7일"),
+      author,
+      note: "세션 만료 정책 변경\n본문은 버린다",
+    }),
+    /^a\.md — 인증 \(\+1 −1\)\n"세션 만료 정책 변경" — neruu00$/,
+  );
+});
+
+test("메모가 없으면 작성자만 남는다", () => {
+  assert.match(
+    summarizeEdit({ path: "a.md", before: null, after: "# x", author: "neruu00" }),
+    /\n— neruu00$/,
+  );
+});
+
+test("섹션이 많으면 끊고 남은 개수를 적는다", () => {
+  const many = (n: number) =>
+    Array.from({ length: n }, (_, i) => `## 섹션 ${i}\n\n내용 ${i}`).join("\n\n");
+  const summary = summarizeEdit({
+    path: "a.md",
+    before: many(8),
+    after: many(8).replace(/내용 \d/g, "바뀜"),
+    author: "n",
   });
 
-  assert.deepEqual(summary.split("\n"), [
-    ".specs/features.md — 인증 (+2 −2)",
-    "삭제: .specs/editor.md",
-    '"세션 만료 정책 변경" — neruu00',
-    "https://github.com/neruu00/cushion/commit/abc123",
-  ]);
-});
-
-test("파일이 많으면 목록을 끊고 남은 건수를 적는다", () => {
-  const changed = Array.from({ length: 13 }, (_, i) => ({ path: `.specs/${i}.md`, content: "" }));
-  const summary = buildSummary({
-    changed,
-    deleted: [],
-    diff: "",
-    commit: { sha: "", author: "", message: "" },
-    truncated: false,
-    githubFullName: null,
-  });
-
-  assert.equal(summary.split("\n").length, 11);
-  assert.ok(summary.endsWith("외 3건"));
-});
-
-test("짧은 diff는 알림에 붙이고 긴 diff는 버린다", () => {
-  assert.ok(notificationText("요약", DIFF).includes("```diff"));
-  assert.equal(notificationText("요약", ""), "요약");
-
-  const long = Array.from({ length: 41 }, (_, i) => `+줄 ${i}`).join("\n");
-  assert.equal(notificationText("요약", long), "요약");
+  assert.ok(summary.includes("외 3개"), summary);
 });
