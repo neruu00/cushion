@@ -9,6 +9,7 @@ import { z } from "zod";
 
 import type { SecretState } from "@/lib/action.type";
 import { getSessionEmail } from "@/lib/authz";
+import { connectCommand } from "@/lib/snippets";
 import { supabase } from "@/lib/supabase";
 import { generateToken } from "@/lib/token";
 
@@ -45,7 +46,11 @@ export async function createAccessToken(
     success: true,
     data: {
       secret: token.plaintext,
-      hint: "개인 환경변수 `CUSHION_TOKEN` 에 넣는다. `.mcp.json`에는 박지 않는다",
+      hint: "이 값은 다시 볼 수 없다. 대개는 아래 명령만 복사하면 된다",
+      // 붙여넣기 한 번으로 끝나게 한다 — 레포 클론도 환경변수도 없이.
+      files: [
+        { name: "Claude Code에 연결 — 이 한 줄", content: connectCommand(token.plaintext) },
+      ],
     },
   };
 }

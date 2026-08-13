@@ -60,6 +60,25 @@
 
 **근거**: Cushion이 GitHub API를 당기면 GitHub App/PAT·권한 설정·레이트리밋·토큰 회전이 전부 딸려온다. 반대로 하면 전부 사라진다 — CI는 이미 파일을 체크아웃해 놨다. **Cushion은 GitHub 자격증명을 하나도 갖지 않는다.**
 
+### D-010. MCP OAuth 대신 토큰이 박힌 CLI 명령을 준다 (2026-08-13)
+
+**결정**: 연결은 `/settings/tokens`가 출력하는 `claude mcp add … --header "Authorization: Bearer …"`
+한 줄이다. MCP OAuth(authorization server metadata · dynamic client registration · PKCE · 리프레시)를
+구현하지 않는다.
+
+**근거**:
+
+- 없애려던 건 "레포 클론 + 환경변수 설정" 두 단계다. 명령 한 줄이 그걸 **전부** 없앤다.
+  OAuth가 추가로 없애는 건 "토큰 문자열을 사람이 한 번 다루는 것"뿐이다
+- 서버 코드가 0줄 늘어난다. `/api/mcp`는 이미 Bearer를 받는다
+- OAuth는 엔드포인트 4개와 상태 관리를 새로 들이고, D-009(SDK 없이 JSON-RPC 직접, 100줄)의
+  근거를 통째로 뒤집는다
+- 토큰이 `~/.claude.json`에 평문으로 남는 건 환경변수를 dotfile에 두는 것과 같은 등급이다.
+  회수 경로도 이미 있다 — 재발급하면 `revoked_at`으로 구 토큰이 즉시 죽는다
+
+**재검토 조건**: 팀이 커져 토큰 배포·회수가 짐이 될 때. 사람마다 토큰을 만들어 나눠 주는
+일이 반복되기 시작하면 그때가 OAuth가 값을 하는 시점이다.
+
 ### D-009. MCP SDK를 넣지 않는다. JSON-RPC를 직접 쓴다 (2026-08-13)
 
 **결정**: `@modelcontextprotocol/sdk` 없이 `app/api/mcp/route.ts`에서 JSON-RPC 2.0을 직접 처리한다.
@@ -222,6 +241,30 @@ plain Node가 import를 못 한다). 러너를 추가하는 대신 파일을 나
 > `\r`를 매치하지 않아 **헤딩 인식이 통째로 실패했다** — 목차도 섹션 조회도 빈 결과.
 > 수신부(`sync.schema.ts`)에서 LF로 접고, 순수 함수들도 `\r?\n`으로 쪼개도록 고쳤다. 테스트 2건 추가.
 > Windows에서 작성된 레포면 어디서나 터진다 — 장난감 문서로만 검증했으면 못 잡았다.
+
+## 🚀 T-7. 배포와 연결
+
+- [x] **T-702** 발급 화면이 `claude mcp add` 명령을 토큰이 박힌 채로 출력.
+      `lib/snippets.ts`의 `connectCommand()`, `actions/token.ts`가 `SecretPayload.files`에 실어 보낸다.
+      **서버 코드는 안 건드렸다** — `/api/mcp`는 이미 `Authorization: Bearer`를 받는다.
+      한 줄로 내는 이유: 백슬래시 줄바꿈이 PowerShell·cmd에서 깨진다.
+      `.mcp.json`(환경변수 확장) 경로는 팀 배포용으로 남겨 뒀다.
+
+- [ ] **T-701** Vercel 배포. **사람이 한다** — GitHub 연동 import.
+      Production 환경변수 7개(`.env.example`)와 GCP 리디렉션 URI
+      `https://<도메인>/api/auth/callback/google` 추가.
+      **`NEXTAUTH_URL`을 배포 도메인으로 반드시 넣을 것** — `baseUrl()`이 이 값으로
+      연결 명령·`.mcp.json`·워크플로의 `CUSHION_URL`을 만든다. 빠뜨리면 프로덕션 화면이
+      `localhost:3000`이 박힌 명령을 태연히 출력한다.
+      Preview는 URL이 매번 달라 OAuth 콜백이 어긋난다 — 환경변수는 Production 스코프에만.
+
+- [ ] **T-703** 실 Claude Code로 접속 확인 (SPEC §11.5의 마지막 항목).
+      **cushion 레포와 무관한 빈 디렉터리**에서 명령 실행 → `claude mcp list` → "스펙 목차 보여줘".
+      토큰 폐기 후 재호출도 해 보고, 그때 클라이언트가 뭘 보여주는지 관찰한다 —
+      우리 401은 `WWW-Authenticate: Bearer`를 달고 있어 OAuth 탐색을 시도할 수 있다.
+      **혼란스러우면 그때 고친다. 지금 추측으로 손대지 않는다.**
+
+> T-701이 끝나면 **T-303(워크플로 실측)의 차단이 풀린다.** GitHub Actions가 도달할 실 URL이 생긴다.
 
 ---
 
