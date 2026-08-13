@@ -89,6 +89,7 @@ plain Node가 import를 못 한다). 러너를 추가하는 대신 파일을 나
 | 환경변수 | `.env.local` 전 항목 채움, `.env.example` 커밋 |
 | DB 마이그레이션 실행 | 6개 테이블 실재 확인 (T-001) |
 | 기반 레이어 | `lib/supabase.ts` · `auth.ts` · `authz.ts` · `token.ts` · `proxy.ts` (T-101~105) |
+| 관리 화면 | `/admin` · `/settings/tokens` · 설치 스니펫 출력 (T-201~203) |
 
 ---
 
@@ -117,15 +118,20 @@ plain Node가 import를 못 한다). 러너를 추가하는 대신 파일을 나
 
 ## 🖥 T-2. 관리 화면
 
-- [ ] **T-201** `/admin` — 레포 생성(slug·name·github_full_name·webhook), sync 토큰 발급/재생성, 멤버 이메일 등록/삭제
-- [ ] **T-202** 레포 생성 직후 **`cushion-sync.yml`과 `.mcp.json`을 복붙 가능한 형태로 화면에 출력**. 별도 설치 가이드를 만들지 않아도 되게
-- [ ] **T-203** `/settings/tokens` — access token 발급·재생성 (직후 1회 노출)
+- [x] **T-201** `/admin` — 레포 등록, sync 토큰 재발급, 멤버 등록/삭제.
+      `actions/repository.ts`가 액션 첫 줄에서 `isAdmin()`을 본다. admin이 아니면 페이지는 404
+- [x] **T-202** 등록 직후 `cushion-sync.yml` · `.mcp.json` · `AGENTS.md` 3줄을 복사 버튼과 함께 출력.
+      템플릿은 `lib/snippets.ts`, base URL은 `NEXTAUTH_URL`에서 가져온다
+- [x] **T-203** `/settings/tokens` — 발급 직후 1회 노출, 폐기는 `revoked_at` 기록(삭제 아님).
+      폐기 쿼리에 `email` 조건이 남의 토큰을 못 죽이게 하는 유일한 방어선이다
 
 ## 🔄 T-3. 동기화
 
-- [ ] **T-301** `POST /api/sync` — sync 토큰 검증 → Zod 파싱 → `documents` upsert/삭제 → `sync_events` 적재 → Mattermost POST
+- [ ] **T-301** `POST /api/sync` — sync 토큰 검증 → Zod 파싱 → `documents` upsert/삭제 → `sync_events` 적재 → Mattermost POST.
+      **페이로드 계약은 `lib/snippets.ts`의 워크플로가 보내는 모양이다** — Zod 스키마를 거기 맞춰 쓴다
 - [ ] **T-302** 구조적 요약 생성기 (경로 + 바뀐 `##` 헤딩 + 증감 줄 수). D-002
-- [ ] **T-303** `cushion-sync.yml` 템플릿 — `fetch-depth: 0`, `changed`+`deleted` 둘 다, `before` all-zeros면 전체 스냅샷 폴백, 페이로드 상한
+- [ ] **T-303** `cushion-sync.yml` **실측 검증** — 템플릿 자체는 T-202에서 `lib/snippets.ts`에 썼다.
+      실제 push로 확인할 것: `fetch-depth: 0`, `changed`+`deleted` 둘 다, `before` all-zeros 폴백, 페이로드 상한
 - [ ] **T-304** `workflow_dispatch` 전체 동기화(`full=true`)
 
 ## 🔌 T-4. MCP
