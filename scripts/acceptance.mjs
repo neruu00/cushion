@@ -134,18 +134,85 @@ try {
     await tool("spec_put", { repo: SLUG_A, ...doc, note: "인수 검증 시드" }, pat);
   }
 
+  // ── 라우팅 재편 (랜딩 / 대시보드) ───────────────────────────────
+  heading("라우팅 — / 는 랜딩, 목록은 /dashboard");
+
+  const anonLanding = await page("/");
+  check("비로그인 / → 200 랜딩", anonLanding.status === 200 && anonLanding.html.includes("시작하기"));
+  check("랜딩에 레포 정보가 새지 않는다", !anonLanding.html.includes(SLUG_A));
+
+  const memberLanding = await page("/", memberCookie);
+  check(
+    "로그인 / → 대시보드로 보낸다",
+    memberLanding.status >= 300 && memberLanding.status < 400 && (memberLanding.location ?? "").includes("/dashboard"),
+    `${memberLanding.status} → ${memberLanding.location}`,
+  );
+
+  const anonDash = await page("/dashboard");
+  check(
+    "비로그인 /dashboard → 로그인으로",
+    anonDash.status >= 300 && anonDash.status < 400 && (anonDash.location ?? "").includes("signin"),
+  );
+
+  const memberDash = await page("/dashboard", memberCookie);
+  check("멤버 대시보드에 레포와 절약 추정이 보인다", memberDash.status === 200 && memberDash.html.includes(SLUG_A));
+
+  // ── 셀프서브 (D-013) ────────────────────────────────────────────
+  heading("셀프서브 — 멤버십이 곧 권한이다");
+
+  // createRepository 자체는 서버 액션이라 HTTP로 직접 못 부른다(암호화된 action id 필요).
+  // 런타임으로는 그 결과 상태(멤버 = 읽기·쓰기·대시보드)를, 액션 고유 로직(로그인 게이트·
+  // 생성자 자동 등록·보상 삭제)은 아래 소스 정적 검사에서 본다.
+  const SLUG_SELF = "zz-selfserve";
+  await db.from("repositories").delete().eq("slug", SLUG_SELF);
+  const { data: selfRepo, error: selfErr } = await db
+    .from("repositories")
+    .insert({ slug: SLUG_SELF, name: "self serve" })
+    .select("id")
+    .single();
+  if (selfErr) throw selfErr;
+  await db.from("repository_members").insert({ repository_id: selfRepo.id, email: OUTSIDER });
+
+  check(
+    "멤버가 되면 바로 쓴다 (outsider의 자기 레포)",
+    (await tool("spec_put", { repo: SLUG_SELF, path: "MINE.md", content: "# 내 레포" }, outsiderPat)).startsWith("저장했다"),
+  );
+  check(
+    "자기 레포는 대시보드에 보인다",
+    (await page("/dashboard", outsiderCookie)).html.includes(SLUG_SELF),
+  );
+  check(
+    "다른 멤버(MEMBER)에게는 이 레포가 안 보인다",
+    !(await tool("spec_outline", {}, pat)).includes(SLUG_SELF),
+  );
+
+  // 액션 고유 로직은 소스로 검사한다 — 빠지면 셀프서브가 조용히 반쪽이 된다
+  const repoActions = readFileSync("actions/repository.ts", "utf8");
+  check(
+    "createRepository가 생성자를 멤버로 등록한다 (소스)",
+    /createRepository[\s\S]*?repository_members[\s\S]*?insert/.test(repoActions),
+  );
+  check(
+    "멤버 등록 실패 시 레포를 지워 보상한다 (소스)",
+    repoActions.includes("보상"),
+  );
+  check(
+    "멤버 관리가 멤버십 기준이다 (소스)",
+    repoActions.includes("canManageMembers") && repoActions.includes("isMember"),
+  );
+
   // ── SPEC §11.2 권한 ─────────────────────────────────────────────
   heading("§11.2 권한");
 
-  const outsiderHome = await page("/", outsiderCookie);
+  const outsiderHome = await page("/dashboard", outsiderCookie);
   check(
-    "미등록 이메일 → 레포 목록에 안 보인다",
+    "미등록 이메일 → 대시보드에 남의 레포가 안 보인다",
     outsiderHome.status === 200 && !outsiderHome.html.includes(SLUG_A),
   );
-  check("미등록 이메일 → URL 직접 입력은 404", (await page(`/${SLUG_A}`, outsiderCookie)).status === 404);
+  check("미등록 이메일 → URL 직접 입력은 404", (await page(`/repositories/${SLUG_A}`, outsiderCookie)).status === 404);
   check(
     "미등록 이메일 → 문서 URL도 404",
-    (await page(`/${SLUG_A}/SPEC.md`, outsiderCookie)).status === 404,
+    (await page(`/repositories/${SLUG_A}/SPEC.md`, outsiderCookie)).status === 404,
   );
   check(
     "미등록 이메일의 토큰 → MCP도 빈손",
@@ -154,7 +221,7 @@ try {
 
   check(
     "이메일 대소문자 정규화 (Member@Example.COM 로 접근)",
-    (await page(`/${SLUG_A}`, await cookieFor("Member@Example.COM"))).status === 200,
+    (await page(`/repositories/${SLUG_A}`, await cookieFor("Member@Example.COM"))).status === 200,
   );
 
   check("접두사가 다른 키 → 거부", (await mcp("ping", {}, "ghp_notourtoken")).status === 401);
@@ -167,7 +234,7 @@ try {
     .eq("repository_id", repos[SLUG_B]);
   check("멤버 아닌 레포에 spec_put → 거부", bDocs === 0, `B 문서 ${bDocs}건`);
 
-  const memberSees = await page(`/${SLUG_A}`, memberCookie);
+  const memberSees = await page(`/repositories/${SLUG_A}`, memberCookie);
   check("멤버는 본다", memberSees.status === 200);
 
   // 멤버에서 빼면 토큰 재발급 없이 즉시 차단돼야 한다 — 요청 시점 조회의 핵심 검증
@@ -176,7 +243,7 @@ try {
     "멤버 제거 → 같은 토큰으로 즉시 차단",
     !(await tool("spec_outline", {}, pat)).includes(SLUG_A),
   );
-  check("멤버 제거 → 화면도 즉시 404", (await page(`/${SLUG_A}`, memberCookie)).status === 404);
+  check("멤버 제거 → 화면도 즉시 404", (await page(`/repositories/${SLUG_A}`, memberCookie)).status === 404);
   await db.from("repository_members").insert({ repository_id: repos[SLUG_A], email: MEMBER });
 
   // 폐기된 토큰은 즉시 죽는다

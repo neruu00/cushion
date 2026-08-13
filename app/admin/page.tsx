@@ -55,7 +55,6 @@ export default async function AdminPage() {
           레포를 등록하고 멤버를 넣는다. 문서는 각 레포 화면에서 만든다.{" "}
           {/* git이 없으므로 이게 유일한 백업이다 (D-011).
               라우트 핸들러가 파일을 내려주므로 <Link>의 클라이언트 이동으로는 다운로드가 안 된다. */}
-          {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
           <a href="/api/export" className="underline underline-offset-4 hover:text-foreground">
             전체 내보내기
           </a>
