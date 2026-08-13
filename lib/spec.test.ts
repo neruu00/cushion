@@ -5,7 +5,14 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { findSection, headings, scoreSection, snippet, splitSections } from "./spec.ts";
+import {
+  findSection,
+  headings,
+  replaceSection,
+  scoreSection,
+  snippet,
+  splitSections,
+} from "./spec.ts";
 
 const DOC = [
   "# 기능",
@@ -71,4 +78,41 @@ test("스니펫은 매칭 주변만 자른다", () => {
   assert.ok(cut.includes("세션만료"));
   assert.ok(cut.length < 200);
   assert.ok(cut.startsWith("…") && cut.endsWith("…"));
+});
+
+test("replaceSection은 그 섹션만 바꾸고 나머지는 바이트 그대로 둔다", () => {
+  const doc = ["# 기능", "", "머리말.", "", "## 인증", "", "30일.", "", "## 댓글", "", "1단계.", ""].join("\n");
+  const out = replaceSection(doc, "인증", "## 인증\n\n7일.\n재로그인 필요.");
+
+  assert.equal(
+    out,
+    ["# 기능", "", "머리말.", "", "## 인증", "", "7일.", "재로그인 필요.", "", "## 댓글", "", "1단계.", ""].join("\n"),
+  );
+  // 손대지 않은 부분이 흔들리면 sha가 흔들리고 이력 diff가 시끄러워진다
+  assert.ok(out.startsWith("# 기능\n\n머리말.\n"));
+  assert.ok(out.endsWith("## 댓글\n\n1단계.\n"));
+});
+
+test("replaceSection — 마지막 섹션, '## 인증'으로 주든 '인증'으로 주든", () => {
+  const doc = "# 기능\n\n## 인증\n\n30일.\n\n## 댓글\n\n1단계.\n";
+  const a = replaceSection(doc, "## 댓글", "## 댓글\n\n2단계.");
+  const b = replaceSection(doc, "댓글", "## 댓글\n\n2단계.");
+
+  assert.equal(a, b);
+  assert.ok(a?.endsWith("## 댓글\n\n2단계.\n"));
+});
+
+test("replaceSection — 꼬리 줄바꿈이 제각각이어도 결과 sha가 같다", () => {
+  const doc = "# 기능\n\n## 인증\n\n30일.\n\n## 댓글\n\n1단계.\n";
+
+  const clean = replaceSection(doc, "인증", "## 인증\n\n7일.");
+  assert.equal(replaceSection(doc, "인증", "## 인증\n\n7일.\n"), clean);
+  assert.equal(replaceSection(doc, "인증", "## 인증\n\n7일.\n\n\n"), clean);
+});
+
+test("replaceSection — 없는 섹션이면 null, CRLF 문서도 동작", () => {
+  const doc = "# 기능\r\n\r\n## 인증\r\n\r\n30일.\r\n";
+
+  assert.equal(replaceSection(doc, "없는섹션", "## 없는섹션\n\nx"), null);
+  assert.ok(replaceSection(doc, "인증", "## 인증\n\n7일.")?.includes("7일."));
 });

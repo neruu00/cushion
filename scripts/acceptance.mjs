@@ -279,6 +279,78 @@ try {
   check("본문이 실제로 바뀌었다", afterEdit?.content === edited);
   check("누가 고쳤는지 남는다", afterEdit?.updated_by === MEMBER);
 
+  // CAS — 같은 base_sha로 **동시에** 쓰면 정확히 하나만 이겨야 한다.
+  // 순차 호출은 사전 비교에 걸려 CAS까지 안 간다. 동시 호출이라야 읽기-비교-쓰기 사이의
+  // 창을 실제로 연다. 어느 쪽이 이기는지는 비결정적이지만 "하나만 이긴다"는 불변식이다.
+  const editedSha = /sha:([0-9a-f]+)/.exec(await tool("spec_get", { repo: SLUG_A, path: MAIN }, pat))?.[1];
+  const contentA = `${edited}\nA가 이겼다.\n`;
+  const contentB = `${edited}\nB가 이겼다.\n`;
+  const [raceA, raceB] = await Promise.all([
+    tool("spec_put", { repo: SLUG_A, path: MAIN, content: contentA, base_sha: editedSha, note: "CAS A" }, pat),
+    tool("spec_put", { repo: SLUG_A, path: MAIN, content: contentB, base_sha: editedSha, note: "CAS B" }, editorPat),
+  ]);
+  const wins = [raceA, raceB].filter((r) => r.startsWith("저장했다"));
+  const { data: afterCas } = await db
+    .from("documents")
+    .select("content")
+    .eq("repository_id", repos[SLUG_A])
+    .eq("path", MAIN)
+    .maybeSingle();
+  check("같은 base_sha 동시 쓰기 → 정확히 하나만 이긴다", wins.length === 1, `${wins.length}건 성공`);
+  check(
+    "본문은 이긴 쪽의 것이고 진 쪽은 흔적이 없다",
+    afterCas?.content === (raceA.startsWith("저장했다") ? contentA : contentB),
+  );
+  // 진 쪽이 현재 sha를 받아 스스로 회복할 수 있어야 한다
+  const loser = raceA.startsWith("저장했다") ? raceB : raceA;
+  check("진 쪽은 현재 sha를 안내받는다", /sha:[0-9a-f]{64}/.test(loser), loser.slice(0, 50));
+
+  // 다음 검증(섹션 스코프)이 이어서 쓰도록 본문을 되돌려 둔다
+  {
+    const s = /sha:([0-9a-f]+)/.exec(await tool("spec_get", { repo: SLUG_A, path: MAIN }, pat))?.[1];
+    await tool("spec_put", { repo: SLUG_A, path: MAIN, content: edited, base_sha: s, note: "CAS 검증 정리" }, pat);
+  }
+
+  // 섹션 스코프 쓰기 — 문서 전체를 실어 보내지 않는다 (spec_put + heading)
+  const beforeSection = await tool("spec_get", { repo: SLUG_A, path: MAIN }, pat);
+  const sectionSha = /sha:([0-9a-f]+)/.exec(beforeSection)?.[1];
+  const sectionPut = await tool(
+    "spec_put",
+    {
+      repo: SLUG_A,
+      path: MAIN,
+      heading: "인수 검증 섹션",
+      content: "## 인수 검증 섹션\n\n섹션만 고쳤다.",
+      base_sha: sectionSha,
+      note: "섹션 스코프 수정",
+    },
+    pat,
+  );
+  const { data: afterSection } = await db
+    .from("documents")
+    .select("content")
+    .eq("repository_id", repos[SLUG_A])
+    .eq("path", MAIN)
+    .maybeSingle();
+  check("heading을 주면 그 섹션만 바뀐다", afterSection?.content.includes("섹션만 고쳤다."), sectionPut.slice(0, 40));
+  check(
+    "나머지 본문은 바이트 그대로다",
+    afterSection?.content.startsWith(docs[0].content.replace(/\s+$/, "")),
+  );
+  // base_sha 충돌이 heading 검증보다 먼저 걸린다(낡은 sha면 어차피 다시 읽어야 하니 맞는
+  // 순서다). 그래서 이 검사는 반드시 현재 sha로 불러야 heading 경로에 도달한다.
+  const freshSha = /sha:([0-9a-f]+)/.exec(await tool("spec_get", { repo: SLUG_A, path: MAIN }, pat))?.[1];
+  check(
+    "없는 섹션을 heading으로 주면 거부",
+    (
+      await tool(
+        "spec_put",
+        { repo: SLUG_A, path: MAIN, heading: "존재하지 않는 섹션", content: "## x\n\ny", base_sha: freshSha },
+        pat,
+      )
+    ).includes("그런 섹션이 없다"),
+  );
+
   // 삭제 — 이력은 살아남아야 한다
   await tool("spec_put", { repo: SLUG_A, path: "TEMP.md", content: "# 임시\n" }, pat);
   const tempRead = await tool("spec_get", { repo: SLUG_A, path: "TEMP.md" }, pat);

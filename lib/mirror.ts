@@ -38,17 +38,18 @@ export async function recordVersion(input: {
  * 두 번 만들면 두 번 드리프트한다. (SPEC §8)
  */
 export async function recordChange(
-  repo: { id: string; slug: string },
+  repo: { id: string; slug: string; mattermost_webhook_url: string | null },
   edit: DocumentEdit,
 ): Promise<number | null> {
   const summary = summarizeEdit(edit);
 
+  // note는 여기 넣지 않는다 — 원문은 document_versions.note에, 사람이 읽는 형태는
+  // summary 안에 이미 있다. 세 번째 사본은 드리프트 자리만 만든다.
   const { data, error } = await supabase
     .from("sync_events")
     .insert({
       repository_id: repo.id,
       author: edit.author,
-      message: edit.note ?? null,
       changed_paths: edit.after === null ? [] : [edit.path],
       deleted_paths: edit.after === null ? [edit.path] : [],
       summary,
@@ -57,27 +58,26 @@ export async function recordChange(
     .maybeSingle();
 
   if (error) console.error("mirror: recordChange", error);
+  const eventId: number | null = data?.id ?? null;
 
-  await notifyMattermost(repo.id, `**${repo.slug}**\n${summary}`);
-  return data?.id ?? null;
+  // 비정규화된 최신 이벤트 id (D-012). 쓰기 경로는 여기 하나뿐이라 어긋날 자리가 없다.
+  if (eventId !== null) {
+    const { error: latestError } = await supabase
+      .from("repositories")
+      .update({ latest_event_id: eventId })
+      .eq("id", repo.id);
+    if (latestError) console.error("mirror: latest_event_id", latestError);
+  }
+
+  await notifyMattermost(repo.mattermost_webhook_url, `**${repo.slug}**\n${summary}`);
+  return eventId;
 }
 
 /**
  * 알림 실패가 편집을 되돌리지 않는다. 문서는 이미 저장됐고, 그게 본질이다.
- * webhook URL은 여기서만 읽는다 — 다른 조회 경로에 실어 나르지 않는다.
+ * URL은 호출부가 이미 읽어 둔 레포 행에서 온다 — 알림 하나에 조회 하나를 더 쓰지 않는다.
  */
-async function notifyMattermost(repositoryId: string, text: string): Promise<void> {
-  const { data, error } = await supabase
-    .from("repositories")
-    .select("mattermost_webhook_url")
-    .eq("id", repositoryId)
-    .maybeSingle();
-
-  if (error) {
-    console.error("mirror: webhook lookup", error);
-    return;
-  }
-  const url: string | null = data?.mattermost_webhook_url ?? null;
+async function notifyMattermost(url: string | null, text: string): Promise<void> {
   if (!url) return;
 
   try {
