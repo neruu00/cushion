@@ -11,6 +11,11 @@ on:
 jobs:
   sync:
     runs-on: ubuntu-latest
+    # 미러는 기본 브랜치를 비춘다. 작업 브랜치 push까지 받으면 머지도 안 된 문서가
+    # 미러를 덮어쓰고, 에이전트는 그걸 확정된 스펙으로 읽는다.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
     steps:
       - uses: actions/checkout@v5
         with:
@@ -34,13 +39,22 @@ jobs:
             echo "::error::CUSHION_SYNC_TOKEN Secret이 비어 있다. Settings > Secrets and variables > Actions 에 추가할 것. Environment secret으로 넣었다면 job에 environment: 를 선언해야 보인다"
             exit 1
           fi
-          case "$CUSHION_SYNC_TOKEN" in
+
+          # 붙여넣기 부산물은 사람이 고치게 두지 않는다 — 공백·따옴표·'Bearer '를 여기서 턴다.
+          TOKEN="$CUSHION_SYNC_TOKEN"
+          TOKEN="$(printf '%s' "$TOKEN" | tr -d '\r\n\t ')"
+          TOKEN="${TOKEN#\"}"; TOKEN="${TOKEN%\"}"
+          TOKEN="${TOKEN#\'}"; TOKEN="${TOKEN%\'}"
+          TOKEN="${TOKEN#Bearer}"
+
+          case "$TOKEN" in
             cshn_sync_*) ;;
             cshn_pat_*)
               echo "::error::access 토큰(cshn_pat_)이 들어갔다. /admin이 주는 sync 토큰(cshn_sync_)이어야 한다"
               exit 1 ;;
             *)
-              echo "::error::sync 토큰 형식이 아니다. cshn_sync_ 로 시작해야 한다 — 값에 따옴표·공백·'Bearer '가 섞였는지 확인"
+              # 값은 찍지 않는다. 길이만으로도 '엉뚱한 걸 붙여넣었는지'는 바로 갈린다 (정상 = 53자)
+              echo "::error::sync 토큰 형식이 아니다 (정리 후 길이 ${#TOKEN}자, 정상은 53자). /admin > 재발급으로 받은 cshn_sync_ 값을 그대로 넣을 것"
               exit 1 ;;
           esac
 
@@ -96,6 +110,6 @@ jobs:
              }' > payload.json
 
           curl -sS --fail-with-body -X POST "$CUSHION_URL/api/sync" \
-            -H "Authorization: Bearer $CUSHION_SYNC_TOKEN" \
+            -H "Authorization: Bearer $TOKEN" \
             -H 'Content-Type: application/json' \
             --data-binary @payload.json
