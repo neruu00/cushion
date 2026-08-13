@@ -100,11 +100,9 @@ plain Node가 import를 못 한다). 러너를 추가하는 대신 파일을 나
       6개 테이블(`repositories` / `repository_members` / `documents` / `sync_events` /
       `access_tokens` / `token_cursors`) 실재 확인함.
 
-- [ ] **T-002** ⛔ **`.env.local`의 `SUPABASE_SERVICE_ROLE_KEY`에 anon 키가 들어 있다** (`role=anon` 확인).
-      RLS는 켜져 있고 정책이 0개라 **모든 읽기가 빈 결과, 모든 쓰기가 거부**된다 — 앱은 조용히 아무것도 안 한다.
-      Supabase Dashboard > Project Settings > API Keys 의 `service_role`(또는 신형 `sb_secret_…`) 값으로 교체할 것.
-      **사람이 한다** — 키는 대화에 출력하지 않는다.
-      이게 막혀 있는 동안 DB를 타는 경로(`/admin`, `/settings/tokens`, `/api/sync`)는 실측 검증이 불가능하다.
+- [x] **T-002** `.env.local`의 `SUPABASE_SERVICE_ROLE_KEY`가 한동안 anon 키였다 → `service_role`로 교체 완료.
+      **증상이 조용하다는 걸 기억해 둘 것**: RLS 정책이 0개라 anon 키로는 읽기가 빈 배열,
+      쓰기가 42501로 거부된다. "화면이 비었다 / 아무 일도 안 일어난다"면 이 키부터 본다.
 
 ---
 
@@ -141,7 +139,8 @@ plain Node가 import를 못 한다). 러너를 추가하는 대신 파일을 나
       헤딩은 diff의 hunk 시작 줄을 **바뀐 뒤 본문**에 되짚어 찾는다.
       저장하는 `summary`에는 diff를 넣지 않는다 — `spec_changes_since`가 그걸 매번 되팔게 된다
 - [x] **T-304** `full=true`면 페이로드에 없는 문서를 미러에서 제거.
-      `changed`가 비면 지우지 않는다 — 워크플로 오작동으로 미러를 통째로 날리는 게 훨씬 나쁘다
+      `changed`가 비면 지우지 않는다 — 워크플로 오작동으로 미러를 통째로 날리는 게 훨씬 나쁘다.
+      **실측 완료**: 임시 레포로 push → 삭제 → full → 빈 full 4케이스 왕복 확인
 - [ ] **T-303** `cushion-sync.yml` **실측 검증** (템플릿은 T-202에서 `lib/snippets.ts`에 썼다).
       배포 URL이 있어야 하고 GitHub Actions에서만 돌릴 수 있다. 확인할 것:
       `fetch-depth: 0`, `changed`+`deleted` 둘 다, `before` all-zeros 폴백, diff 40KB 상한.

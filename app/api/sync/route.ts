@@ -97,6 +97,12 @@ export async function POST(request: NextRequest) {
 
   // ── 델타 + 알림 (같은 요약을 나눠 쓴다) ────────────────────────────
   const deleted = [...payload.deleted, ...prunedPaths];
+
+  // 아무것도 안 바뀌었으면 이벤트를 남기지 않는다. 빈 이벤트는 모든 토큰 커서를
+  // 스테일로 만들어 놓고 정작 "변경 없음"만 돌려준다 — 이 도구가 없애려는 낭비다.
+  if (payload.changed.length === 0 && deleted.length === 0) {
+    return Response.json({ ok: true, upserted: 0, deleted: 0, event_id: null });
+  }
   const summary = buildSummary({
     changed: payload.changed,
     deleted,
