@@ -14,6 +14,7 @@
  */
 import { getAccessibleRepo } from "@/lib/authz";
 import { advanceCursor, recordChange, recordVersion } from "@/lib/mirror";
+import { replaceSection } from "@/lib/spec";
 import { supabase } from "@/lib/supabase";
 import { documentTitle } from "@/lib/summary";
 import { sha256 } from "@/lib/token";
@@ -79,6 +80,8 @@ export async function putDocument(input: {
   repo: string;
   path: string;
   content: string;
+  /** 주면 그 `##` 섹션만 교체한다. content는 헤딩 줄을 포함한 섹션 전체 */
+  heading?: string;
   baseSha?: string;
   note?: string | null;
   /** MCP로 들어온 경우의 토큰 id. 주면 쓴 사람의 커서를 같이 전진시킨다 */
@@ -103,7 +106,25 @@ export async function putDocument(input: {
     return { ok: false, code: "conflict", message: "그 사이 문서가 삭제됐다" };
   }
 
-  const content = input.content;
+  // 섹션 스코프 쓰기 — 문서 전체를 실어 보내지 않기 위한 것 (SPEC §7).
+  // 잠금(base_sha)은 여전히 문서 전체 기준이다: 남이 다른 섹션을 고쳤어도 거부된다.
+  // 병합하지 않는다는 원칙이 섹션 단위라고 달라지지 않는다.
+  let content = input.content;
+  if (input.heading !== undefined) {
+    if (!existing) {
+      return { ok: false, code: "invalid", message: "섹션 수정은 기존 문서에만 쓸 수 있다. 새 문서는 heading 없이 전체를 보낼 것" };
+    }
+    const merged = replaceSection(existing.content, input.heading, input.content);
+    if (merged === null) {
+      // 오타로 문서 끝에 덧붙는 것보다 거부가 낫다. 뭐가 있는지는 알려준다.
+      return {
+        ok: false,
+        code: "invalid",
+        message: `그런 섹션이 없다: ${input.heading}. spec_outline으로 헤딩을 확인할 것`,
+      };
+    }
+    content = merged;
+  }
 
   const sha = sha256(content);
   const now = new Date().toISOString();

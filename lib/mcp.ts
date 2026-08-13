@@ -1,6 +1,6 @@
 /**
  * @file lib/mcp.ts
- * @description MCP 툴 4종과 구독 커서 (T-402, T-403, T-404). 전송 계층은 app/api/mcp/route.ts.
+ * @description MCP 툴 — 읽기 4종 + 쓰기 2종 — 과 구독 커서. 전송 계층은 app/api/mcp/route.ts.
  *
  * **원본이 여기 있으므로 쓰기 툴이 있다** (D-011). 그래서 유출된 PAT는 열람뿐 아니라
  * 훼손도 할 수 있다 — 복구 근거는 `document_versions`뿐이다. (SPEC §6)
@@ -23,15 +23,14 @@ export const SERVER_INFO = { name: "cushion", version: "0.1.0" } as const;
  * 툴 description이 "무엇을"이라면 여기는 "어떤 순서로"다.
  */
 export const INSTRUCTIONS =
-  "스펙 파일을 통째로 읽지 말 것. spec_outline으로 목차를 본 뒤 필요한 섹션만 spec_get(heading). " +
-  "재조회는 if_none_match에 직전 sha. 응답 끝에 [stale]이 있으면 spec_changes_since. " +
-  "고칠 땐 spec_get으로 받은 sha를 spec_put의 base_sha에 그대로 넘긴다.";
+  "문서를 통째로 읽지 말 것: spec_outline → 필요한 섹션만 spec_get(heading). " +
+  "재조회는 if_none_match에 직전 sha. [stale]이 보이면 spec_changes_since. " +
+  "수정은 spec_put — base_sha는 spec_get의 sha, 섹션만 고칠 땐 heading에 그 섹션 전체를 보낸다.";
 
 export const TOOLS = [
   {
     name: "spec_outline",
-    description:
-      "문서 목록과 각 문서의 ## 헤딩만 반환한다. 스펙을 읽기 전에 먼저 부른다. repo를 생략하면 접근 가능한 전체 레포를 한 번에 본다.",
+    description: "문서 목록과 ## 헤딩. 읽기 전에 먼저 부른다. repo 생략 = 전체 레포.",
     inputSchema: {
       type: "object",
       properties: { repo: { type: "string", description: "레포 slug. 생략하면 전체" } },
@@ -40,7 +39,7 @@ export const TOOLS = [
   {
     name: "spec_get",
     description:
-      "문서 하나, 또는 heading을 주면 그 ## 섹션만 반환한다. if_none_match에 직전 응답의 sha를 넣으면 안 바뀐 경우 본문 대신 unchanged만 온다.",
+      "문서 전체 또는 heading의 ## 섹션 하나. if_none_match에 직전 sha를 주면 안 바뀐 경우 unchanged만 온다.",
     inputSchema: {
       type: "object",
       properties: {
@@ -54,7 +53,7 @@ export const TOOLS = [
   },
   {
     name: "spec_search",
-    description: "스펙 본문을 검색해 매칭된 섹션 상위 몇 개를 반환한다. 어느 문서에 있는지 모를 때 쓴다.",
+    description: "본문 검색, 매칭 섹션 상위 몇 개. 어느 문서인지 모를 때.",
     inputSchema: {
       type: "object",
       properties: { query: { type: "string" }, repo: { type: "string" } },
@@ -63,8 +62,7 @@ export const TOOLS = [
   },
   {
     name: "spec_changes_since",
-    description:
-      "마지막으로 확인한 이후의 스펙 변경 요약. 인자 없이 부르면 저장된 커서 이후를 주고 커서를 전진시킨다.",
+    description: "커서 이후의 변경 요약. 인자 없이 부르면 커서를 전진시킨다.",
     inputSchema: {
       type: "object",
       properties: {
@@ -76,13 +74,14 @@ export const TOOLS = [
   {
     name: "spec_put",
     description:
-      "문서를 만들거나 고친다. 고칠 때는 spec_get으로 받은 sha를 base_sha에 넣어야 한다 — 그 사이 남이 고쳤으면 거부되고 현재 sha를 돌려준다. 새 문서면 base_sha를 생략한다. 내용은 전체를 보낸다(부분 수정 아님).",
+      "문서 생성·수정. 기존 문서는 base_sha 필수 — 그 사이 남이 고쳤으면 거부하고 현재 sha를 준다. heading을 주면 그 섹션만 교체된다.",
     inputSchema: {
       type: "object",
       properties: {
         repo: { type: "string" },
-        path: { type: "string", description: "레포 루트 기준 경로. .md 로 끝나야 한다" },
-        content: { type: "string", description: "문서 전체 내용" },
+        path: { type: "string", description: ".md 로 끝나는 경로" },
+        content: { type: "string", description: "문서 전체. heading을 줬으면 그 섹션 전체(## 줄 포함)" },
+        heading: { type: "string", description: "이 ## 섹션만 교체. 문서 전체를 보내지 않아도 된다" },
         base_sha: { type: "string", description: "직전 spec_get의 sha. 새 문서면 생략" },
         note: { type: "string", description: "무엇을 왜 바꿨는지 한 줄" },
       },
@@ -91,7 +90,7 @@ export const TOOLS = [
   },
   {
     name: "spec_delete",
-    description: "문서를 지운다. base_sha가 필요하다. 이전 본문은 이력에 남아 되돌릴 수 있다.",
+    description: "삭제. base_sha 필수. 이전 본문은 이력에 남는다.",
     inputSchema: {
       type: "object",
       properties: {
@@ -440,6 +439,7 @@ async function specPut(context: McpContext, rawArgs: unknown): Promise<ToolResul
     repo: args.data.repo,
     path: args.data.path,
     content: args.data.content,
+    heading: args.data.heading,
     baseSha: args.data.base_sha,
     note: args.data.note,
     tokenId: context.identity.id,

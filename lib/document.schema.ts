@@ -27,6 +27,8 @@ export const putDocumentSchema = z.object({
   path: documentPath,
   // 스펙 문서 하나가 512KB를 넘으면 그건 스펙이 아니다.
   content: z.string().max(512 * 1024).transform(crlfToLf),
+  /** 주면 그 `##` 섹션만 교체. content는 헤딩 줄 포함 섹션 전체 — 문서 전체를 실어 보내지 않기 위한 것 */
+  heading: z.string().trim().min(1).max(200).optional(),
   /**
    * 수정이면 직전에 읽은 sha. 새 문서면 생략한다.
    * 없이 기존 문서를 덮으려 하면 거부한다 — 조용한 덮어쓰기가 제일 나쁘다.
