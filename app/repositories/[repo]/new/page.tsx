@@ -8,11 +8,11 @@ import { notFound, redirect } from "next/navigation";
 import { DocumentForm } from "@/components/DocumentForm";
 import { getAccessibleRepo, getSessionEmail } from "@/lib/authz";
 
-export default async function NewDocumentPage({ params }: PageProps<"/[repo]/new">) {
+export default async function NewDocumentPage({ params }: PageProps<"/repositories/[repo]/new">) {
   const { repo: slug } = await params;
 
   const email = await getSessionEmail();
-  if (!email) redirect(`/api/auth/signin?callbackUrl=${encodeURIComponent(`/${slug}/new`)}`);
+  if (!email) redirect(`/api/auth/signin?callbackUrl=${encodeURIComponent(`/repositories/${slug}/new`)}`);
 
   const repo = await getAccessibleRepo(email, slug);
   if (!repo) notFound();
@@ -21,7 +21,7 @@ export default async function NewDocumentPage({ params }: PageProps<"/[repo]/new
     <main className="mx-auto w-full max-w-3xl space-y-6 p-8">
       <header className="space-y-1">
         <p className="text-xs text-muted-foreground">
-          <Link href={`/${repo.slug}`} className="font-mono hover:text-foreground">
+          <Link href={`/repositories/${repo.slug}`} className="font-mono hover:text-foreground">
             {repo.slug}
           </Link>
         </p>

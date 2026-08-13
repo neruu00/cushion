@@ -68,3 +68,29 @@ test("비워둔 optional 입력은 ''가 아니라 null로 간다", () => {
   assert.equal(parsed.data.github_full_name, null);
   assert.equal(parsed.data.mattermost_webhook_url, null);
 });
+
+test("웹훅은 URL 형태만 받는다", () => {
+  // 틀린 값은 저장할 땐 조용하고, 알림 보낼 때 서버 로그에만 실패가 남는다 — 그때는 아무도 모른다
+  const bad = createRepositorySchema.safeParse({
+    slug: "a",
+    name: "A",
+    discord_webhook_url: "discord.com/api/webhooks/1",
+  });
+  assert.equal(bad.success, false);
+
+  const ok = createRepositorySchema.safeParse({
+    slug: "a",
+    name: "A",
+    mattermost_webhook_url: "https://mm.example.com/hooks/xyz",
+    discord_webhook_url: "https://discord.com/api/webhooks/1/abc",
+  });
+  assert.ok(ok.success);
+  assert.equal(ok.data.discord_webhook_url, "https://discord.com/api/webhooks/1/abc");
+});
+
+test("웹훅 빈 칸은 null — DB에 ''를 넣지 않는다", () => {
+  const parsed = createRepositorySchema.safeParse({ slug: "a", name: "A", discord_webhook_url: "  " });
+
+  assert.ok(parsed.success);
+  assert.equal(parsed.data.discord_webhook_url, null);
+});

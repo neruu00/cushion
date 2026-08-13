@@ -50,8 +50,8 @@ export async function saveDocument(
     };
   }
 
-  revalidatePath(`/${parsed.data.repo}`);
-  revalidatePath(`/${parsed.data.repo}/${parsed.data.path}`);
+  revalidatePath(`/repositories/${parsed.data.repo}`);
+  revalidatePath(`/repositories/${parsed.data.repo}/${parsed.data.path}`);
   return { success: true, data: { sha: result.sha } };
 }
 
@@ -71,7 +71,7 @@ export async function removeDocument(formData: FormData): Promise<void> {
   });
   if (!result.ok) console.error("removeDocument", result.code, result.message);
 
-  revalidatePath(`/${parsed.data.repo}`);
+  revalidatePath(`/repositories/${parsed.data.repo}`);
 }
 
 /**
@@ -121,6 +121,6 @@ export async function restoreVersion(formData: FormData): Promise<void> {
   });
   if (!result.ok) console.error("restoreVersion", result.code, result.message);
 
-  revalidatePath(`/${parsed.data.repo}/${parsed.data.path}`);
-  revalidatePath(`/${parsed.data.repo}/history/${parsed.data.path}`);
+  revalidatePath(`/repositories/${parsed.data.repo}/${parsed.data.path}`);
+  revalidatePath(`/repositories/${parsed.data.repo}/history/${parsed.data.path}`);
 }

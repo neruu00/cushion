@@ -12,13 +12,13 @@ import { Button } from "@/components/ui/button";
 import { getAccessibleRepo, getSessionEmail } from "@/lib/authz";
 import { supabase } from "@/lib/supabase";
 
-export default async function EditDocumentPage({ params }: PageProps<"/[repo]/edit/[...path]">) {
+export default async function EditDocumentPage({ params }: PageProps<"/repositories/[repo]/edit/[...path]">) {
   const { repo: slug, path } = await params;
   const docPath = path.join("/");
 
   const email = await getSessionEmail();
   if (!email) {
-    redirect(`/api/auth/signin?callbackUrl=${encodeURIComponent(`/${slug}/edit/${docPath}`)}`);
+    redirect(`/api/auth/signin?callbackUrl=${encodeURIComponent(`/repositories/${slug}/edit/${docPath}`)}`);
   }
 
   // 멤버가 아니면 404. 읽기와 쓰기의 문턱이 같다 — 볼 수 있으면 고칠 수 있다.
@@ -39,18 +39,18 @@ export default async function EditDocumentPage({ params }: PageProps<"/[repo]/ed
     <main className="mx-auto w-full max-w-3xl space-y-6 p-8">
       <header className="space-y-1">
         <p className="text-xs text-muted-foreground">
-          <Link href={`/${repo.slug}`} className="font-mono hover:text-foreground">
+          <Link href={`/repositories/${repo.slug}`} className="font-mono hover:text-foreground">
             {repo.slug}
           </Link>
           {" / "}
-          <Link href={`/${repo.slug}/${doc.path}`} className="font-mono hover:text-foreground">
+          <Link href={`/repositories/${repo.slug}/${doc.path}`} className="font-mono hover:text-foreground">
             {doc.path}
           </Link>
         </p>
         <h1 className="text-xl font-semibold">편집</h1>
         <p className="text-xs text-muted-foreground">
           <Link
-            href={`/${repo.slug}/history/${doc.path}`}
+            href={`/repositories/${repo.slug}/history/${doc.path}`}
             className="underline underline-offset-4 hover:text-foreground"
           >
             변경 이력

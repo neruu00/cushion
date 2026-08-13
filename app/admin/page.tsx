@@ -7,12 +7,10 @@
 import { Trash2 } from "lucide-react";
 import { notFound } from "next/navigation";
 
-import {
-  addMember,
-  createRepository,
-  removeMember,
-} from "@/actions/repository";
+import { addMember, removeMember } from "@/actions/repository";
 import { ActionForm } from "@/components/ActionForm";
+import { Field } from "@/components/Field";
+import { NewRepoDialog } from "@/components/NewRepoDialog";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -21,8 +19,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { isAdmin } from "@/lib/authz";
 import { supabase } from "@/lib/supabase";
 
@@ -32,6 +28,7 @@ interface RepoRow {
   name: string;
   github_full_name: string | null;
   mattermost_webhook_url: string | null;
+  discord_webhook_url: string | null;
   repository_members: { email: string }[];
 }
 
@@ -41,7 +38,9 @@ export default async function AdminPage() {
 
   const { data, error } = await supabase
     .from("repositories")
-    .select("id, slug, name, github_full_name, mattermost_webhook_url, repository_members(email)")
+    .select(
+      "id, slug, name, github_full_name, mattermost_webhook_url, discord_webhook_url, repository_members(email)",
+    )
     .order("slug");
 
   if (error) console.error("AdminPage", error);
@@ -55,35 +54,13 @@ export default async function AdminPage() {
           레포를 등록하고 멤버를 넣는다. 문서는 각 레포 화면에서 만든다.{" "}
           {/* git이 없으므로 이게 유일한 백업이다 (D-011).
               라우트 핸들러가 파일을 내려주므로 <Link>의 클라이언트 이동으로는 다운로드가 안 된다. */}
-          {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
           <a href="/api/export" className="underline underline-offset-4 hover:text-foreground">
             전체 내보내기
           </a>
         </p>
       </header>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>레포 등록</CardTitle>
-          <CardDescription>slug는 소문자·숫자·하이픈. 나머지는 나중에 채워도 된다.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ActionForm
-            action={createRepository}
-            submitLabel="등록"
-            className="grid gap-3 sm:grid-cols-2"
-          >
-            <Field name="slug" label="slug" placeholder="cushion" required />
-            <Field name="name" label="이름" placeholder="Cushion" required />
-            <Field name="github_full_name" label="GitHub (org/repo)" placeholder="neruu00/cushion" />
-            <Field
-              name="mattermost_webhook_url"
-              label="Mattermost webhook"
-              placeholder="https://…/hooks/…"
-            />
-          </ActionForm>
-        </CardContent>
-      </Card>
+      <NewRepoDialog />
 
       {repos.length === 0 ? (
         <p className="text-sm text-muted-foreground">등록된 레포가 없다.</p>
@@ -95,7 +72,9 @@ export default async function AdminPage() {
               <CardDescription>
                 {repo.name}
                 {repo.github_full_name ? ` · ${repo.github_full_name}` : ""}
-                {repo.mattermost_webhook_url ? " · webhook 설정됨" : " · webhook 없음"}
+                {repo.mattermost_webhook_url ? " · Mattermost" : ""}
+                {repo.discord_webhook_url ? " · Discord" : ""}
+                {!repo.mattermost_webhook_url && !repo.discord_webhook_url ? " · webhook 없음" : ""}
               </CardDescription>
             </CardHeader>
 
@@ -142,24 +121,5 @@ export default async function AdminPage() {
         ))
       )}
     </main>
-  );
-}
-
-interface FieldProps {
-  name: string;
-  label: string;
-  placeholder?: string;
-  type?: string;
-  required?: boolean;
-}
-
-// 같은 name의 필드가 레포 카드마다 반복되므로 id를 쓰지 않는다.
-// label로 감싸면 id 없이도 연결된다 — 중복 id를 만들 여지가 아예 없어진다.
-function Field({ name, label, placeholder, type = "text", required }: FieldProps) {
-  return (
-    <Label className="grid gap-1.5">
-      <span>{label}</span>
-      <Input name={name} type={type} placeholder={placeholder} required={required} />
-    </Label>
   );
 }

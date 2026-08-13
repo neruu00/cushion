@@ -18,11 +18,13 @@ export interface Repo {
   github_full_name: string | null;
   /** 쓰기 경로의 알림이 재조회 없이 쓰도록 같이 실어 온다. 클라이언트로는 안 나간다 */
   mattermost_webhook_url: string | null;
+  discord_webhook_url: string | null;
   /** 레포별 최신 이벤트 (D-012 비정규화). [stale] 판단이 추가 쿼리 없이 된다 */
   latest_event_id: number;
 }
 
-const REPO_COLUMNS = "id, slug, name, github_full_name, mattermost_webhook_url, latest_event_id";
+const REPO_COLUMNS =
+  "id, slug, name, github_full_name, mattermost_webhook_url, discord_webhook_url, latest_event_id";
 
 // ─── 정체성 ──────────────────────────────────────────────────────────
 
@@ -95,6 +97,21 @@ export function isAdminEmail(email: string | null | undefined): boolean {
 /** 현재 로그인 세션이 admin인가. 서버 액션 첫 줄에서 쓴다. */
 export async function isAdmin(): Promise<boolean> {
   return isAdminEmail(await getSessionEmail());
+}
+
+/** 이 이메일이 이 레포의 멤버인가. 셀프서브 멤버 관리의 권한 판정용 (D-013). */
+export async function isMember(email: string, repositoryId: string): Promise<boolean> {
+  const { count, error } = await supabase
+    .from("repository_members")
+    .select("email", { count: "exact", head: true })
+    .eq("repository_id", repositoryId)
+    .eq("email", email.toLowerCase());
+
+  if (error) {
+    console.error("isMember", error);
+    return false; // 조회 실패는 권한 없음 (fail-closed)
+  }
+  return Boolean(count);
 }
 
 /** 이 이메일이 멤버로 등록된 레포 id 목록. admin 여부는 보지 않는다. */

@@ -13,13 +13,13 @@ import { Markdown } from "@/components/Markdown";
 import { getAccessibleRepo, getSessionEmail } from "@/lib/authz";
 import { supabase } from "@/lib/supabase";
 
-export default async function DocumentPage({ params }: PageProps<"/[repo]/[...path]">) {
+export default async function DocumentPage({ params }: PageProps<"/repositories/[repo]/[...path]">) {
   const { repo: slug, path } = await params;
   const docPath = path.join("/");
 
   const email = await getSessionEmail();
   if (!email) {
-    redirect(`/api/auth/signin?callbackUrl=${encodeURIComponent(`/${slug}/${docPath}`)}`);
+    redirect(`/api/auth/signin?callbackUrl=${encodeURIComponent(`/repositories/${slug}/${docPath}`)}`);
   }
 
   const repo = await getAccessibleRepo(email, slug);
@@ -44,7 +44,7 @@ export default async function DocumentPage({ params }: PageProps<"/[repo]/[...pa
     <main className="mx-auto w-full max-w-3xl space-y-6 p-8">
       <header className="space-y-2 border-b pb-4">
         <p className="text-xs text-muted-foreground">
-          <Link href={`/${repo.slug}`} className="font-mono hover:text-foreground">
+          <Link href={`/repositories/${repo.slug}`} className="font-mono hover:text-foreground">
             {repo.slug}
           </Link>
           {" / "}
@@ -56,13 +56,13 @@ export default async function DocumentPage({ params }: PageProps<"/[repo]/[...pa
             {doc.updated_by ? ` · ${doc.updated_by}` : ""}
           </span>
           <Link
-            href={`/${repo.slug}/edit/${doc.path}`}
+            href={`/repositories/${repo.slug}/edit/${doc.path}`}
             className="inline-flex items-center gap-1 underline underline-offset-4 hover:text-foreground"
           >
             편집 <Pencil className="size-3" />
           </Link>
           <Link
-            href={`/${repo.slug}/history/${doc.path}`}
+            href={`/repositories/${repo.slug}/history/${doc.path}`}
             className="inline-flex items-center gap-1 underline underline-offset-4 hover:text-foreground"
           >
             이력 <History className="size-3" />

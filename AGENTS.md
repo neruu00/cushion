@@ -25,7 +25,7 @@ spec_get(repo:"cushion", path:"SPEC.md", heading:"6. 인증 · 권한")
 ```
 
 붙어 있지 않다면 `/settings/tokens`에서 발급하고 명령 한 줄을 실행한다.
-웹으로는 <https://cushion-chi.vercel.app/cushion>.
+웹으로는 <https://cushion-chi.vercel.app/repositories/cushion>.
 
 **이 문서(`AGENTS.md`)와 `CLAUDE.md`는 레포에 남는다.** Claude Code가 세션 시작에 자동으로
 읽는 파일이라 Cushion에 두면 아무도 규칙을 안 읽는다 — 붙기 *전에* 필요한 문서다.
@@ -81,7 +81,8 @@ export async function createRepository(formData: FormData) {
 
 ### 3. 권한에서 절대 깨뜨리면 안 되는 4가지
 
-- **`ADMIN_EMAILS`가 비면 전원 거부**(fail-closed). 빈 값을 "제한 없음"으로 읽는 순간 전면 개방이다
+- **`ADMIN_EMAILS`가 비면 전원 거부**(fail-closed). 빈 값을 "제한 없음"으로 읽는 순간 전면 개방이다.
+  적용 범위는 `/admin`(전체 조망·내보내기)이다 — 레포 생성은 로그인만으로, 멤버 관리는 그 레포 멤버면 된다 (D-013)
 - **이메일은 쓸 때·조회할 때 양쪽에서 `lowercase`.** DB `CHECK` 제약이 있지만 조회 경로는 막아주지 않는다. 대소문자 차이 = ACL 우회 구멍
 - **토큰에 권한을 굽지 않는다.** 토큰은 이메일까지만 해석하고, 레포 권한은 **요청 시점에 `repository_members`를 조회**한다. 멤버에서 빼면 토큰 재발급 없이 즉시 차단돼야 한다
 - **권한 없는 레포는 403이 아니라 404.** 403은 "그 레포가 존재한다"를 알려준다

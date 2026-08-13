@@ -48,7 +48,7 @@ cp .env.example .env.local     # 값을 채운다
 RLS 정책이 0개라 모든 읽기가 빈 결과, 모든 쓰기가 거부되는데 **에러 없이 조용하다.**
 "화면이 비었다 / 아무 일도 안 일어난다"면 이 키부터 본다.
 
-`supabase/migrations/`의 SQL을 번호 순서대로 Supabase SQL Editor에서 실행한다. 그다음:
+`supabase/migrations/0001_schema.sql`을 Supabase SQL Editor에서 실행한다(멱등하다). 그다음:
 
 ```bash
 pnpm dev
@@ -124,8 +124,8 @@ Next.js **16** App Router · Tailwind v4 + shadcn/ui · Supabase(Postgres) · Ne
 
 | 문서 | 어디에 | 담는 것 |
 |---|---|---|
-| `SPEC.md` | [Cushion](https://cushion-chi.vercel.app/cushion/SPEC.md) | 무엇을·왜. 데이터 모델, MCP 툴 명세, 검증 항목 |
-| `PLAN.md` | [Cushion](https://cushion-chi.vercel.app/cushion/PLAN.md) | 현재 상태, 다음 작업, **결정 로그** |
+| `SPEC.md` | [Cushion](https://cushion-chi.vercel.app/repositories/cushion/SPEC.md) | 무엇을·왜. 데이터 모델, MCP 툴 명세, 검증 항목 |
+| `PLAN.md` | [Cushion](https://cushion-chi.vercel.app/repositories/cushion/PLAN.md) | 현재 상태, 다음 작업, **결정 로그** |
 | [`AGENTS.md`](AGENTS.md) | 레포 | 코드를 읽어선 알기 어려운 규칙과 함정 |
 | [`supabase/migrations/`](supabase/migrations) | 레포 | DB 스키마의 원본 |
 
