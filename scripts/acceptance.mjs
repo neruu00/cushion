@@ -20,7 +20,10 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const BASE = process.env.CUSHION_URL ?? "http://localhost:3000";
-const COOKIE = "authjs.session-token";
+
+// Auth.js는 HTTPS면 쿠키 이름에 __Secure- 접두사를 붙이고, 그 이름을 JWT salt로도 쓴다.
+// 이름이 어긋나면 서버가 세션을 아예 못 읽어서 "로그인했는데 아무것도 안 보임"으로 나타난다.
+const COOKIE = `${BASE.startsWith("https:") ? "__Secure-" : ""}authjs.session-token`;
 
 const db = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
