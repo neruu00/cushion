@@ -10,6 +10,8 @@
     "module": "esnext",
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
+    // *.test.ts가 `node --test`로 직접 실행되므로 확장자 포함 import가 필요하다 (noEmit이라 허용됨)
+    "allowImportingTsExtensions": true,
     "isolatedModules": true,
     "jsx": "react-jsx",
     "incremental": true,
