@@ -10,7 +10,6 @@
  *
  * 여기서 못 잡는 것:
  *   - ADMIN_EMAILS 빈 값 fail-closed → 서버를 다른 env로 다시 띄워야 한다. 맨 아래 안내 참조
- *   - cushion-sync.yml 실동작 → GitHub Actions가 필요하다 (T-303)
  *   - 알림 품질 → 사람이 읽고 판단할 일이다 (SPEC §11.6)
  */
 import { createClient } from "@supabase/supabase-js";
@@ -68,13 +67,6 @@ const page = (path, cookie) =>
     async (r) => ({ status: r.status, location: r.headers.get("location"), html: await r.text() }),
   );
 
-const sync = (body, bearer) =>
-  fetch(`${BASE}/api/sync`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${bearer}` },
-    body: JSON.stringify(body),
-  }).then(async (r) => ({ status: r.status, body: await r.json().catch(() => null) }));
-
 let rpcId = 0;
 const mcp = (method, params, bearer) =>
   fetch(`${BASE}/api/mcp`, {
@@ -90,9 +82,8 @@ async function tool(name, args, bearer) {
 
 // ── 준비 ──────────────────────────────────────────────────────────────
 
-const syncA = mint("cshn_sync_");
-const syncB = mint("cshn_sync_");
 const pat = mint("cshn_pat_");
+const editorPat = mint("cshn_pat_"); // 같은 사람의 다른 세션 — "남이 고쳤다"를 흉내낸다
 const outsiderPat = mint("cshn_pat_");
 
 async function seed() {
@@ -102,8 +93,8 @@ async function seed() {
   const { data, error } = await db
     .from("repositories")
     .insert([
-      { slug: SLUG_A, name: "acceptance A", github_full_name: "neruu00/cushion", sync_token_hash: sha256(syncA) },
-      { slug: SLUG_B, name: "acceptance B", sync_token_hash: sha256(syncB) },
+      { slug: SLUG_A, name: "acceptance A", github_full_name: "neruu00/cushion" },
+      { slug: SLUG_B, name: "acceptance B" },
     ])
     .select("id, slug");
   if (error) throw error;
@@ -112,33 +103,36 @@ async function seed() {
   await db.from("repository_members").insert({ repository_id: byslug[SLUG_A], email: MEMBER });
   await db.from("access_tokens").insert([
     { email: MEMBER, token_hash: sha256(pat), name: "acceptance" },
+    { email: MEMBER, token_hash: sha256(editorPat), name: "acceptance editor" },
     { email: OUTSIDER, token_hash: sha256(outsiderPat), name: "acceptance" },
   ]);
   return byslug;
 }
 
-const docs = ["SPEC.md", "AGENTS.md", "PLAN.md"].map((path) => ({
+// 절감 실측의 대조군. SPEC·PLAN은 Cushion으로 옮겼으므로(D-011) 레포에 남은 실제 문서를 쓴다 —
+// 장난감 문서로 재면 숫자가 거짓말을 한다.
+const docs = ["README.md", "AGENTS.md"].map((path) => ({
   path,
-  content: readFileSync(path, "utf8"),
+  // 서버가 저장할 때 CRLF를 LF로 접는다(의도된 동작). 여기서 같이 접지 않으면
+  // Windows 체크아웃에서만 "본문이 안 바뀌었다"로 보인다 — 제품이 아니라 비교가 틀린 것이다.
+  content: readFileSync(path, "utf8").replace(/\r\n/g, "\n"),
 }));
 
 // ── 본편 ──────────────────────────────────────────────────────────────
+
+// 검증에 쓸 대표 문서. 파일 이름을 여기저기 박으면 fixture를 바꿀 때마다 같이 깨진다.
+const MAIN = docs[0].path;
 
 const repos = await seed();
 const memberCookie = await cookieFor(MEMBER);
 const outsiderCookie = await cookieFor(OUTSIDER);
 
 try {
-  // 자기 자신의 문서를 미러에 넣는다. 절감 실측을 장난감 문서로 하면 의미가 없다.
-  await sync(
-    {
-      commit: { sha: "acc0001", author: "neruu00", message: "인수 검증 시드" },
-      changed: docs,
-      deleted: [],
-      diff: "",
-    },
-    syncA,
-  );
+  // 자기 자신의 문서를 실제 쓰기 경로로 넣는다. 절감 실측을 장난감 문서로 하면 의미가 없고,
+  // 시드까지 spec_put으로 하면 그 자체가 쓰기 경로 검증이 된다.
+  for (const doc of docs) {
+    await tool("spec_put", { repo: SLUG_A, ...doc, note: "인수 검증 시드" }, pat);
+  }
 
   // ── SPEC §11.2 권한 ─────────────────────────────────────────────
   heading("§11.2 권한");
@@ -163,19 +157,15 @@ try {
     (await page(`/${SLUG_A}`, await cookieFor("Member@Example.COM"))).status === 200,
   );
 
-  check("sync 토큰으로 /api/mcp → 거부", (await mcp("ping", {}, syncA)).status === 401);
-  check("access 토큰으로 /api/sync → 거부", (await sync({}, pat)).status === 401);
+  check("접두사가 다른 키 → 거부", (await mcp("ping", {}, "ghp_notourtoken")).status === 401);
 
-  // 레포 A의 토큰은 A만 가리킨다. B를 갱신할 방법이 표현 자체로 없다.
-  await sync(
-    { commit: { sha: "acc0002", author: "x", message: "침범 시도" }, changed: [{ path: "INTRUDER.md", content: "#" }], deleted: [], diff: "" },
-    syncA,
-  );
+  // 멤버가 아닌 레포에는 쓰지도 못한다. 읽기와 쓰기의 문턱이 같다.
+  await tool("spec_put", { repo: SLUG_B, path: "INTRUDER.md", content: "#" }, pat);
   const { count: bDocs } = await db
     .from("documents")
     .select("path", { count: "exact", head: true })
     .eq("repository_id", repos[SLUG_B]);
-  check("레포 A의 sync 토큰으로 B를 갱신할 수 없다", bDocs === 0, `B 문서 ${bDocs}건`);
+  check("멤버 아닌 레포에 spec_put → 거부", bDocs === 0, `B 문서 ${bDocs}건`);
 
   const memberSees = await page(`/${SLUG_A}`, memberCookie);
   check("멤버는 본다", memberSees.status === 200);
@@ -226,55 +216,104 @@ try {
     }
   }
 
-  // ── SPEC §11.3 동기화 ───────────────────────────────────────────
-  heading("§11.3 동기화");
+  // ── SPEC §11.3 쓰기 ─────────────────────────────────────────────
+  heading("§11.3 쓰기 (원본이 여기 있다)");
 
   const { count: seeded } = await db
     .from("documents")
     .select("path", { count: "exact", head: true })
     .eq("repository_id", repos[SLUG_A]);
-  check("push한 문서가 미러에 있다", seeded === docs.length + 1, `${seeded}건`);
+  check("spec_put으로 넣은 문서가 남아 있다", seeded === docs.length, `${seeded}건`);
 
-  await sync(
-    { commit: { sha: "acc0003", author: "x", message: "폐기" }, changed: [], deleted: ["INTRUDER.md"], diff: "" },
-    syncA,
+  const readBack = await tool("spec_get", { repo: SLUG_A, path: MAIN }, pat);
+  const seedSha = /sha:([0-9a-f]+)/.exec(readBack)?.[1] ?? "";
+  check("sha를 돌려준다", seedSha.length === 64);
+
+  // 낙관적 잠금 — 이 검사가 이 모델 전체를 지탱한다
+  const stale = await tool(
+    "spec_put",
+    { repo: SLUG_A, path: MAIN, content: "덮어쓰기", base_sha: "0".repeat(64) },
+    pat,
   );
-  const { data: afterDelete } = await db
+  const { data: untouched } = await db
     .from("documents")
-    .select("path")
+    .select("content_sha")
     .eq("repository_id", repos[SLUG_A])
-    .eq("path", "INTRUDER.md");
-  check("삭제 push → 미러에서도 사라진다 (T-603)", (afterDelete ?? []).length === 0);
+    .eq("path", MAIN)
+    .maybeSingle();
+  check("낡은 base_sha → 거부하고 현재 sha를 알려준다", stale.includes(seedSha), stale.slice(0, 60));
+  check("거부됐으면 본문이 그대로다", untouched?.content_sha === seedSha);
 
-  await sync(
-    { full: true, commit: { sha: "acc0004", author: "x", message: "전체" }, changed: [docs[0]], deleted: [], diff: "" },
-    syncA,
-  );
-  const { data: afterFull } = await db
-    .from("documents")
-    .select("path")
-    .eq("repository_id", repos[SLUG_A]);
   check(
-    "full 동기화 → 페이로드에 없는 문서 제거",
-    afterFull.length === 1 && afterFull[0].path === "SPEC.md",
-    afterFull.map((d) => d.path).join(", "),
+    "base_sha 없이 기존 문서를 덮으려 하면 거부",
+    (await tool("spec_put", { repo: SLUG_A, path: MAIN, content: "x" }, pat)).includes("base_sha"),
   );
 
-  const before = await db
-    .from("sync_events")
-    .select("id", { count: "exact", head: true })
-    .eq("repository_id", repos[SLUG_A]);
-  await sync({ full: true, changed: [], deleted: [], diff: "" }, syncA);
-  const after = await db
-    .from("sync_events")
-    .select("id", { count: "exact", head: true })
-    .eq("repository_id", repos[SLUG_A]);
-  check("빈 동기화는 미러도 커서도 건드리지 않는다", before.count === after.count);
+  // 정상 수정 → 이력이 남는다
+  const edited = `${docs[0].content}
 
-  // 되돌려 놓는다 — 아래 절감 실측이 문서 3개를 다 본다
-  await sync(
-    { full: true, commit: { sha: "acc0005", author: "neruu00", message: "복구" }, changed: docs, deleted: [], diff: "" },
-    syncA,
+## 인수 검증 섹션
+
+추가.
+`;
+  await tool(
+    "spec_put",
+    { repo: SLUG_A, path: MAIN, content: edited, base_sha: seedSha, note: "섹션 추가" },
+    pat,
+  );
+  const { data: versions } = await db
+    .from("document_versions")
+    .select("content_sha, author, note")
+    .eq("repository_id", repos[SLUG_A])
+    .eq("path", MAIN)
+    .order("id", { ascending: false });
+  check("수정하면 이전 본문이 이력에 남는다", versions?.[0]?.content_sha === seedSha, `${versions?.length ?? 0}건`);
+  check("이력에 작성자와 메모가 있다", versions?.[0]?.author === MEMBER && versions?.[0]?.note === "섹션 추가");
+
+  const { data: afterEdit } = await db
+    .from("documents")
+    .select("content, updated_by")
+    .eq("repository_id", repos[SLUG_A])
+    .eq("path", MAIN)
+    .maybeSingle();
+  check("본문이 실제로 바뀌었다", afterEdit?.content === edited);
+  check("누가 고쳤는지 남는다", afterEdit?.updated_by === MEMBER);
+
+  // 삭제 — 이력은 살아남아야 한다
+  await tool("spec_put", { repo: SLUG_A, path: "TEMP.md", content: "# 임시\n" }, pat);
+  const tempRead = await tool("spec_get", { repo: SLUG_A, path: "TEMP.md" }, pat);
+  const tempSha = /sha:([0-9a-f]+)/.exec(tempRead)?.[1];
+  await tool("spec_delete", { repo: SLUG_A, path: "TEMP.md", base_sha: tempSha }, pat);
+  const { count: tempLeft } = await db
+    .from("documents")
+    .select("path", { count: "exact", head: true })
+    .eq("repository_id", repos[SLUG_A])
+    .eq("path", "TEMP.md");
+  const { count: tempHistory } = await db
+    .from("document_versions")
+    .select("id", { count: "exact", head: true })
+    .eq("repository_id", repos[SLUG_A])
+    .eq("path", "TEMP.md");
+  check("삭제하면 목차에서 사라진다", tempLeft === 0);
+  check("삭제해도 이력은 남는다 — 되돌릴 수 있어야 한다", tempHistory === 1, `${tempHistory}건`);
+
+  check(
+    "삭제된 문서는 spec_get으로도 안 나온다",
+    (await tool("spec_get", { repo: SLUG_A, path: "TEMP.md" }, pat)).includes("그런 문서가 없다"),
+  );
+
+  // 되돌리기 — 이력이 읽히는지까지 확인한다. 쓰기만 하고 못 꺼내면 없는 것과 같다.
+  const { data: restorable } = await db
+    .from("document_versions")
+    .select("id, content_sha")
+    .eq("repository_id", repos[SLUG_A])
+    .eq("path", "TEMP.md")
+    .maybeSingle();
+  check("삭제된 문서의 이력을 찾을 수 있다", Boolean(restorable));
+
+  check(
+    ".md가 아닌 경로는 거부",
+    (await tool("spec_put", { repo: SLUG_A, path: "notes.txt", content: "x" }, pat)).includes(".md"),
   );
 
   // ── SPEC §11.5 MCP ──────────────────────────────────────────────
@@ -287,46 +326,70 @@ try {
 
   const toolNames = ((await mcp("tools/list", {}, pat)).json?.result?.tools ?? []).map((t) => t.name);
   check(
-    "툴 4종",
-    ["spec_outline", "spec_get", "spec_search", "spec_changes_since"].every((n) => toolNames.includes(n)),
+    "읽기 4종 + 쓰기 2종",
+    ["spec_outline", "spec_get", "spec_search", "spec_changes_since", "spec_put", "spec_delete"].every(
+      (n) => toolNames.includes(n),
+    ),
     toolNames.join(", "),
   );
-  check("쓰기 툴이 없다", toolNames.every((n) => n.startsWith("spec_")), toolNames.length + "개");
 
   const outline = await tool("spec_outline", {}, pat);
-  const full = await tool("spec_get", { repo: SLUG_A, path: "SPEC.md" }, pat);
+  const full = await tool("spec_get", { repo: SLUG_A, path: MAIN }, pat);
   const sha = /sha:([0-9a-f]+)/.exec(full)?.[1] ?? "";
   check(
     "if_none_match 일치 → 본문 대신 unchanged",
-    (await tool("spec_get", { repo: SLUG_A, path: "SPEC.md", if_none_match: sha }, pat)).trim() === "unchanged",
+    (await tool("spec_get", { repo: SLUG_A, path: MAIN, if_none_match: sha }, pat)).trim() === "unchanged",
   );
-  check("spec_search가 섹션을 짚는다", (await tool("spec_search", { query: "sync token" }, pat)).includes("SPEC.md"));
+  check("spec_search가 섹션을 짚는다", (await tool("spec_search", { query: "코드 규칙" }, pat)).includes("/"));
 
   // ── SPEC §11.4 구독 ─────────────────────────────────────────────
   heading("§11.4 구독");
 
   check("최신 상태에서는 [stale]이 없다", !outline.includes("[stale]"));
 
-  await sync(
+  // 다른 세션(editorPat)이 고친다 — pat의 커서는 그대로이므로 밀린 상태가 된다
+  const beforeEdit = await tool("spec_get", { repo: SLUG_A, path: MAIN }, editorPat);
+  await tool(
+    "spec_put",
     {
-      commit: { sha: "acc0006", author: "someone", message: "다른 사람이 스펙을 고쳤다" },
-      changed: [{ path: "SPEC.md", content: docs[0].content + "\n\n## 새 섹션\n\n추가.\n" }],
-      deleted: [],
-      diff: "",
+      repo: SLUG_A,
+      path: MAIN,
+      content: `${edited}\n\n## 남이 고친 섹션\n\n추가.\n`,
+      base_sha: /sha:([0-9a-f]+)/.exec(beforeEdit)?.[1],
+      note: "다른 사람이 스펙을 고쳤다",
     },
-    syncA,
+    editorPat,
   );
-  check("다른 사람 push 후 → 다음 툴 응답에 [stale]", (await tool("spec_outline", {}, pat)).includes("[stale]"));
+  check("남이 고친 뒤 → 다음 툴 응답에 [stale]", (await tool("spec_outline", {}, pat)).includes("[stale]"));
 
   const changes = await tool("spec_changes_since", {}, pat);
-  check("spec_changes_since가 요약을 준다", changes.includes("SPEC.md"));
+  check("spec_changes_since가 요약을 준다", changes.includes(MAIN));
   check("커서 전진 → [stale]이 사라진다", !(await tool("spec_outline", {}, pat)).includes("[stale]"));
+
+  // ── 내보내기 (git을 버린 뒤의 유일한 탈출구) ────────────────────
+  heading("내보내기");
+
+  const exported = await fetch(`${BASE}/api/export`, {
+    headers: { Authorization: `Bearer ${pat}` },
+  });
+  const dump = await exported.text();
+  check("토큰으로 내려받는다", exported.status === 200);
+  check(
+    "모든 문서가 담긴다",
+    docs.every((d) => dump.includes(`${SLUG_A}/${d.path}`)),
+    `${dump.length.toLocaleString()}자`,
+  );
+  check("본문까지 담긴다", dump.includes(docs[1].content.slice(0, 120)));
+  check(
+    "인증 없이는 안 준다",
+    (await fetch(`${BASE}/api/export`)).status === 401,
+  );
 
   // ── SPEC §11.1 토큰 절감 ────────────────────────────────────────
   heading("§11.1 토큰 절감 (T-601)");
 
   const control = docs.reduce((sum, d) => sum + d.content.length, 0);
-  console.log(`  대조군: 스펙 3개 전량 로드  ${control.toLocaleString()}자`);
+  console.log(`  대조군: 문서 ${docs.length}개 전량 로드  ${control.toLocaleString()}자  (${docs.map((d) => d.path).join(", ")})`);
   console.log(`  실험군: spec_outline 1회 + 작업당 필요한 섹션 1개  (outline ${outline.length.toLocaleString()}자)\n`);
 
   // 헤딩 문자열을 박아 두지 않는다 — 문서가 바뀌면 같이 틀어진다. outline에서 찾는다.
@@ -338,9 +401,9 @@ try {
   }
 
   const tasks = [
-    ["토큰 발급 규칙을 확인한다", "인증"],
-    ["MCP 툴 인자를 확인한다", "MCP 서버"],
     ["파일명 규칙을 확인한다", "코드 규칙"],
+    ["커밋해도 되는지 확인한다", "작업 방식"],
+    ["에이전트를 붙이는 법을 확인한다", "에이전트 붙이기"],
   ];
 
   let experiment = outline.length;

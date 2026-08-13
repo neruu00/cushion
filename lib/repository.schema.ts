@@ -55,4 +55,3 @@ export const memberSchema = z.object({
     .pipe(z.email("이메일 형식이 아닙니다.")),
 });
 
-export const repositoryIdSchema = z.object({ repository_id: z.uuid() });

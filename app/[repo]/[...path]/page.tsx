@@ -1,10 +1,11 @@
 /**
  * @file app/[repo]/[...path]/page.tsx
- * @description 문서 보기 + GitHub 원본 링크 (T-502).
+ * @description 문서 보기 (T-502).
  *
- * 편집 버튼이 없는 게 맞다. 원본은 git이고 수정은 PR로 한다 (D-001).
+ * 원본이 여기 있으므로 편집 링크가 있다 (D-011). GitHub 링크는 문서가 아니라
+ * "관련 코드 레포"를 가리킨다 — 문서는 더 이상 그 레포에 없다.
  */
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, History, Pencil } from "lucide-react";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
@@ -26,7 +27,7 @@ export default async function DocumentPage({ params }: PageProps<"/[repo]/[...pa
 
   const { data: doc, error } = await supabase
     .from("documents")
-    .select("path, title, content, updated_at, commit_sha")
+    .select("path, title, content, updated_at, updated_by")
     .eq("repository_id", repo.id)
     .eq("path", docPath)
     .maybeSingle();
@@ -34,9 +35,9 @@ export default async function DocumentPage({ params }: PageProps<"/[repo]/[...pa
   if (error) console.error("DocumentPage", error);
   if (!doc) notFound();
 
-  // 브랜치를 저장하지 않으므로 HEAD로 건다. 기본 브랜치가 뭐든 따라간다.
+  // 문서는 여기 있고 레포는 관련 코드일 뿐이다 — 문서 파일이 아니라 레포로 건다.
   const source = repo.github_full_name
-    ? `https://github.com/${repo.github_full_name}/blob/HEAD/${doc.path}`
+    ? `https://github.com/${repo.github_full_name}`
     : null;
 
   return (
@@ -50,8 +51,22 @@ export default async function DocumentPage({ params }: PageProps<"/[repo]/[...pa
           <span className="font-mono">{doc.path}</span>
         </p>
         <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-          <span>{doc.updated_at.slice(0, 10)} 동기화</span>
-          {doc.commit_sha ? <span className="font-mono">{doc.commit_sha.slice(0, 7)}</span> : null}
+          <span>
+            {doc.updated_at.slice(0, 10)}
+            {doc.updated_by ? ` · ${doc.updated_by}` : ""}
+          </span>
+          <Link
+            href={`/${repo.slug}/edit/${doc.path}`}
+            className="inline-flex items-center gap-1 underline underline-offset-4 hover:text-foreground"
+          >
+            편집 <Pencil className="size-3" />
+          </Link>
+          <Link
+            href={`/${repo.slug}/history/${doc.path}`}
+            className="inline-flex items-center gap-1 underline underline-offset-4 hover:text-foreground"
+          >
+            이력 <History className="size-3" />
+          </Link>
           {source ? (
             <a
               href={source}
@@ -59,7 +74,7 @@ export default async function DocumentPage({ params }: PageProps<"/[repo]/[...pa
               target="_blank"
               rel="noreferrer"
             >
-              GitHub 원본 <ExternalLink className="size-3" />
+              관련 레포 <ExternalLink className="size-3" />
             </a>
           ) : null}
         </div>

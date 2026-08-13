@@ -67,29 +67,6 @@ export async function identityFromAccessToken(
   return { id: data.id as string, email: data.email as string };
 }
 
-/**
- * sync token(`cshn_sync_`) → 그 토큰이 속한 레포. 유효하지 않으면 null.
- * 스코프가 레포 하나이므로 "레포 A의 토큰으로 레포 B 갱신"은 여기서 이미 불가능하다.
- */
-export async function repoFromSyncToken(
-  authorizationHeader: string | null | undefined,
-): Promise<Repo | null> {
-  const hash = hashFromAuthHeader(authorizationHeader, "sync");
-  if (!hash) return null;
-
-  const { data, error } = await supabase
-    .from("repositories")
-    .select(REPO_COLUMNS)
-    .eq("sync_token_hash", hash)
-    .maybeSingle();
-
-  if (error) {
-    console.error("repoFromSyncToken", error);
-    return null;
-  }
-  return data;
-}
-
 // ─── 권한 ────────────────────────────────────────────────────────────
 
 /**
