@@ -58,6 +58,18 @@
 
 **근거**: Cushion이 GitHub API를 당기면 GitHub App/PAT·권한 설정·레이트리밋·토큰 회전이 전부 딸려온다. 반대로 하면 전부 사라진다 — CI는 이미 파일을 체크아웃해 놨다. **Cushion은 GitHub 자격증명을 하나도 갖지 않는다.**
 
+### D-009. MCP SDK를 넣지 않는다. JSON-RPC를 직접 쓴다 (2026-08-13)
+
+**결정**: `@modelcontextprotocol/sdk` 없이 `app/api/mcp/route.ts`에서 JSON-RPC 2.0을 직접 처리한다.
+
+**근거**: 이 서버는 세션도 SSE도 없고 읽기 툴 4개뿐이다. SDK가 값을 하는 부분(세션 관리,
+스트림 전송, 서버 발신 알림)을 하나도 쓰지 않는다. 실제로 필요한 건 POST 하나에
+`initialize` / `tools/list` / `tools/call` / `ping`을 태우는 것뿐이고 그게 100줄이다.
+Next 라우트 핸들러에 SDK 트랜스포트를 물리려면 어댑터가 하나 더 붙는다.
+
+**재검토 조건**: 서버가 먼저 말을 걸어야 할 때(`resources/subscribe` 푸시 등, D-005 참조).
+그때는 SSE가 필요하고 SDK가 값을 한다.
+
 ### D-008. 토큰 파싱(순수)과 토큰 조회(DB)를 다른 파일에 둔다 (2026-08-13)
 
 **결정**: `lib/token.ts`는 `node:crypto`만 쓰는 순수 함수(발급·sha256·접두사 파싱), DB를 타는
@@ -91,6 +103,7 @@ plain Node가 import를 못 한다). 러너를 추가하는 대신 파일을 나
 | 기반 레이어 | `lib/supabase.ts` · `auth.ts` · `authz.ts` · `token.ts` · `proxy.ts` (T-101~105) |
 | 관리 화면 | `/admin` · `/settings/tokens` · 설치 스니펫 출력 (T-201~203) |
 | 동기화 수신 | `POST /api/sync` · 구조적 요약 · 전체 동기화 (T-301·302·304) |
+| MCP 서버 | `POST /api/mcp` · 툴 4종 · 커서 구독 (T-401~404) |
 
 ---
 
@@ -148,10 +161,13 @@ plain Node가 import를 못 한다). 러너를 추가하는 대신 파일을 나
 
 ## 🔌 T-4. MCP
 
-- [ ] **T-401** `POST /api/mcp` — Streamable HTTP. Bearer 인증 → 이메일 → 요청 시점 권한 조회
-- [ ] **T-402** `spec_outline` / `spec_get`(`if_none_match`) / `spec_search` / `spec_changes_since`
-- [ ] **T-403** 커서 기반 `[stale]` 한 줄 부착 (D-005)
-- [ ] **T-404** 서버 `instructions` — 호출 순서를 박되 **100토큰 이내**
+- [x] **T-401** `POST /api/mcp` — Streamable HTTP. **MCP SDK 없이 JSON-RPC 직접**(D-009).
+      GET·DELETE는 405(SSE·세션 없음). 권한은 요청마다 `buildContext`가 다시 조회한다
+- [x] **T-402** `spec_outline` / `spec_get`(`heading`, `if_none_match`) / `spec_search` / `spec_changes_since`.
+      섹션 분할·검색은 `lib/spec.ts`(순수, 테스트 있음), 툴 배선은 `lib/mcp.ts`
+- [x] **T-403** `[stale]` 한 줄 (D-005). **처음 붙은 토큰은 커서를 최신으로 깔고 시작한다** —
+      안 그러면 첫 호출부터 [stale]이 붙는데 방금 목차를 읽은 에이전트에겐 거짓말이다
+- [x] **T-404** `instructions` 140자 (≈70토큰). `initialize` 응답에 실린다
 
 ## 🎨 T-5. 읽기 화면
 
