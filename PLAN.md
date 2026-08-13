@@ -90,6 +90,7 @@ plain Node가 import를 못 한다). 러너를 추가하는 대신 파일을 나
 | DB 마이그레이션 실행 | 6개 테이블 실재 확인 (T-001) |
 | 기반 레이어 | `lib/supabase.ts` · `auth.ts` · `authz.ts` · `token.ts` · `proxy.ts` (T-101~105) |
 | 관리 화면 | `/admin` · `/settings/tokens` · 설치 스니펫 출력 (T-201~203) |
+| 동기화 수신 | `POST /api/sync` · 구조적 요약 · 전체 동기화 (T-301·302·304) |
 
 ---
 
@@ -98,6 +99,10 @@ plain Node가 import를 못 한다). 러너를 추가하는 대신 파일을 나
 - [x] **T-001** `supabase/migrations/0001_init.sql` 실행 완료.
       6개 테이블(`repositories` / `repository_members` / `documents` / `sync_events` /
       `access_tokens` / `token_cursors`) 실재 확인함.
+
+- [x] **T-002** `.env.local`의 `SUPABASE_SERVICE_ROLE_KEY`가 한동안 anon 키였다 → `service_role`로 교체 완료.
+      **증상이 조용하다는 걸 기억해 둘 것**: RLS 정책이 0개라 anon 키로는 읽기가 빈 배열,
+      쓰기가 42501로 거부된다. "화면이 비었다 / 아무 일도 안 일어난다"면 이 키부터 본다.
 
 ---
 
@@ -127,12 +132,19 @@ plain Node가 import를 못 한다). 러너를 추가하는 대신 파일을 나
 
 ## 🔄 T-3. 동기화
 
-- [ ] **T-301** `POST /api/sync` — sync 토큰 검증 → Zod 파싱 → `documents` upsert/삭제 → `sync_events` 적재 → Mattermost POST.
-      **페이로드 계약은 `lib/snippets.ts`의 워크플로가 보내는 모양이다** — Zod 스키마를 거기 맞춰 쓴다
-- [ ] **T-302** 구조적 요약 생성기 (경로 + 바뀐 `##` 헤딩 + 증감 줄 수). D-002
-- [ ] **T-303** `cushion-sync.yml` **실측 검증** — 템플릿 자체는 T-202에서 `lib/snippets.ts`에 썼다.
-      실제 push로 확인할 것: `fetch-depth: 0`, `changed`+`deleted` 둘 다, `before` all-zeros 폴백, 페이로드 상한
-- [ ] **T-304** `workflow_dispatch` 전체 동기화(`full=true`)
+- [x] **T-301** `POST /api/sync` — sync 토큰 검증 → Zod 파싱(`lib/sync.schema.ts`) → `documents`
+      upsert/삭제 → `sync_events` 적재 → Mattermost POST.
+      알림 실패가 동기화를 죽이지 않는다(try/catch + 5초 타임아웃). webhook URL은 이 경로에서만 읽는다
+- [x] **T-302** `lib/summary.ts` — 경로 + 바뀐 `##` 헤딩 + 증감 줄 수 (D-002).
+      헤딩은 diff의 hunk 시작 줄을 **바뀐 뒤 본문**에 되짚어 찾는다.
+      저장하는 `summary`에는 diff를 넣지 않는다 — `spec_changes_since`가 그걸 매번 되팔게 된다
+- [x] **T-304** `full=true`면 페이로드에 없는 문서를 미러에서 제거.
+      `changed`가 비면 지우지 않는다 — 워크플로 오작동으로 미러를 통째로 날리는 게 훨씬 나쁘다.
+      **실측 완료**: 임시 레포로 push → 삭제 → full → 빈 full 4케이스 왕복 확인
+- [ ] **T-303** `cushion-sync.yml` **실측 검증** (템플릿은 T-202에서 `lib/snippets.ts`에 썼다).
+      배포 URL이 있어야 하고 GitHub Actions에서만 돌릴 수 있다. 확인할 것:
+      `fetch-depth: 0`, `changed`+`deleted` 둘 다, `before` all-zeros 폴백, diff 40KB 상한.
+      *로컬에 `jq`가 없어 워크플로 스크립트는 이 기계에서 돌려보지 못했다*
 
 ## 🔌 T-4. MCP
 
