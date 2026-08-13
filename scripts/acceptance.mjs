@@ -113,7 +113,9 @@ async function seed() {
 // 장난감 문서로 재면 숫자가 거짓말을 한다.
 const docs = ["README.md", "AGENTS.md"].map((path) => ({
   path,
-  content: readFileSync(path, "utf8"),
+  // 서버가 저장할 때 CRLF를 LF로 접는다(의도된 동작). 여기서 같이 접지 않으면
+  // Windows 체크아웃에서만 "본문이 안 바뀌었다"로 보인다 — 제품이 아니라 비교가 틀린 것이다.
+  content: readFileSync(path, "utf8").replace(/\r\n/g, "\n"),
 }));
 
 // ── 본편 ──────────────────────────────────────────────────────────────
