@@ -123,33 +123,10 @@ export interface McpContext {
 
 // ─── 컨텍스트 ────────────────────────────────────────────────────────
 
-/**
- * ponytail: 최신 이벤트를 레포 수만큼 조회한다. `sync_events(repository_id, id desc)` 인덱스를
- * 그대로 타므로 레포 몇 개 규모에선 문제없다. 수십 개를 넘으면 max(id) 뷰를 판다.
- */
-async function latestEvent(repositoryId: string): Promise<{ id: number; paths: string[] }> {
-  const { data, error } = await supabase
-    .from("sync_events")
-    .select("id, changed_paths, deleted_paths")
-    .eq("repository_id", repositoryId)
-    .order("id", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (error) console.error("mcp: latestEvent", error);
-  if (!data) return { id: 0, paths: [] };
-  return {
-    id: Number(data.id),
-    paths: [...(data.changed_paths ?? []), ...(data.deleted_paths ?? [])],
-  };
-}
-
 export async function buildContext(identity: TokenIdentity): Promise<McpContext> {
   const repos = await getAccessibleRepos(identity.email);
   const state = new Map<string, RepoState>();
   if (repos.length === 0) return { identity, repos, state };
-
-  const latest = await Promise.all(repos.map((repo) => latestEvent(repo.id)));
 
   const { data, error } = await supabase
     .from("token_cursors")
@@ -164,15 +141,35 @@ export async function buildContext(identity: TokenIdentity): Promise<McpContext>
     ]),
   );
 
-  repos.forEach((repo, index) => {
+  // 최신 이벤트 id는 레포 행에 비정규화돼 있어(D-012) 여기서 sync_events를 두드리지 않는다.
+  for (const repo of repos) {
     state.set(repo.id, {
-      latest: latest[index].id,
+      latest: repo.latest_event_id,
       // 처음 붙은 토큰은 "지금부터"로 시작한다. 안 그러면 첫 호출부터 [stale]이 붙는데,
       // 방금 목차를 읽은 에이전트에게 그 줄은 거짓말이고 그냥 토큰 낭비다.
-      cursor: stored.get(repo.id) ?? latest[index].id,
-      latestPaths: latest[index].paths,
+      cursor: stored.get(repo.id) ?? repo.latest_event_id,
+      latestPaths: [],
     });
-  });
+  }
+
+  // [stale]에 실을 경로는 뒤처진 레포가 있을 때만 조회한다 — 최신 상태가 대부분이므로
+  // 이 쿼리는 평소에 아예 나가지 않는다. latest_event_id가 곧 이벤트 id라 정확히 집는다.
+  const behindIds = repos
+    .filter((repo) => (stored.get(repo.id) ?? repo.latest_event_id) < repo.latest_event_id)
+    .map((repo) => repo.latest_event_id);
+  if (behindIds.length > 0) {
+    const { data: events, error: eventsError } = await supabase
+      .from("sync_events")
+      .select("id, repository_id, changed_paths, deleted_paths")
+      .in("id", behindIds);
+    if (eventsError) console.error("mcp: stale paths", eventsError);
+    for (const event of events ?? []) {
+      const entry = state.get(event.repository_id as string);
+      if (entry) {
+        entry.latestPaths = [...(event.changed_paths ?? []), ...(event.deleted_paths ?? [])];
+      }
+    }
+  }
 
   const missing = repos.filter((repo) => !stored.has(repo.id));
   if (missing.length > 0) {
