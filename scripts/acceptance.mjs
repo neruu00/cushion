@@ -238,6 +238,30 @@ try {
     "slug 형식 위반은 거부",
     (await tool("repo_create", { slug: "Bad Slug!", name: "x" }, outsiderPat)).includes("slug"),
   );
+  // 오타 난 slug를 "레포가 하나도 없음"과 뭉뚱그리면 에이전트가 repo_create로 중복을 만든다
+  check(
+    "없는 레포를 물으면 그렇게 말한다",
+    (await tool("doc_outline", { repo: "zz-no-such-repo" }, outsiderPat)).includes("그런 레포가 없다"),
+  );
+
+  // 스킬 3종이 실제 툴·출력과 맞는지. 문서가 거짓말하면 에이전트가 그대로 따라 한다.
+  const mcpSource = readFileSync("lib/mcp.ts", "utf8");
+  for (const skill of ["cushion", "cushion-list", "cushion-use"]) {
+    const body = readFileSync(`.claude/skills/${skill}/SKILL.md`, "utf8");
+    check(
+      `${skill} 스킬에 frontmatter가 있다`,
+      body.startsWith("---") && body.includes("name: ") && body.includes("description: "),
+    );
+    const referenced = [...new Set([...body.matchAll(/(doc_[a-z_]+|repo_create)/g)].map((m) => m[1]))];
+    const unknown = referenced.filter((n) => !toolNames.includes(n));
+    check(`${skill} 스킬이 없는 툴을 부르지 않는다`, unknown.length === 0, unknown.join(", "));
+  }
+  // 빈 레포 표기가 어긋나면 /cushion-list가 엉뚱한 걸 세거나 놓친다
+  check(
+    "cushion-list의 빈 레포 표기가 코드와 같다",
+    readFileSync(".claude/skills/cushion-list/SKILL.md", "utf8").includes("문서 없음") &&
+      mcpSource.includes("문서 없음"),
+  );
 
   check(
     "웹훅 갱신도 같은 문턱을 쓴다 (소스)",

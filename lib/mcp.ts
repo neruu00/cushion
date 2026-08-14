@@ -313,7 +313,13 @@ async function docOutline(context: McpContext, rawArgs: unknown): Promise<ToolRe
   if (!args.success) return badArgs(args.error.issues[0].message);
 
   const repos = reposFor(context, args.data.repo);
-  if (repos.length === 0) return { text: "접근 가능한 레포가 없다. repo_create로 만들 수 있다." };
+  if (repos.length === 0) {
+    // "오타 난 slug"와 "레포가 하나도 없음"을 구분한다. 뭉뚱그리면 오타 하나에
+    // 에이전트가 repo_create를 불러 중복 레포를 만든다.
+    return args.data.repo
+      ? { text: `그런 레포가 없다: ${args.data.repo}`, isError: true }
+      : { text: "접근 가능한 레포가 없다. repo_create로 만들 수 있다." };
+  }
 
   const docs = await documentsOf(repos);
   const byRepo = new Map(repos.map((repo) => [repo.id, [] as DocRow[]]));
