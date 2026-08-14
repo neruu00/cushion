@@ -272,7 +272,7 @@ try {
 
   check(
     "웹훅 갱신도 같은 문턱을 쓴다 (소스)",
-    /updateWebhooks[\s\S]*?canManageMembers/.test(libActions),
+    /updateLibrary[\s\S]*?canManageMembers/.test(libActions),
   );
 
   // 웹훅 — 저장·해제가 실제로 반영되나. 알림 실패는 조용하므로 여기서라도 붙잡는다.

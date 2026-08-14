@@ -15,6 +15,12 @@ interface FieldProps {
   type?: string;
   required?: boolean;
   defaultValue?: string;
+  /**
+   * 값이 여러 개일 수 있는 칸. 한 줄짜리 input이면 Enter가 줄을 추가하는 대신 폼을 제출하고,
+   * 그래서 화면이 "값은 하나"라고 말하게 된다 — 여러 개를 받는 칸에는 거짓말이다.
+   */
+  multiline?: boolean;
+  hint?: string;
 }
 
 export function Field({
@@ -24,17 +30,32 @@ export function Field({
   type = "text",
   required,
   defaultValue,
+  multiline,
+  hint,
 }: FieldProps) {
   return (
     <Label className="grid gap-1.5">
       <span>{label}</span>
-      <Input
-        name={name}
-        type={type}
-        placeholder={placeholder}
-        required={required}
-        defaultValue={defaultValue}
-      />
+      {multiline ? (
+        <textarea
+          name={name}
+          placeholder={placeholder}
+          required={required}
+          defaultValue={defaultValue}
+          spellCheck={false}
+          rows={3}
+          className="w-full rounded-lg border bg-transparent px-2.5 py-1.5 font-mono text-sm leading-relaxed outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+        />
+      ) : (
+        <Input
+          name={name}
+          type={type}
+          placeholder={placeholder}
+          required={required}
+          defaultValue={defaultValue}
+        />
+      )}
+      {hint ? <span className="text-xs font-normal text-muted-foreground">{hint}</span> : null}
     </Label>
   );
 }

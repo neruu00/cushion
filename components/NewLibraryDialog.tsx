@@ -41,9 +41,11 @@ export function NewLibraryDialog() {
           <Field name="slug" label="slug" placeholder="my-project" required />
           <Field name="name" label="이름" placeholder="My Project" required />
           <Field
+            multiline
             name="github_repos"
             label="이 라이브러리를 보는 GitHub 레포 (선택)"
-            placeholder="acme/web  acme/api  또는 acme/*"
+            placeholder={"acme/web\nacme/api"}
+            hint="한 줄에 하나씩. 조직 전체는 acme/* 로 한 줄이면 된다"
           />
           <Field
             name="mattermost_webhook_url"

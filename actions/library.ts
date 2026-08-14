@@ -13,7 +13,7 @@ import { revalidatePath } from "next/cache";
 import type { SecretState } from "@/lib/action.type";
 import { getSessionEmail, isAdmin, isMember } from "@/lib/authz";
 import { createLibraryFor } from "@/lib/library";
-import { memberSchema, webhooksSchema } from "@/lib/library.schema";
+import { librarySettingsSchema, memberSchema } from "@/lib/library.schema";
 import { setupFiles } from "@/lib/snippets";
 import { supabase } from "@/lib/supabase";
 
@@ -71,18 +71,15 @@ export async function addMember(_prev: SecretState, formData: FormData): Promise
   return { success: true };
 }
 
-/** 이미 만든 라이브러리의 알림 채널 갱신. 권한은 멤버 관리와 같은 문턱이다 (그 라이브러리의 멤버). */
-export async function updateWebhooks(
-  _prev: SecretState,
-  formData: FormData,
-): Promise<SecretState> {
+/** 이미 만든 라이브러리의 설정 갱신. 권한은 멤버 관리와 같은 문턱이다 (그 라이브러리의 멤버). */
+export async function updateLibrary(_prev: SecretState, formData: FormData): Promise<SecretState> {
   const email = await getSessionEmail();
   if (!email) return { success: false, error: "로그인이 필요합니다." };
 
-  const parsed = webhooksSchema.safeParse(Object.fromEntries(formData));
+  const parsed = librarySettingsSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { success: false, error: parsed.error.issues[0].message };
 
-  const { library_id, ...webhooks } = parsed.data;
+  const { library_id, ...settings } = parsed.data;
   if (!(await canManageMembers(email, library_id))) {
     return { success: false, error: "이 라이브러리의 멤버만 바꿀 수 있습니다." };
   }
@@ -90,27 +87,30 @@ export async function updateWebhooks(
   // slug를 되받아 재검증에 쓴다 — 폼이 준 값을 믿고 경로를 만들지 않는다.
   const { data, error } = await supabase
     .from("libraries")
-    .update(webhooks)
+    .update(settings)
     .eq("id", library_id)
     .select("slug")
     .single();
 
   if (error || !data) {
-    console.error("updateWebhooks", error);
+    console.error("updateLibrary", error);
     return { success: false, error: "저장에 실패했습니다." };
   }
 
   revalidatePath(`/libraries/${data.slug}`);
+  revalidatePath("/dashboard");
   revalidatePath("/admin");
 
   const connected = [
-    webhooks.mattermost_webhook_url ? "Mattermost" : null,
-    webhooks.discord_webhook_url ? "Discord" : null,
+    settings.mattermost_webhook_url ? "Mattermost" : null,
+    settings.discord_webhook_url ? "Discord" : null,
   ].filter(Boolean);
   return {
     success: true,
     data: {
-      hint: connected.length > 0 ? `저장됐다 — ${connected.join(" · ")}` : "저장됐다 — 연결 없음",
+      hint: `저장됐다 — GitHub ${settings.github_repos.length}개 · 알림 ${
+        connected.length > 0 ? connected.join(" · ") : "없음"
+      }`,
     },
   };
 }

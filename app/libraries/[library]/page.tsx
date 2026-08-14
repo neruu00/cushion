@@ -14,7 +14,7 @@ import { addMember, removeMember } from "@/actions/library";
 import { ActionForm } from "@/components/ActionForm";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { WebhookDialog } from "@/components/WebhookDialog";
+import { LibrarySettingsDialog } from "@/components/LibrarySettingsDialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { getAccessibleLibrary, getSessionEmail } from "@/lib/authz";
@@ -115,8 +115,10 @@ export default async function LibraryPage({ params }: PageProps<"/libraries/[lib
               .join(" · ") || "알림 채널 없음"}
           </p>
         </div>
-        <WebhookDialog
+        <LibrarySettingsDialog
           libraryId={library.id}
+          name={library.name}
+          githubRepos={library.github_repos}
           mattermostWebhookUrl={library.mattermost_webhook_url}
           discordWebhookUrl={library.discord_webhook_url}
         />

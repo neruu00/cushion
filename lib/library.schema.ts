@@ -76,11 +76,15 @@ export const createLibrarySchema = z.object({
 });
 
 /**
- * 이미 만든 라이브러리의 웹훅 갱신. 두 칸이 늘 함께 오므로 **빈 칸 = 연결 해제**다 —
+ * 이미 만든 라이브러리의 설정 갱신. 칸이 늘 함께 오므로 **빈 칸 = 지움**이다 —
  * "안 보냈다"와 "지웠다"를 구분할 필요가 없어진다.
+ *
+ * slug는 여기 없다. 바꾸는 순간 팀원의 URL과 에이전트가 쓰던 `library` 인자가 죽는다.
  */
-export const webhooksSchema = z.object({
+export const librarySettingsSchema = z.object({
   library_id: z.uuid(),
+  name: z.string().trim().min(1, "이름을 입력하세요.").max(100),
+  github_repos: githubRepos,
   mattermost_webhook_url: webhookUrl,
   discord_webhook_url: webhookUrl,
 });
