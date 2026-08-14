@@ -10,7 +10,7 @@
  */
 import type { NextRequest } from "next/server";
 
-import { getAccessibleRepos, getSessionEmail, identityFromAccessToken } from "@/lib/authz";
+import { getAccessibleLibraries, getSessionEmail, identityFromAccessToken } from "@/lib/authz";
 import { supabase } from "@/lib/supabase";
 
 const SEPARATOR = "=".repeat(70);
@@ -21,14 +21,14 @@ export async function GET(request: NextRequest): Promise<Response> {
   const email = identity?.email ?? (await getSessionEmail());
   if (!email) return new Response("unauthorized", { status: 401 });
 
-  const repos = await getAccessibleRepos(email);
+  const repos = await getAccessibleLibraries(email);
   if (repos.length === 0) return new Response("접근 가능한 문서가 없다.\n", { status: 200 });
 
   const { data, error } = await supabase
     .from("documents")
-    .select("repository_id, path, content, updated_at, updated_by")
+    .select("library_id, path, content, updated_at, updated_by")
     .in(
-      "repository_id",
+      "library_id",
       repos.map((repo) => repo.id),
     )
     .order("path");
@@ -46,7 +46,7 @@ export async function GET(request: NextRequest): Promise<Response> {
     "",
     ...(data ?? []).map(
       (doc: {
-        repository_id: string;
+        library_id: string;
         path: string;
         content: string;
         updated_at: string;
@@ -54,7 +54,7 @@ export async function GET(request: NextRequest): Promise<Response> {
       }) =>
         [
           SEPARATOR,
-          `${slug.get(doc.repository_id)}/${doc.path}`,
+          `${slug.get(doc.library_id)}/${doc.path}`,
           `updated ${doc.updated_at}${doc.updated_by ? ` by ${doc.updated_by}` : ""}`,
           SEPARATOR,
           doc.content,

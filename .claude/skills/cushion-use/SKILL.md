@@ -18,7 +18,7 @@ description: 이 프로젝트가 쓸 Cushion 레포를 정해 AGENTS.md에 기�
 4. 못 정하거나 추측이 애매하면 **묻는다.** 목록을 보여주고 고르게 한다 — 틀린 레포를
    박아 두면 이후 모든 세션이 엉뚱한 문서를 읽는다
 
-고른 slug가 실재하는지 `doc_outline(repo:"<slug>")`로 확인한다. 오타를 그대로
+고른 slug가 실재하는지 `doc_outline(library:"<slug>")`로 확인한다. 오타를 그대로
 기록하면 다음 세션이 조용히 실패한다.
 
 ## 2. AGENTS.md에 기록

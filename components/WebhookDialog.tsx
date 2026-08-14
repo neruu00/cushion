@@ -2,15 +2,15 @@
 
 /**
  * @file components/WebhookDialog.tsx
- * @description 이미 만든 레포의 알림 채널을 고친다. 레포 페이지의 "알림" 버튼이 연다.
+ * @description 이미 만든 라이브러리의 알림 채널을 고친다.
  *
  * 현재 값을 그대로 보여준다. 웹훅 URL은 그 채널에 글을 쓸 수 있는 값이지만, 이 화면을 보는
- * 사람은 이미 스펙 전체를 읽고 쓰는 멤버다. 가리면 "지금 어느 채널에 붙어 있나"를 아무도
+ * 사람은 이미 문서 전체를 읽고 쓰는 멤버다. 가리면 "지금 어느 채널에 붙어 있나"를 아무도
  * 확인할 수 없게 되는데, 그게 더 나쁘다.
  */
 import { Bell } from "lucide-react";
 
-import { updateWebhooks } from "@/actions/repository";
+import { updateWebhooks } from "@/actions/library";
 import { ActionForm } from "@/components/ActionForm";
 import { Field } from "@/components/Field";
 import { Button } from "@/components/ui/button";
@@ -24,13 +24,13 @@ import {
 } from "@/components/ui/dialog";
 
 interface WebhookDialogProps {
-  repositoryId: string;
+  libraryId: string;
   mattermostWebhookUrl: string | null;
   discordWebhookUrl: string | null;
 }
 
 export function WebhookDialog({
-  repositoryId,
+  libraryId,
   mattermostWebhookUrl,
   discordWebhookUrl,
 }: WebhookDialogProps) {
@@ -54,7 +54,7 @@ export function WebhookDialog({
           Base UI가 그걸 경고로 알려준다. 컨트롤드로 바꿔도 그 상태의 출처는 결국 같은 서버 값이다.
         */}
         <ActionForm action={updateWebhooks} submitLabel="저장" className="grid gap-3">
-          <input type="hidden" name="repository_id" value={repositoryId} />
+          <input type="hidden" name="library_id" value={libraryId} />
           <Field
             key={`mm:${mattermostWebhookUrl ?? ""}`}
             name="mattermost_webhook_url"

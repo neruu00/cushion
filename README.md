@@ -70,7 +70,7 @@ pnpm dev
 `/admin`에서 레포를 만들고 볼 사람들의 이메일을 멤버로 등록한다.
 **등록되지 않은 이메일은 로그인해도 아무것도 못 본다.**
 
-문서는 `/[repo]` 화면의 "새 문서"로 만들거나 에이전트가 `doc_put`으로 만든다.
+문서는 `/[library]` 화면의 "새 문서"로 만들거나 에이전트가 `doc_put`으로 만든다.
 경로는 `.md`로 끝나야 한다 — 목차·섹션 조회가 전부 마크다운을 전제한다.
 
 **읽기와 쓰기의 문턱이 같다.** 볼 수 있는 사람은 고칠 수 있다. 역할을 나누지 않는다.
@@ -125,8 +125,8 @@ Next.js **16** App Router · Tailwind v4 + shadcn/ui · Supabase(Postgres) · Ne
 
 | 문서 | 어디에 | 담는 것 |
 |---|---|---|
-| `SPEC.md` | [Cushion](https://cushion-chi.vercel.app/repositories/cushion/SPEC.md) | 무엇을·왜. 데이터 모델, MCP 툴 명세, 검증 항목 |
-| `PLAN.md` | [Cushion](https://cushion-chi.vercel.app/repositories/cushion/PLAN.md) | 현재 상태, 다음 작업, **결정 로그** |
+| `SPEC.md` | [Cushion](https://cushion-chi.vercel.app/libraries/cushion/SPEC.md) | 무엇을·왜. 데이터 모델, MCP 툴 명세, 검증 항목 |
+| `PLAN.md` | [Cushion](https://cushion-chi.vercel.app/libraries/cushion/PLAN.md) | 현재 상태, 다음 작업, **결정 로그** |
 | [`AGENTS.md`](AGENTS.md) | 레포 | 코드를 읽어선 알기 어려운 규칙과 함정 |
 | [`supabase/migrations/`](supabase/migrations) | 레포 | DB 스키마의 원본 |
 

@@ -12,12 +12,12 @@ import { revalidatePath } from "next/cache";
 
 import type { SecretState } from "@/lib/action.type";
 import { getSessionEmail, isAdmin, isMember } from "@/lib/authz";
-import { createRepositoryFor } from "@/lib/repository";
-import { memberSchema, webhooksSchema } from "@/lib/repository.schema";
+import { createLibraryFor } from "@/lib/library";
+import { memberSchema, webhooksSchema } from "@/lib/library.schema";
 import { setupFiles } from "@/lib/snippets";
 import { supabase } from "@/lib/supabase";
 
-export async function createRepository(
+export async function createLibrary(
   _prev: SecretState,
   formData: FormData,
 ): Promise<SecretState> {
@@ -25,39 +25,39 @@ export async function createRepository(
   const email = await getSessionEmail();
   if (!email) return { success: false, error: "로그인이 필요합니다." };
 
-  // 생성 로직은 lib/repository.ts 하나뿐이다. MCP repo_create도 같은 함수를 지난다.
-  const result = await createRepositoryFor(email, Object.fromEntries(formData));
+  // 생성 로직은 lib/repository.ts 하나뿐이다. MCP library_create도 같은 함수를 지난다.
+  const result = await createLibraryFor(email, Object.fromEntries(formData));
   if (!result.ok) return { success: false, error: result.message };
 
   revalidatePath("/dashboard");
   return {
     success: true,
     data: {
-      hint: `${result.slug} 등록됨. 문서는 /repositories/${result.slug} 에서 만든다`,
+      hint: `${result.slug} 등록됨. 문서는 /libraries/${result.slug} 에서 만든다`,
       files: setupFiles(),
     },
   };
 }
 
 /** 멤버 관리 권한: 그 레포의 멤버거나 admin. 셀프서브에서 팀원을 못 부르면 반쪽이다. */
-async function canManageMembers(email: string, repositoryId: string): Promise<boolean> {
+async function canManageMembers(email: string, libraryId: string): Promise<boolean> {
   if (await isAdmin()) return true;
-  return isMember(email, repositoryId);
+  return isMember(email, libraryId);
 }
 
 export async function addMember(_prev: SecretState, formData: FormData): Promise<SecretState> {
-  // 세션부터 — 레포 단위 판정은 repository_id를 알아야 해서 Zod 뒤에 온다
+  // 세션부터 — 레포 단위 판정은 library_id를 알아야 해서 Zod 뒤에 온다
   const email = await getSessionEmail();
   if (!email) return { success: false, error: "로그인이 필요합니다." };
 
   const parsed = memberSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { success: false, error: parsed.error.issues[0].message };
 
-  if (!(await canManageMembers(email, parsed.data.repository_id))) {
+  if (!(await canManageMembers(email, parsed.data.library_id))) {
     return { success: false, error: "이 레포의 멤버만 초대할 수 있습니다." };
   }
 
-  const { error } = await supabase.from("repository_members").insert(parsed.data);
+  const { error } = await supabase.from("library_members").insert(parsed.data);
   if (error) {
     console.error("addMember", error);
     return {
@@ -71,7 +71,7 @@ export async function addMember(_prev: SecretState, formData: FormData): Promise
   return { success: true };
 }
 
-/** 이미 만든 레포의 알림 채널 갱신. 권한은 멤버 관리와 같은 문턱이다 (그 레포의 멤버). */
+/** 이미 만든 라이브러리의 알림 채널 갱신. 권한은 멤버 관리와 같은 문턱이다 (그 라이브러리의 멤버). */
 export async function updateWebhooks(
   _prev: SecretState,
   formData: FormData,
@@ -82,16 +82,16 @@ export async function updateWebhooks(
   const parsed = webhooksSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { success: false, error: parsed.error.issues[0].message };
 
-  const { repository_id, ...webhooks } = parsed.data;
-  if (!(await canManageMembers(email, repository_id))) {
-    return { success: false, error: "이 레포의 멤버만 바꿀 수 있습니다." };
+  const { library_id, ...webhooks } = parsed.data;
+  if (!(await canManageMembers(email, library_id))) {
+    return { success: false, error: "이 라이브러리의 멤버만 바꿀 수 있습니다." };
   }
 
   // slug를 되받아 재검증에 쓴다 — 폼이 준 값을 믿고 경로를 만들지 않는다.
   const { data, error } = await supabase
-    .from("repositories")
+    .from("libraries")
     .update(webhooks)
-    .eq("id", repository_id)
+    .eq("id", library_id)
     .select("slug")
     .single();
 
@@ -100,7 +100,7 @@ export async function updateWebhooks(
     return { success: false, error: "저장에 실패했습니다." };
   }
 
-  revalidatePath(`/repositories/${data.slug}`);
+  revalidatePath(`/libraries/${data.slug}`);
   revalidatePath("/admin");
 
   const connected = [
@@ -126,12 +126,12 @@ export async function removeMember(formData: FormData): Promise<void> {
   const parsed = memberSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return;
 
-  if (!(await canManageMembers(email, parsed.data.repository_id))) return;
+  if (!(await canManageMembers(email, parsed.data.library_id))) return;
 
   const { error } = await supabase
-    .from("repository_members")
+    .from("library_members")
     .delete()
-    .eq("repository_id", parsed.data.repository_id)
+    .eq("library_id", parsed.data.library_id)
     .eq("email", parsed.data.email);
 
   if (error) console.error("removeMember", error);

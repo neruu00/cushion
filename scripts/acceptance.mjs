@@ -87,20 +87,22 @@ const editorPat = mint("cshn_pat_"); // 같은 사람의 다른 세션 — "남�
 const outsiderPat = mint("cshn_pat_");
 
 async function seed() {
-  await db.from("repositories").delete().in("slug", [SLUG_A, SLUG_B]);
+  await db.from("libraries").delete().like("slug", "zz-%");
   await db.from("access_tokens").delete().in("email", [MEMBER, OUTSIDER]);
 
   const { data, error } = await db
-    .from("repositories")
+    .from("libraries")
     .insert([
-      { slug: SLUG_A, name: "acceptance A", github_full_name: "neruu00/cushion" },
-      { slug: SLUG_B, name: "acceptance B" },
+      // 두 행의 키 집합을 맞춘다. PostgREST는 여러 행을 한 번에 넣을 때 빠진 칸을
+      // 컬럼 기본값이 아니라 null로 채운다 — github_repos는 not null이라 그대로 터진다.
+      { slug: SLUG_A, name: "acceptance A", github_repos: ["neruu00/cushion"] },
+      { slug: SLUG_B, name: "acceptance B", github_repos: [] },
     ])
     .select("id, slug");
   if (error) throw error;
 
   const byslug = Object.fromEntries(data.map((r) => [r.slug, r.id]));
-  await db.from("repository_members").insert({ repository_id: byslug[SLUG_A], email: MEMBER });
+  await db.from("library_members").insert({ library_id: byslug[SLUG_A], email: MEMBER });
   await db.from("access_tokens").insert([
     { email: MEMBER, token_hash: sha256(pat), name: "acceptance" },
     { email: MEMBER, token_hash: sha256(editorPat), name: "acceptance editor" },
@@ -131,7 +133,7 @@ try {
   // 자기 자신의 문서를 실제 쓰기 경로로 넣는다. 절감 실측을 장난감 문서로 하면 의미가 없고,
   // 시드까지 doc_put으로 하면 그 자체가 쓰기 경로 검증이 된다.
   for (const doc of docs) {
-    await tool("doc_put", { repo: SLUG_A, ...doc, note: "인수 검증 시드" }, pat);
+    await tool("doc_put", { library: SLUG_A, ...doc, note: "인수 검증 시드" }, pat);
   }
 
   // ── 라우팅 재편 (랜딩 / 대시보드) ───────────────────────────────
@@ -160,22 +162,22 @@ try {
   // ── 셀프서브 (D-013) ────────────────────────────────────────────
   heading("셀프서브 — 멤버십이 곧 권한이다");
 
-  // createRepository 자체는 서버 액션이라 HTTP로 직접 못 부른다(암호화된 action id 필요).
+  // createLibrary 자체는 서버 액션이라 HTTP로 직접 못 부른다(암호화된 action id 필요).
   // 런타임으로는 그 결과 상태(멤버 = 읽기·쓰기·대시보드)를, 액션 고유 로직(로그인 게이트·
   // 생성자 자동 등록·보상 삭제)은 아래 소스 정적 검사에서 본다.
   const SLUG_SELF = "zz-selfserve";
-  await db.from("repositories").delete().eq("slug", SLUG_SELF);
+  await db.from("libraries").delete().eq("slug", SLUG_SELF);
   const { data: selfRepo, error: selfErr } = await db
-    .from("repositories")
+    .from("libraries")
     .insert({ slug: SLUG_SELF, name: "self serve" })
     .select("id")
     .single();
   if (selfErr) throw selfErr;
-  await db.from("repository_members").insert({ repository_id: selfRepo.id, email: OUTSIDER });
+  await db.from("library_members").insert({ library_id: selfRepo.id, email: OUTSIDER });
 
   check(
     "멤버가 되면 바로 쓴다 (outsider의 자기 레포)",
-    (await tool("doc_put", { repo: SLUG_SELF, path: "MINE.md", content: "# 내 레포" }, outsiderPat)).startsWith("저장했다"),
+    (await tool("doc_put", { library: SLUG_SELF, path: "MINE.md", content: "# 내 레포" }, outsiderPat)).startsWith("저장했다"),
   );
   check(
     "자기 레포는 대시보드에 보인다",
@@ -187,44 +189,44 @@ try {
   );
 
   // 액션 고유 로직은 소스로 검사한다 — 빠지면 셀프서브가 조용히 반쪽이 된다
-  const repoActions = readFileSync("actions/repository.ts", "utf8");
-  // 생성 로직은 lib/repository.ts 한 곳이다. 웹 폼과 MCP가 같은 함수를 지나야
+  const libActions = readFileSync("actions/library.ts", "utf8");
+  // 생성 로직은 lib/library.ts 한 곳이다. 웹 폼과 MCP가 같은 함수를 지나야
   // "한쪽만 멤버를 안 넣는" 드리프트가 생기지 않는다.
-  const repoLib = readFileSync("lib/repository.ts", "utf8");
+  const libLib = readFileSync("lib/library.ts", "utf8");
   check(
     "생성자를 첫 멤버로 등록한다 (소스)",
-    /repository_members[\s\S]*?insert/.test(repoLib),
+    /library_members[\s\S]*?insert/.test(libLib),
   );
-  check("멤버 등록 실패 시 레포를 지워 보상한다 (소스)", repoLib.includes("보상"));
+  check("멤버 등록 실패 시 레포를 지워 보상한다 (소스)", libLib.includes("보상"));
   check(
     "웹 폼과 MCP가 같은 생성 함수를 쓴다 (소스)",
-    repoActions.includes("createRepositoryFor") &&
-      readFileSync("lib/mcp.ts", "utf8").includes("createRepositoryFor"),
+    libActions.includes("createLibraryFor") &&
+      readFileSync("lib/mcp.ts", "utf8").includes("createLibraryFor"),
   );
   check(
     "액션에 생성 로직 사본이 없다 (소스)",
-    !/createRepository\([\s\S]{0,600}?from\("repositories"\)/.test(repoActions),
+    !/createLibrary\([\s\S]{0,600}?from\("libraries"\)/.test(libActions),
   );
   check(
     "멤버 관리가 멤버십 기준이다 (소스)",
-    repoActions.includes("canManageMembers") && repoActions.includes("isMember"),
+    libActions.includes("canManageMembers") && libActions.includes("isMember"),
   );
-  // 에이전트가 스스로 레포를 만든다 (repo_create). 생성 경로는 웹 폼과 같은 lib/repository.ts다.
+  // 에이전트가 스스로 라이브러리를 만든다 (library_create). 생성 경로는 웹 폼과 같은 lib/library.ts다.
   const SLUG_AGENT = "zz-agent-made";
-  await db.from("repositories").delete().eq("slug", SLUG_AGENT);
+  await db.from("libraries").delete().eq("slug", SLUG_AGENT);
   const created = await tool(
-    "repo_create",
-    { slug: SLUG_AGENT, name: "에이전트가 만든 레포", github_full_name: "neruu00/cushion" },
+    "library_create",
+    { slug: SLUG_AGENT, name: "에이전트가 만든 라이브러리", github_repos: ["acme/*"] },
     outsiderPat,
   );
-  check("repo_create로 레포를 만든다", created.startsWith("만들었다"), created.slice(0, 60));
+  check("library_create로 레포를 만든다", created.startsWith("만들었다"), created.slice(0, 60));
   check(
     "만든 레포가 다음 호출부터 보인다 (문서 0개라도)",
     (await tool("doc_outline", {}, outsiderPat)).includes(`${SLUG_AGENT}/`),
   );
   check(
     "만든 사람이 바로 쓸 수 있다",
-    (await tool("doc_put", { repo: SLUG_AGENT, path: "NOTE.md", content: "# 메모" }, outsiderPat)).startsWith("저장했다"),
+    (await tool("doc_put", { library: SLUG_AGENT, path: "NOTE.md", content: "# 메모" }, outsiderPat)).startsWith("저장했다"),
   );
   check(
     "남의 토큰에는 안 보인다",
@@ -232,16 +234,21 @@ try {
   );
   check(
     "같은 slug 두 번은 거부",
-    (await tool("repo_create", { slug: SLUG_AGENT, name: "중복" }, outsiderPat)).includes("이미 있는"),
+    (await tool("library_create", { slug: SLUG_AGENT, name: "중복" }, outsiderPat)).includes("이미 있는"),
   );
   check(
     "slug 형식 위반은 거부",
-    (await tool("repo_create", { slug: "Bad Slug!", name: "x" }, outsiderPat)).includes("slug"),
+    (await tool("library_create", { slug: "Bad Slug!", name: "x" }, outsiderPat)).includes("slug"),
   );
-  // 오타 난 slug를 "레포가 하나도 없음"과 뭉뚱그리면 에이전트가 repo_create로 중복을 만든다
+  // 오타 난 slug를 "레포가 하나도 없음"과 뭉뚱그리면 에이전트가 library_create로 중복을 만든다
   check(
-    "없는 레포를 물으면 그렇게 말한다",
-    (await tool("doc_outline", { repo: "zz-no-such-repo" }, outsiderPat)).includes("그런 레포가 없다"),
+    "library_create가 github_repos 배열을 받는다",
+    (await tool("library_create", { slug: "zz-gh", name: "gh", github_repos: ["acme/*", "acme/web"] }, outsiderPat)).startsWith("만들었다"),
+  );
+
+  check(
+    "없는 라이브러리를 물으면 그렇게 말한다",
+    (await tool("doc_outline", { library: "zz-no-such-repo" }, outsiderPat)).includes("그런 라이브러리가 없다"),
   );
 
   // 스킬 3종이 실제 툴·출력과 맞는지. 문서가 거짓말하면 에이전트가 그대로 따라 한다.
@@ -252,7 +259,7 @@ try {
       `${skill} 스킬에 frontmatter가 있다`,
       body.startsWith("---") && body.includes("name: ") && body.includes("description: "),
     );
-    const referenced = [...new Set([...body.matchAll(/(doc_[a-z_]+|repo_create)/g)].map((m) => m[1]))];
+    const referenced = [...new Set([...body.matchAll(/(doc_[a-z_]+|library_create)/g)].map((m) => m[1]))];
     const unknown = referenced.filter((n) => !toolNames.includes(n));
     check(`${skill} 스킬이 없는 툴을 부르지 않는다`, unknown.length === 0, unknown.join(", "));
   }
@@ -265,30 +272,30 @@ try {
 
   check(
     "웹훅 갱신도 같은 문턱을 쓴다 (소스)",
-    /updateWebhooks[\s\S]*?canManageMembers/.test(repoActions),
+    /updateWebhooks[\s\S]*?canManageMembers/.test(libActions),
   );
 
   // 웹훅 — 저장·해제가 실제로 반영되나. 알림 실패는 조용하므로 여기서라도 붙잡는다.
   await db
-    .from("repositories")
+    .from("libraries")
     .update({
       mattermost_webhook_url: "https://mm.example.com/hooks/x",
       discord_webhook_url: "https://discord.com/api/webhooks/1/y",
     })
     .eq("id", selfRepo.id);
-  const withHooks = await page(`/repositories/${SLUG_SELF}`, outsiderCookie);
+  const withHooks = await page(`/libraries/${SLUG_SELF}`, outsiderCookie);
   check(
     "레포 화면이 붙은 채널을 보여준다",
     withHooks.html.includes("Mattermost") && withHooks.html.includes("Discord"),
   );
 
   await db
-    .from("repositories")
+    .from("libraries")
     .update({ mattermost_webhook_url: null, discord_webhook_url: null })
     .eq("id", selfRepo.id);
   check(
     "연결이 없으면 없다고 말한다",
-    (await page(`/repositories/${SLUG_SELF}`, outsiderCookie)).html.includes("알림 채널 없음"),
+    (await page(`/libraries/${SLUG_SELF}`, outsiderCookie)).html.includes("알림 채널 없음"),
   );
 
   // ── SPEC §11.2 권한 ─────────────────────────────────────────────
@@ -299,10 +306,10 @@ try {
     "미등록 이메일 → 대시보드에 남의 레포가 안 보인다",
     outsiderHome.status === 200 && !outsiderHome.html.includes(SLUG_A),
   );
-  check("미등록 이메일 → URL 직접 입력은 404", (await page(`/repositories/${SLUG_A}`, outsiderCookie)).status === 404);
+  check("미등록 이메일 → URL 직접 입력은 404", (await page(`/libraries/${SLUG_A}`, outsiderCookie)).status === 404);
   check(
     "미등록 이메일 → 문서 URL도 404",
-    (await page(`/repositories/${SLUG_A}/SPEC.md`, outsiderCookie)).status === 404,
+    (await page(`/libraries/${SLUG_A}/SPEC.md`, outsiderCookie)).status === 404,
   );
   check(
     "미등록 이메일의 토큰 → MCP도 빈손",
@@ -311,30 +318,30 @@ try {
 
   check(
     "이메일 대소문자 정규화 (Member@Example.COM 로 접근)",
-    (await page(`/repositories/${SLUG_A}`, await cookieFor("Member@Example.COM"))).status === 200,
+    (await page(`/libraries/${SLUG_A}`, await cookieFor("Member@Example.COM"))).status === 200,
   );
 
   check("접두사가 다른 키 → 거부", (await mcp("ping", {}, "ghp_notourtoken")).status === 401);
 
   // 멤버가 아닌 레포에는 쓰지도 못한다. 읽기와 쓰기의 문턱이 같다.
-  await tool("doc_put", { repo: SLUG_B, path: "INTRUDER.md", content: "#" }, pat);
+  await tool("doc_put", { library: SLUG_B, path: "INTRUDER.md", content: "#" }, pat);
   const { count: bDocs } = await db
     .from("documents")
     .select("path", { count: "exact", head: true })
-    .eq("repository_id", repos[SLUG_B]);
+    .eq("library_id", repos[SLUG_B]);
   check("멤버 아닌 레포에 doc_put → 거부", bDocs === 0, `B 문서 ${bDocs}건`);
 
-  const memberSees = await page(`/repositories/${SLUG_A}`, memberCookie);
+  const memberSees = await page(`/libraries/${SLUG_A}`, memberCookie);
   check("멤버는 본다", memberSees.status === 200);
 
   // 멤버에서 빼면 토큰 재발급 없이 즉시 차단돼야 한다 — 요청 시점 조회의 핵심 검증
-  await db.from("repository_members").delete().eq("repository_id", repos[SLUG_A]).eq("email", MEMBER);
+  await db.from("library_members").delete().eq("library_id", repos[SLUG_A]).eq("email", MEMBER);
   check(
     "멤버 제거 → 같은 토큰으로 즉시 차단",
     !(await tool("doc_outline", {}, pat)).includes(SLUG_A),
   );
-  check("멤버 제거 → 화면도 즉시 404", (await page(`/repositories/${SLUG_A}`, memberCookie)).status === 404);
-  await db.from("repository_members").insert({ repository_id: repos[SLUG_A], email: MEMBER });
+  check("멤버 제거 → 화면도 즉시 404", (await page(`/libraries/${SLUG_A}`, memberCookie)).status === 404);
+  await db.from("library_members").insert({ library_id: repos[SLUG_A], email: MEMBER });
 
   // 폐기된 토큰은 즉시 죽는다
   const throwaway = mint("cshn_pat_");
@@ -379,23 +386,23 @@ try {
   const { count: seeded } = await db
     .from("documents")
     .select("path", { count: "exact", head: true })
-    .eq("repository_id", repos[SLUG_A]);
+    .eq("library_id", repos[SLUG_A]);
   check("doc_put으로 넣은 문서가 남아 있다", seeded === docs.length, `${seeded}건`);
 
-  const readBack = await tool("doc_get", { repo: SLUG_A, path: MAIN }, pat);
+  const readBack = await tool("doc_get", { library: SLUG_A, path: MAIN }, pat);
   const seedSha = /sha:([0-9a-f]+)/.exec(readBack)?.[1] ?? "";
   check("sha를 돌려준다", seedSha.length === 64);
 
   // 낙관적 잠금 — 이 검사가 이 모델 전체를 지탱한다
   const stale = await tool(
     "doc_put",
-    { repo: SLUG_A, path: MAIN, content: "덮어쓰기", base_sha: "0".repeat(64) },
+    { library: SLUG_A, path: MAIN, content: "덮어쓰기", base_sha: "0".repeat(64) },
     pat,
   );
   const { data: untouched } = await db
     .from("documents")
     .select("content_sha")
-    .eq("repository_id", repos[SLUG_A])
+    .eq("library_id", repos[SLUG_A])
     .eq("path", MAIN)
     .maybeSingle();
   check("낡은 base_sha → 거부하고 현재 sha를 알려준다", stale.includes(seedSha), stale.slice(0, 60));
@@ -403,7 +410,7 @@ try {
 
   check(
     "base_sha 없이 기존 문서를 덮으려 하면 거부",
-    (await tool("doc_put", { repo: SLUG_A, path: MAIN, content: "x" }, pat)).includes("base_sha"),
+    (await tool("doc_put", { library: SLUG_A, path: MAIN, content: "x" }, pat)).includes("base_sha"),
   );
 
   // 정상 수정 → 이력이 남는다
@@ -415,13 +422,13 @@ try {
 `;
   await tool(
     "doc_put",
-    { repo: SLUG_A, path: MAIN, content: edited, base_sha: seedSha, note: "섹션 추가" },
+    { library: SLUG_A, path: MAIN, content: edited, base_sha: seedSha, note: "섹션 추가" },
     pat,
   );
   const { data: versions } = await db
     .from("document_versions")
     .select("content_sha, author, note")
-    .eq("repository_id", repos[SLUG_A])
+    .eq("library_id", repos[SLUG_A])
     .eq("path", MAIN)
     .order("id", { ascending: false });
   check("수정하면 이전 본문이 이력에 남는다", versions?.[0]?.content_sha === seedSha, `${versions?.length ?? 0}건`);
@@ -430,7 +437,7 @@ try {
   const { data: afterEdit } = await db
     .from("documents")
     .select("content, updated_by")
-    .eq("repository_id", repos[SLUG_A])
+    .eq("library_id", repos[SLUG_A])
     .eq("path", MAIN)
     .maybeSingle();
   check("본문이 실제로 바뀌었다", afterEdit?.content === edited);
@@ -439,18 +446,18 @@ try {
   // CAS — 같은 base_sha로 **동시에** 쓰면 정확히 하나만 이겨야 한다.
   // 순차 호출은 사전 비교에 걸려 CAS까지 안 간다. 동시 호출이라야 읽기-비교-쓰기 사이의
   // 창을 실제로 연다. 어느 쪽이 이기는지는 비결정적이지만 "하나만 이긴다"는 불변식이다.
-  const editedSha = /sha:([0-9a-f]+)/.exec(await tool("doc_get", { repo: SLUG_A, path: MAIN }, pat))?.[1];
+  const editedSha = /sha:([0-9a-f]+)/.exec(await tool("doc_get", { library: SLUG_A, path: MAIN }, pat))?.[1];
   const contentA = `${edited}\nA가 이겼다.\n`;
   const contentB = `${edited}\nB가 이겼다.\n`;
   const [raceA, raceB] = await Promise.all([
-    tool("doc_put", { repo: SLUG_A, path: MAIN, content: contentA, base_sha: editedSha, note: "CAS A" }, pat),
-    tool("doc_put", { repo: SLUG_A, path: MAIN, content: contentB, base_sha: editedSha, note: "CAS B" }, editorPat),
+    tool("doc_put", { library: SLUG_A, path: MAIN, content: contentA, base_sha: editedSha, note: "CAS A" }, pat),
+    tool("doc_put", { library: SLUG_A, path: MAIN, content: contentB, base_sha: editedSha, note: "CAS B" }, editorPat),
   ]);
   const wins = [raceA, raceB].filter((r) => r.startsWith("저장했다"));
   const { data: afterCas } = await db
     .from("documents")
     .select("content")
-    .eq("repository_id", repos[SLUG_A])
+    .eq("library_id", repos[SLUG_A])
     .eq("path", MAIN)
     .maybeSingle();
   check("같은 base_sha 동시 쓰기 → 정확히 하나만 이긴다", wins.length === 1, `${wins.length}건 성공`);
@@ -464,17 +471,17 @@ try {
 
   // 다음 검증(섹션 스코프)이 이어서 쓰도록 본문을 되돌려 둔다
   {
-    const s = /sha:([0-9a-f]+)/.exec(await tool("doc_get", { repo: SLUG_A, path: MAIN }, pat))?.[1];
-    await tool("doc_put", { repo: SLUG_A, path: MAIN, content: edited, base_sha: s, note: "CAS 검증 정리" }, pat);
+    const s = /sha:([0-9a-f]+)/.exec(await tool("doc_get", { library: SLUG_A, path: MAIN }, pat))?.[1];
+    await tool("doc_put", { library: SLUG_A, path: MAIN, content: edited, base_sha: s, note: "CAS 검증 정리" }, pat);
   }
 
   // 섹션 스코프 쓰기 — 문서 전체를 실어 보내지 않는다 (doc_put + heading)
-  const beforeSection = await tool("doc_get", { repo: SLUG_A, path: MAIN }, pat);
+  const beforeSection = await tool("doc_get", { library: SLUG_A, path: MAIN }, pat);
   const sectionSha = /sha:([0-9a-f]+)/.exec(beforeSection)?.[1];
   const sectionPut = await tool(
     "doc_put",
     {
-      repo: SLUG_A,
+      library: SLUG_A,
       path: MAIN,
       heading: "인수 검증 섹션",
       content: "## 인수 검증 섹션\n\n섹션만 고쳤다.",
@@ -486,7 +493,7 @@ try {
   const { data: afterSection } = await db
     .from("documents")
     .select("content")
-    .eq("repository_id", repos[SLUG_A])
+    .eq("library_id", repos[SLUG_A])
     .eq("path", MAIN)
     .maybeSingle();
   check("heading을 주면 그 섹션만 바뀐다", afterSection?.content.includes("섹션만 고쳤다."), sectionPut.slice(0, 40));
@@ -496,53 +503,53 @@ try {
   );
   // base_sha 충돌이 heading 검증보다 먼저 걸린다(낡은 sha면 어차피 다시 읽어야 하니 맞는
   // 순서다). 그래서 이 검사는 반드시 현재 sha로 불러야 heading 경로에 도달한다.
-  const freshSha = /sha:([0-9a-f]+)/.exec(await tool("doc_get", { repo: SLUG_A, path: MAIN }, pat))?.[1];
+  const freshSha = /sha:([0-9a-f]+)/.exec(await tool("doc_get", { library: SLUG_A, path: MAIN }, pat))?.[1];
   check(
     "없는 섹션을 heading으로 주면 거부",
     (
       await tool(
         "doc_put",
-        { repo: SLUG_A, path: MAIN, heading: "존재하지 않는 섹션", content: "## x\n\ny", base_sha: freshSha },
+        { library: SLUG_A, path: MAIN, heading: "존재하지 않는 섹션", content: "## x\n\ny", base_sha: freshSha },
         pat,
       )
     ).includes("그런 섹션이 없다"),
   );
 
   // 삭제 — 이력은 살아남아야 한다
-  await tool("doc_put", { repo: SLUG_A, path: "TEMP.md", content: "# 임시\n" }, pat);
-  const tempRead = await tool("doc_get", { repo: SLUG_A, path: "TEMP.md" }, pat);
+  await tool("doc_put", { library: SLUG_A, path: "TEMP.md", content: "# 임시\n" }, pat);
+  const tempRead = await tool("doc_get", { library: SLUG_A, path: "TEMP.md" }, pat);
   const tempSha = /sha:([0-9a-f]+)/.exec(tempRead)?.[1];
-  await tool("doc_delete", { repo: SLUG_A, path: "TEMP.md", base_sha: tempSha }, pat);
+  await tool("doc_delete", { library: SLUG_A, path: "TEMP.md", base_sha: tempSha }, pat);
   const { count: tempLeft } = await db
     .from("documents")
     .select("path", { count: "exact", head: true })
-    .eq("repository_id", repos[SLUG_A])
+    .eq("library_id", repos[SLUG_A])
     .eq("path", "TEMP.md");
   const { count: tempHistory } = await db
     .from("document_versions")
     .select("id", { count: "exact", head: true })
-    .eq("repository_id", repos[SLUG_A])
+    .eq("library_id", repos[SLUG_A])
     .eq("path", "TEMP.md");
   check("삭제하면 목차에서 사라진다", tempLeft === 0);
   check("삭제해도 이력은 남는다 — 되돌릴 수 있어야 한다", tempHistory === 1, `${tempHistory}건`);
 
   check(
     "삭제된 문서는 doc_get으로도 안 나온다",
-    (await tool("doc_get", { repo: SLUG_A, path: "TEMP.md" }, pat)).includes("그런 문서가 없다"),
+    (await tool("doc_get", { library: SLUG_A, path: "TEMP.md" }, pat)).includes("그런 문서가 없다"),
   );
 
   // 되돌리기 — 이력이 읽히는지까지 확인한다. 쓰기만 하고 못 꺼내면 없는 것과 같다.
   const { data: restorable } = await db
     .from("document_versions")
     .select("id, content_sha")
-    .eq("repository_id", repos[SLUG_A])
+    .eq("library_id", repos[SLUG_A])
     .eq("path", "TEMP.md")
     .maybeSingle();
   check("삭제된 문서의 이력을 찾을 수 있다", Boolean(restorable));
 
   check(
     ".md가 아닌 경로는 거부",
-    (await tool("doc_put", { repo: SLUG_A, path: "notes.txt", content: "x" }, pat)).includes(".md"),
+    (await tool("doc_put", { library: SLUG_A, path: "notes.txt", content: "x" }, pat)).includes(".md"),
   );
 
   // ── SPEC §11.5 MCP ──────────────────────────────────────────────
@@ -563,17 +570,17 @@ try {
       "doc_changes_since",
       "doc_put",
       "doc_delete",
-      "repo_create",
+      "library_create",
     ].every((n) => toolNames.includes(n)),
     toolNames.join(", "),
   );
 
   const outline = await tool("doc_outline", {}, pat);
-  const full = await tool("doc_get", { repo: SLUG_A, path: MAIN }, pat);
+  const full = await tool("doc_get", { library: SLUG_A, path: MAIN }, pat);
   const sha = /sha:([0-9a-f]+)/.exec(full)?.[1] ?? "";
   check(
     "if_none_match 일치 → 본문 대신 unchanged",
-    (await tool("doc_get", { repo: SLUG_A, path: MAIN, if_none_match: sha }, pat)).trim() === "unchanged",
+    (await tool("doc_get", { library: SLUG_A, path: MAIN, if_none_match: sha }, pat)).trim() === "unchanged",
   );
   check("doc_search가 섹션을 짚는다", (await tool("doc_search", { query: "코드 규칙" }, pat)).includes("/"));
 
@@ -583,11 +590,11 @@ try {
   check("최신 상태에서는 [stale]이 없다", !outline.includes("[stale]"));
 
   // 다른 세션(editorPat)이 고친다 — pat의 커서는 그대로이므로 밀린 상태가 된다
-  const beforeEdit = await tool("doc_get", { repo: SLUG_A, path: MAIN }, editorPat);
+  const beforeEdit = await tool("doc_get", { library: SLUG_A, path: MAIN }, editorPat);
   await tool(
     "doc_put",
     {
-      repo: SLUG_A,
+      library: SLUG_A,
       path: MAIN,
       content: `${edited}\n\n## 남이 고친 섹션\n\n추가.\n`,
       base_sha: /sha:([0-9a-f]+)/.exec(beforeEdit)?.[1],
@@ -648,7 +655,7 @@ try {
       check(`실측: ${task}`, false, `outline에서 '${keyword}' 섹션을 못 찾았다`);
       continue;
     }
-    const text = await tool("doc_get", { repo: SLUG_A, path: hit.doc, heading: hit.heading }, pat);
+    const text = await tool("doc_get", { library: SLUG_A, path: hit.doc, heading: hit.heading }, pat);
     experiment += text.length;
     console.log(`  ${task}\n    → ${hit.doc} ## ${hit.heading}  ${text.length.toLocaleString()}자`);
   }
@@ -659,7 +666,9 @@ try {
   console.log(`  ※ 문자 수다. 토크나이저마다 절대값은 달라지지만 비교하는 두 값이 같은 종류의 글이라 비율은 유지된다.`);
   check("실험군이 대조군보다 작다", experiment < control);
 } finally {
-  await db.from("repositories").delete().in("slug", [SLUG_A, SLUG_B]);
+  // 임시 라이브러리는 전부 `zz-`로 시작한다. 목록을 손으로 관리하면 새 slug를 추가할 때마다
+  // 여기도 고쳐야 하고, 잊는 순간 실 DB에 쓰레기가 남는다 — 실제로 두 개가 남아 있었다.
+  await db.from("libraries").delete().like("slug", "zz-%");
   await db.from("access_tokens").delete().in("email", [MEMBER, OUTSIDER]);
 
   console.log(`\n${failures === 0 ? "전부 통과" : `${failures}건 실패`}. 임시 데이터 정리 완료.`);

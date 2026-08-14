@@ -21,7 +21,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 interface DocumentFormProps {
-  repo: string;
+  library: string;
   /** 새 문서면 빈 문자열 */
   path: string;
   content: string;
@@ -29,7 +29,7 @@ interface DocumentFormProps {
   sha: string;
 }
 
-export function DocumentForm({ repo, path, content, sha }: DocumentFormProps) {
+export function DocumentForm({ library, path, content, sha }: DocumentFormProps) {
   const [state, formAction, pending] = useActionState(saveDocument, null);
   const [draft, setDraft] = useState(content);
 
@@ -39,7 +39,7 @@ export function DocumentForm({ repo, path, content, sha }: DocumentFormProps) {
 
   return (
     <form action={formAction} className="space-y-4">
-      <input type="hidden" name="repo" value={repo} />
+      <input type="hidden" name="library" value={library} />
       <input type="hidden" name="base_sha" value={currentSha} />
 
       {path ? (

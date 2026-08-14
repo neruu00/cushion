@@ -13,10 +13,10 @@
  */
 import { z } from "zod";
 
-import { getAccessibleRepos, type Repo, type TokenIdentity } from "@/lib/authz";
+import { getAccessibleLibraries, type Library, type TokenIdentity } from "@/lib/authz";
 import { deleteDocument, putDocument } from "@/lib/document";
 import { deleteDocumentSchema, putDocumentSchema } from "@/lib/document.schema";
-import { createRepositoryFor } from "@/lib/repository";
+import { createLibraryFor } from "@/lib/library";
 import { findSection, headings, scoreSection, snippet, splitSections } from "@/lib/markdown";
 import { supabase } from "@/lib/supabase";
 
@@ -38,7 +38,7 @@ export const TOOLS = [
       "문서 목록과 ## 헤딩 (스펙·ADR·런북·회의록 등). 먼저 부른다. repo 생략 = 접근 가능한 전체.",
     inputSchema: {
       type: "object",
-      properties: { repo: { type: "string", description: "레포 slug. 생략하면 전체" } },
+      properties: { library: { type: "string", description: "라이브러리 slug. 생략하면 전체" } },
     },
   },
   {
@@ -48,12 +48,12 @@ export const TOOLS = [
     inputSchema: {
       type: "object",
       properties: {
-        repo: { type: "string" },
-        path: { type: "string", description: "레포 루트 기준 경로" },
+        library: { type: "string" },
+        path: { type: "string", description: "라이브러리 루트 기준 경로" },
         heading: { type: "string", description: "## 섹션 제목" },
         if_none_match: { type: "string", description: "직전에 받은 sha" },
       },
-      required: ["repo", "path"],
+      required: ["library", "path"],
     },
   },
   {
@@ -61,7 +61,7 @@ export const TOOLS = [
     description: "본문 검색, 매칭 섹션 상위 몇 개. 어느 문서에 있는지 모를 때.",
     inputSchema: {
       type: "object",
-      properties: { query: { type: "string" }, repo: { type: "string" } },
+      properties: { query: { type: "string" }, library: { type: "string" } },
       required: ["query"],
     },
   },
@@ -71,7 +71,7 @@ export const TOOLS = [
     inputSchema: {
       type: "object",
       properties: {
-        repo: { type: "string" },
+        library: { type: "string" },
         since: { type: "number", description: "이벤트 id. 주면 커서를 움직이지 않는다" },
       },
     },
@@ -83,14 +83,14 @@ export const TOOLS = [
     inputSchema: {
       type: "object",
       properties: {
-        repo: { type: "string" },
+        library: { type: "string" },
         path: { type: "string", description: ".md 로 끝나는 경로" },
         content: { type: "string", description: "문서 전체. heading을 줬으면 그 섹션 전체(## 줄 포함)" },
         heading: { type: "string", description: "이 ## 섹션만 교체. 문서 전체를 보내지 않아도 된다" },
         base_sha: { type: "string", description: "직전 doc_get의 sha. 새 문서면 생략" },
         note: { type: "string", description: "무엇을 왜 바꿨는지 한 줄" },
       },
-      required: ["repo", "path", "content"],
+      required: ["library", "path", "content"],
     },
   },
   {
@@ -99,24 +99,28 @@ export const TOOLS = [
     inputSchema: {
       type: "object",
       properties: {
-        repo: { type: "string" },
+        library: { type: "string" },
         path: { type: "string" },
         base_sha: { type: "string" },
         note: { type: "string" },
       },
-      required: ["repo", "path", "base_sha"],
+      required: ["library", "path", "base_sha"],
     },
   },
   {
-    name: "repo_create",
+    name: "library_create",
     description:
-      "새 레포(문서 묶음)를 만든다. 부른 토큰의 주인이 첫 멤버가 된다. 문서를 넣을 곳이 없을 때만.",
+      "새 라이브러리(문서 묶음)를 만든다. 부른 토큰의 주인이 첫 멤버가 된다. 넣을 곳이 없을 때만.",
     inputSchema: {
       type: "object",
       properties: {
         slug: { type: "string", description: "소문자·숫자·하이픈. URL에 쓰인다" },
         name: { type: "string", description: "사람이 읽는 이름" },
-        github_full_name: { type: "string", description: "org/repo. 관련 GitHub 레포가 있으면" },
+        github_repos: {
+          type: "array",
+          items: { type: "string" },
+          description: "이 라이브러리를 보는 GitHub 레포. 'org/repo' 또는 조직 전체면 'org/*'",
+        },
       },
       required: ["slug", "name"],
     },
@@ -128,7 +132,7 @@ export interface ToolResult {
   isError?: boolean;
 }
 
-interface RepoState {
+interface LibraryState {
   latest: number;
   cursor: number;
   latestPaths: string[];
@@ -136,26 +140,26 @@ interface RepoState {
 
 export interface McpContext {
   identity: TokenIdentity;
-  repos: Repo[];
-  state: Map<string, RepoState>;
+  repos: Library[];
+  state: Map<string, LibraryState>;
 }
 
 // ─── 컨텍스트 ────────────────────────────────────────────────────────
 
 export async function buildContext(identity: TokenIdentity): Promise<McpContext> {
-  const repos = await getAccessibleRepos(identity.email);
-  const state = new Map<string, RepoState>();
+  const repos = await getAccessibleLibraries(identity.email);
+  const state = new Map<string, LibraryState>();
   if (repos.length === 0) return { identity, repos, state };
 
   const { data, error } = await supabase
     .from("token_cursors")
-    .select("repository_id, last_event_id")
+    .select("library_id, last_event_id")
     .eq("token_id", identity.id);
   if (error) console.error("mcp: cursors", error);
 
   const stored = new Map<string, number>(
-    (data ?? []).map((row: { repository_id: string; last_event_id: number }) => [
-      row.repository_id,
+    (data ?? []).map((row: { library_id: string; last_event_id: number }) => [
+      row.library_id,
       Number(row.last_event_id),
     ]),
   );
@@ -179,11 +183,11 @@ export async function buildContext(identity: TokenIdentity): Promise<McpContext>
   if (behindIds.length > 0) {
     const { data: events, error: eventsError } = await supabase
       .from("sync_events")
-      .select("id, repository_id, changed_paths, deleted_paths")
+      .select("id, library_id, changed_paths, deleted_paths")
       .in("id", behindIds);
     if (eventsError) console.error("mcp: stale paths", eventsError);
     for (const event of events ?? []) {
-      const entry = state.get(event.repository_id as string);
+      const entry = state.get(event.library_id as string);
       if (entry) {
         entry.latestPaths = [...(event.changed_paths ?? []), ...(event.deleted_paths ?? [])];
       }
@@ -195,10 +199,10 @@ export async function buildContext(identity: TokenIdentity): Promise<McpContext>
     const { error: seedError } = await supabase.from("token_cursors").upsert(
       missing.map((repo) => ({
         token_id: identity.id,
-        repository_id: repo.id,
+        library_id: repo.id,
         last_event_id: state.get(repo.id)?.cursor ?? 0,
       })),
-      { onConflict: "token_id,repository_id" },
+      { onConflict: "token_id,library_id" },
     );
     if (seedError) console.error("mcp: cursor seed", seedError);
   }
@@ -226,29 +230,30 @@ export function staleLine(context: McpContext): string | null {
 
 // ─── 툴 ──────────────────────────────────────────────────────────────
 
-const outlineArgs = z.object({ repo: z.string().optional() });
-// 형태 검증은 createRepositorySchema가 한다 — 여기서 또 규칙을 쓰면 두 곳이 어긋난다.
+const outlineArgs = z.object({ library: z.string().optional() });
+// 형태 검증은 createLibrarySchema가 한다 — 여기서 또 규칙을 쓰면 두 곳이 어긋난다.
 const createArgs = z.object({
   slug: z.string(),
   name: z.string(),
-  github_full_name: z.string().optional(),
+  // 스키마가 문자열을 나누므로 배열이 오면 합쳐서 넘긴다 — 검증 규칙은 한 곳뿐이다
+  github_repos: z.array(z.string()).optional(),
 });
 const getArgs = z.object({
-  repo: z.string(),
+  library: z.string(),
   path: z.string(),
   heading: z.string().optional(),
   if_none_match: z.string().optional(),
 });
-const searchArgs = z.object({ query: z.string().min(1), repo: z.string().optional() });
-const changesArgs = z.object({ repo: z.string().optional(), since: z.number().int().optional() });
+const searchArgs = z.object({ query: z.string().min(1), library: z.string().optional() });
+const changesArgs = z.object({ library: z.string().optional(), since: z.number().int().optional() });
 
 /** 접근 불가와 존재하지 않음을 구분하지 않는다 — 구분하면 레포의 존재가 새어 나간다. */
-function reposFor(context: McpContext, slug?: string): Repo[] {
+function librariesFor(context: McpContext, slug?: string): Library[] {
   return slug ? context.repos.filter((repo) => repo.slug === slug) : context.repos;
 }
 
 interface DocRow {
-  repository_id: string;
+  library_id: string;
   path: string;
   title: string | null;
   content: string;
@@ -259,13 +264,13 @@ interface DocRow {
  * ponytail: 헤딩만 필요할 때도 content를 통째로 읽는다. 헤딩 컬럼을 따로 두면 sync가
  * 그걸 갱신해야 하고 드리프트가 하나 더 는다. 문서 수백 개가 되면 그때 넣는다.
  */
-async function documentsOf(repos: Repo[], path?: string): Promise<DocRow[]> {
+async function documentsOf(repos: Library[], path?: string): Promise<DocRow[]> {
   if (repos.length === 0) return [];
   let query = supabase
     .from("documents")
-    .select("repository_id, path, title, content, content_sha")
+    .select("library_id, path, title, content, content_sha")
     .in(
-      "repository_id",
+      "library_id",
       repos.map((repo) => repo.id),
     )
     .order("path");
@@ -297,8 +302,8 @@ export async function callTool(
       return docPut(context, rawArgs);
     case "doc_delete":
       return docDelete(context, rawArgs);
-    case "repo_create":
-      return repoCreate(context, rawArgs);
+    case "library_create":
+      return libraryCreate(context, rawArgs);
     default:
       return { text: `그런 툴이 없다: ${name}`, isError: true };
   }
@@ -312,24 +317,24 @@ async function docOutline(context: McpContext, rawArgs: unknown): Promise<ToolRe
   const args = outlineArgs.safeParse(rawArgs ?? {});
   if (!args.success) return badArgs(args.error.issues[0].message);
 
-  const repos = reposFor(context, args.data.repo);
+  const repos = librariesFor(context, args.data.library);
   if (repos.length === 0) {
     // "오타 난 slug"와 "레포가 하나도 없음"을 구분한다. 뭉뚱그리면 오타 하나에
-    // 에이전트가 repo_create를 불러 중복 레포를 만든다.
-    return args.data.repo
-      ? { text: `그런 레포가 없다: ${args.data.repo}`, isError: true }
-      : { text: "접근 가능한 레포가 없다. repo_create로 만들 수 있다." };
+    // 에이전트가 library_create를 불러 중복 레포를 만든다.
+    return args.data.library
+      ? { text: `그런 라이브러리가 없다: ${args.data.library}`, isError: true }
+      : { text: "접근 가능한 라이브러리가 없다. library_create로 만들 수 있다." };
   }
 
   const docs = await documentsOf(repos);
   const byRepo = new Map(repos.map((repo) => [repo.id, [] as DocRow[]]));
-  for (const doc of docs) byRepo.get(doc.repository_id)?.push(doc);
+  for (const doc of docs) byRepo.get(doc.library_id)?.push(doc);
 
   const lines: string[] = [];
   for (const repo of repos) {
     const own = byRepo.get(repo.id) ?? [];
     // 빈 레포도 한 줄로 알린다. 안 그러면 방금 만든 레포가 목록에서 사라져
-    // "생성이 실패했나"로 읽힌다 — repo_create 직후가 정확히 그 상황이다.
+    // "생성이 실패했나"로 읽힌다 — library_create 직후가 정확히 그 상황이다.
     if (own.length === 0) {
       lines.push(`${repo.slug}/ — 문서 없음`);
       continue;
@@ -346,10 +351,10 @@ async function docGet(context: McpContext, rawArgs: unknown): Promise<ToolResult
   const args = getArgs.safeParse(rawArgs ?? {});
   if (!args.success) return badArgs(args.error.issues[0].message);
 
-  const [repo] = reposFor(context, args.data.repo);
-  if (!repo) return { text: `그런 레포가 없다: ${args.data.repo}`, isError: true };
+  const [library] = librariesFor(context, args.data.library);
+  if (!library) return { text: `그런 라이브러리가 없다: ${args.data.library}`, isError: true };
 
-  const [doc] = await documentsOf([repo], args.data.path);
+  const [doc] = await documentsOf([library], args.data.path);
   if (!doc) return { text: `그런 문서가 없다: ${args.data.path}`, isError: true };
 
   // 해시가 같으면 본문 대신 5토큰. doc_get 재호출의 대부분이 여기서 끝난다.
@@ -360,7 +365,7 @@ async function docGet(context: McpContext, rawArgs: unknown): Promise<ToolResult
   const body = args.data.heading ? findSection(doc.content, args.data.heading) : doc.content;
   if (body === null) return { text: `그런 섹션이 없다: ${args.data.heading}`, isError: true };
 
-  return { text: `${repo.slug}/${doc.path} sha:${doc.content_sha}\n\n${body}` };
+  return { text: `${library.slug}/${doc.path} sha:${doc.content_sha}\n\n${body}` };
 }
 
 const SEARCH_LIMIT = 5;
@@ -369,7 +374,7 @@ async function docSearch(context: McpContext, rawArgs: unknown): Promise<ToolRes
   const args = searchArgs.safeParse(rawArgs ?? {});
   if (!args.success) return badArgs(args.error.issues[0].message);
 
-  const repos = reposFor(context, args.data.repo);
+  const repos = librariesFor(context, args.data.library);
   const bySlug = new Map(repos.map((repo) => [repo.id, repo.slug]));
   const query = args.data.query;
 
@@ -380,7 +385,7 @@ async function docSearch(context: McpContext, rawArgs: unknown): Promise<ToolRes
       if (score > 0) {
         hits.push({
           score,
-          label: `${bySlug.get(doc.repository_id)}/${doc.path}${
+          label: `${bySlug.get(doc.library_id)}/${doc.path}${
             section.heading ? ` ## ${section.heading}` : ""
           }`,
           // 헤딩은 라벨에 이미 있다. 스니펫에서 다시 싣지 않는다.
@@ -408,17 +413,20 @@ const CHANGES_LIMIT = 20;
  * 생성 로직은 웹 폼과 같은 lib/repository.ts를 지난다 — 두 벌이면 한쪽만 어긋난다.
  *
  * 새 레포는 이 요청의 컨텍스트에 없다. 그래서 다음 툴 호출부터 보인다고 알려 준다 —
- * 안 그러면 에이전트가 바로 doc_put을 부르고 "그런 레포가 없다"를 받는다.
+ * 안 그러면 에이전트가 바로 doc_put을 부르고 "그런 라이브러리가 없다"를 받는다.
  */
-async function repoCreate(context: McpContext, rawArgs: unknown): Promise<ToolResult> {
+async function libraryCreate(context: McpContext, rawArgs: unknown): Promise<ToolResult> {
   const args = createArgs.safeParse(rawArgs ?? {});
   if (!args.success) return badArgs(args.error.issues[0].message);
 
-  const result = await createRepositoryFor(context.identity.email, args.data);
+  const result = await createLibraryFor(context.identity.email, {
+    ...args.data,
+    github_repos: args.data.github_repos?.join(" "),
+  });
   if (!result.ok) return { text: result.message, isError: true };
 
   return {
-    text: `만들었다 ${result.slug} — 멤버: ${context.identity.email}. doc_put(repo:"${result.slug}", …)으로 문서를 넣는다`,
+    text: `만들었다 ${result.slug} — 멤버: ${context.identity.email}. doc_put(library:"${result.slug}", …)으로 문서를 넣는다`,
   };
 }
 
@@ -426,7 +434,7 @@ async function docChangesSince(context: McpContext, rawArgs: unknown): Promise<T
   const args = changesArgs.safeParse(rawArgs ?? {});
   if (!args.success) return badArgs(args.error.issues[0].message);
 
-  const repos = reposFor(context, args.data.repo);
+  const repos = librariesFor(context, args.data.library);
   const blocks: string[] = [];
 
   for (const repo of repos) {
@@ -437,7 +445,7 @@ async function docChangesSince(context: McpContext, rawArgs: unknown): Promise<T
     const { data, error } = await supabase
       .from("sync_events")
       .select("id, summary")
-      .eq("repository_id", repo.id)
+      .eq("library_id", repo.id)
       .gt("id", from)
       .order("id")
       .limit(CHANGES_LIMIT);
@@ -461,11 +469,11 @@ async function docChangesSince(context: McpContext, rawArgs: unknown): Promise<T
       const { error: cursorError } = await supabase.from("token_cursors").upsert(
         {
           token_id: context.identity.id,
-          repository_id: repo.id,
+          library_id: repo.id,
           last_event_id: advanced,
           updated_at: new Date().toISOString(),
         },
-        { onConflict: "token_id,repository_id" },
+        { onConflict: "token_id,library_id" },
       );
       if (cursorError) console.error("mcp: cursor advance", cursorError);
     }
@@ -477,8 +485,8 @@ async function docChangesSince(context: McpContext, rawArgs: unknown): Promise<T
 // ─── 쓰기 ────────────────────────────────────────────────────────────
 
 /** 방금 내가 만든 이벤트는 이미 본 것으로 친다. `advanceCursor`의 메모리 쪽 짝. */
-function markSeen(context: McpContext, repositoryId: string, eventId: number | null): void {
-  const state = context.state.get(repositoryId);
+function markSeen(context: McpContext, libraryId: string, eventId: number | null): void {
+  const state = context.state.get(libraryId);
   if (!state || eventId === null) return;
   state.latest = Math.max(state.latest, eventId);
   state.cursor = state.latest;
@@ -494,7 +502,7 @@ async function docPut(context: McpContext, rawArgs: unknown): Promise<ToolResult
 
   const result = await putDocument({
     email: context.identity.email,
-    repo: args.data.repo,
+    repo: args.data.library,
     path: args.data.path,
     content: args.data.content,
     heading: args.data.heading,
@@ -508,8 +516,8 @@ async function docPut(context: McpContext, rawArgs: unknown): Promise<ToolResult
     return { text: `${result.message}${current}`, isError: true };
   }
   // DB뿐 아니라 이번 요청의 컨텍스트도 밀어 준다 — 안 그러면 방금 쓴 응답에 [stale]이 붙는다
-  markSeen(context, result.repositoryId, result.eventId);
-  return { text: `저장했다 ${args.data.repo}/${args.data.path} sha:${result.sha}` };
+  markSeen(context, result.libraryId, result.eventId);
+  return { text: `저장했다 ${args.data.library}/${args.data.path} sha:${result.sha}` };
 }
 
 async function docDelete(context: McpContext, rawArgs: unknown): Promise<ToolResult> {
@@ -518,7 +526,7 @@ async function docDelete(context: McpContext, rawArgs: unknown): Promise<ToolRes
 
   const result = await deleteDocument({
     email: context.identity.email,
-    repo: args.data.repo,
+    repo: args.data.library,
     path: args.data.path,
     baseSha: args.data.base_sha,
     note: args.data.note,
@@ -529,6 +537,6 @@ async function docDelete(context: McpContext, rawArgs: unknown): Promise<ToolRes
     const current = result.currentSha ? ` 현재 sha:${result.currentSha}` : "";
     return { text: `${result.message}${current}`, isError: true };
   }
-  markSeen(context, result.repositoryId, result.eventId);
-  return { text: `지웠다 ${args.data.repo}/${args.data.path}` };
+  markSeen(context, result.libraryId, result.eventId);
+  return { text: `지웠다 ${args.data.library}/${args.data.path}` };
 }

@@ -21,11 +21,11 @@ MCP 서버 `cushion`으로 읽는다. 이 문서는 **코드에서 읽어낼 수
 
 ```
 doc_outline               # 목차부터
-doc_get(repo:"cushion", path:"SPEC.md", heading:"6. 인증 · 권한")
+doc_get(library:"cushion", path:"SPEC.md", heading:"6. 인증 · 권한")
 ```
 
 붙어 있지 않다면 `/settings/tokens`에서 발급하고 명령 한 줄을 실행한다.
-웹으로는 <https://cushion-chi.vercel.app/repositories/cushion>.
+웹으로는 <https://cushion-chi.vercel.app/libraries/cushion>.
 
 **이 문서(`AGENTS.md`)와 `CLAUDE.md`는 레포에 남는다.** Claude Code가 세션 시작에 자동으로
 읽는 파일이라 Cushion에 두면 아무도 규칙을 안 읽는다 — 붙기 _전에_ 필요한 문서다.
@@ -73,7 +73,7 @@ doc_get(repo:"cushion", path:"SPEC.md", heading:"6. 인증 · 권한")
 순서를 지킨다: **권한 확인 → Zod 검증 → 로직 → 재검증**
 
 ```ts
-export async function createRepository(formData: FormData) {
+export async function createLibrary(formData: FormData) {
   if (!(await isAdmin()))
     return { success: false, error: "관리자 권한이 필요합니다." };
   // ...
@@ -85,7 +85,7 @@ export async function createRepository(formData: FormData) {
 - **`ADMIN_EMAILS`가 비면 전원 거부**(fail-closed). 빈 값을 "제한 없음"으로 읽는 순간 전면 개방이다.
   적용 범위는 `/admin`(전체 조망·내보내기)이다 — 레포 생성은 로그인만으로, 멤버 관리는 그 레포 멤버면 된다 (D-013)
 - **이메일은 쓸 때·조회할 때 양쪽에서 `lowercase`.** DB `CHECK` 제약이 있지만 조회 경로는 막아주지 않는다. 대소문자 차이 = ACL 우회 구멍
-- **토큰에 권한을 굽지 않는다.** 토큰은 이메일까지만 해석하고, 레포 권한은 **요청 시점에 `repository_members`를 조회**한다. 멤버에서 빼면 토큰 재발급 없이 즉시 차단돼야 한다
+- **토큰에 권한을 굽지 않는다.** 토큰은 이메일까지만 해석하고, 레포 권한은 **요청 시점에 `library_members`를 조회**한다. 멤버에서 빼면 토큰 재발급 없이 즉시 차단돼야 한다
 - **권한 없는 레포는 403이 아니라 404.** 403은 "그 레포가 존재한다"를 알려준다
 
 ### 4. 토큰은 이제 읽기 전용이 아니다
@@ -109,7 +109,7 @@ export async function createRepository(formData: FormData) {
 - **본문을 덮기 전에 `document_versions`에 이전 것을 남긴다.** append-only.
   삭제할 때도 남긴다 — 삭제야말로 되돌릴 수 있어야 한다
 - **이력은 읽히는 경로가 있어야 한다.** 쓰기만 하고 못 꺼내면 없는 것보다 나쁘다 —
-  해결된 것처럼 보이기 때문이다. `/[repo]/history/[...path]`가 그 리더고,
+  해결된 것처럼 보이기 때문이다. `/[library]/history/[...path]`가 그 리더고,
   거기서 `lib/diff.ts`가 버전 사이 변경을 hunk로 보여준다. 전문 보기도 남겨 둔다 —
   diff가 상한에 걸려 생략될 때 그게 유일한 수단이다
 - **되돌리기는 덮어쓰기가 아니라 새 저장이다.** append-only를 지켜야
@@ -134,7 +134,7 @@ export async function createRepository(formData: FormData) {
 - **LLM diff 요약** — 요약 모델은 본문만 보므로 "어느 코드가 영향받는지" 판단이 추측이 된다. 구조적 요약(경로 + 섹션 + 증감)으로 간다 (D-002)
 - **git 동기화 / sync 토큰** — 원본이 Cushion이다. 되살리면 원본이 둘이 된다 (D-011)
 - **자동 병합 / 충돌 해결 UI** — 브랜치가 없어 병합할 근거가 없다. `base_sha`로 거부만 한다
-- **유저 테이블** — `repository_members` 한 테이블이 "등록됐나"와 "어느 레포"를 동시에 답한다 (D-003)
+- **유저 테이블** — `library_members` 한 테이블이 "등록됐나"와 "어느 레포"를 동시에 답한다 (D-003)
 - **임베딩 · 벡터 DB** — 스펙 수십 개 규모에서 substring 스코어링으로 충분 (D-004)
 - **폴링 · 상시 연결 구독** — 커서 + 응답에 얹는 `[stale]` 한 줄로 대체 (D-005)
 - **개인별 알림 구독 / 브라우저 푸시 / SMS** — 레포당 Mattermost 채널 하나
@@ -175,7 +175,7 @@ type ActionResult<T = void> =
 
 **서버 컴포넌트가 기본.** `'use client'`는 토큰 복사 버튼·확인 다이얼로그 같은 **최소 리프**에만 붙인다.
 
-마크다운 렌더는 **서버 컴포넌트에서** 한다(`react-markdown`) — 클라이언트 번들 0. 보기 화면에 에디터 런타임을 싣지 않는다. 편집은 별도 라우트(`/[repo]/edit/…`)의 textarea다.
+마크다운 렌더는 **서버 컴포넌트에서** 한다(`react-markdown`) — 클라이언트 번들 0. 보기 화면에 에디터 런타임을 싣지 않는다. 편집은 별도 라우트(`/[library]/edit/…`)의 textarea다.
 
 UI는 shadcn/ui(base·nova = Base UI + Lucide + Geist). 아이콘은 **`lucide-react`만**. 화면이 실제로 쓰는 컴포넌트만 `pnpm dlx shadcn@latest add`로 추가한다 — 미리 다 깔지 않는다.
 

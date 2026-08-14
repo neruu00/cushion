@@ -13,7 +13,7 @@ import type { SaveResult } from "@/lib/action.type";
 import { getSessionEmail } from "@/lib/authz";
 import { deleteDocument, putDocument } from "@/lib/document";
 import { deleteDocumentSchema, putDocumentSchema, restoreSchema } from "@/lib/document.schema";
-import { getAccessibleRepo } from "@/lib/authz";
+import { getAccessibleLibrary } from "@/lib/authz";
 import { supabase } from "@/lib/supabase";
 
 /**
@@ -32,7 +32,7 @@ export async function saveDocument(
 
   const result = await putDocument({
     email,
-    repo: parsed.data.repo,
+    repo: parsed.data.library,
     path: parsed.data.path,
     content: parsed.data.content,
     // 빈 문자열로 오는 hidden input을 "없음"으로 접는다 (새 문서)
@@ -50,8 +50,8 @@ export async function saveDocument(
     };
   }
 
-  revalidatePath(`/repositories/${parsed.data.repo}`);
-  revalidatePath(`/repositories/${parsed.data.repo}/${parsed.data.path}`);
+  revalidatePath(`/libraries/${parsed.data.library}`);
+  revalidatePath(`/libraries/${parsed.data.library}/${parsed.data.path}`);
   return { success: true, data: { sha: result.sha } };
 }
 
@@ -64,14 +64,14 @@ export async function removeDocument(formData: FormData): Promise<void> {
 
   const result = await deleteDocument({
     email,
-    repo: parsed.data.repo,
+    repo: parsed.data.library,
     path: parsed.data.path,
     baseSha: parsed.data.base_sha,
     note: parsed.data.note,
   });
   if (!result.ok) console.error("removeDocument", result.code, result.message);
 
-  revalidatePath(`/repositories/${parsed.data.repo}`);
+  revalidatePath(`/libraries/${parsed.data.library}`);
 }
 
 /**
@@ -86,7 +86,7 @@ export async function restoreVersion(formData: FormData): Promise<void> {
   const parsed = restoreSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return;
 
-  const repo = await getAccessibleRepo(email, parsed.data.repo);
+  const repo = await getAccessibleLibrary(email, parsed.data.library);
   if (!repo) return;
 
   // 버전이 정말 이 레포·이 경로의 것인지 확인한다. id만 믿으면 남의 이력을 끌어올 수 있다.
@@ -94,7 +94,7 @@ export async function restoreVersion(formData: FormData): Promise<void> {
     .from("document_versions")
     .select("content, created_at")
     .eq("id", parsed.data.version_id)
-    .eq("repository_id", repo.id)
+    .eq("library_id", repo.id)
     .eq("path", parsed.data.path)
     .maybeSingle();
 
@@ -107,13 +107,13 @@ export async function restoreVersion(formData: FormData): Promise<void> {
   const { data: current } = await supabase
     .from("documents")
     .select("content_sha")
-    .eq("repository_id", repo.id)
+    .eq("library_id", repo.id)
     .eq("path", parsed.data.path)
     .maybeSingle();
 
   const result = await putDocument({
     email,
-    repo: parsed.data.repo,
+    repo: parsed.data.library,
     path: parsed.data.path,
     content: version.content,
     baseSha: current?.content_sha,
@@ -121,6 +121,6 @@ export async function restoreVersion(formData: FormData): Promise<void> {
   });
   if (!result.ok) console.error("restoreVersion", result.code, result.message);
 
-  revalidatePath(`/repositories/${parsed.data.repo}/${parsed.data.path}`);
-  revalidatePath(`/repositories/${parsed.data.repo}/history/${parsed.data.path}`);
+  revalidatePath(`/libraries/${parsed.data.library}/${parsed.data.path}`);
+  revalidatePath(`/libraries/${parsed.data.library}/history/${parsed.data.path}`);
 }

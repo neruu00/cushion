@@ -12,7 +12,7 @@ description: 이 프로젝트의 문서(스펙·ADR·런북·회의록·용어�
 
 ```
 doc_outline                                    # 무엇이 있는지부터. 본문 아님
-doc_get(repo:"…", path:"SPEC.md", heading:"6. 인증 · 권한")
+doc_get(library:"…", path:"SPEC.md", heading:"6. 인증 · 권한")
 ```
 
 - **문서를 통째로 읽지 않는다.** 목차를 보고 필요한 `##` 섹션만 가져온다.
@@ -25,7 +25,7 @@ doc_get(repo:"…", path:"SPEC.md", heading:"6. 인증 · 권한")
 ## 쓰기
 
 ```
-doc_put(repo:"…", path:"SPEC.md", heading:"6. 인증 · 권한",
+doc_put(library:"…", path:"SPEC.md", heading:"6. 인증 · 권한",
         content:"## 6. 인증 · 권한\n…", base_sha:"<doc_get의 sha>", note:"무엇을 왜")
 ```
 
@@ -61,7 +61,7 @@ doc_put(repo:"…", path:"SPEC.md", heading:"6. 인증 · 권한",
 
 경로가 곧 분류다. 이미 있는 관례를 `doc_outline`으로 먼저 보고 따른다
 (`adr/0001-*.md`, `runbook/*.md`, `meetings/2026-08-13.md` 같은 식).
-넣을 레포 자체가 없으면 `repo_create(slug:"…", name:"…")`.
+넣을 레포 자체가 없으면 `library_create(slug:"…", name:"…")`.
 
 ## 붙어 있지 않다면
 

@@ -1,5 +1,5 @@
 /**
- * @file app/[repo]/history/[...path]/page.tsx
+ * @file app/[library]/history/[...path]/page.tsx
  * @description 문서 변경 이력. git history를 대신하는 화면이다 (D-011).
  *
  * 이력은 (레포, 경로)에 매달려 있으므로 **지워진 문서의 이력도 여기서 보인다.**
@@ -11,7 +11,7 @@ import { notFound, redirect } from "next/navigation";
 import { restoreVersion } from "@/actions/document";
 import { DiffView } from "@/components/DiffView";
 import { Button } from "@/components/ui/button";
-import { getAccessibleRepo, getSessionEmail } from "@/lib/authz";
+import { getAccessibleLibrary, getSessionEmail } from "@/lib/authz";
 import { supabase } from "@/lib/supabase";
 
 interface VersionRow {
@@ -23,30 +23,30 @@ interface VersionRow {
   created_at: string;
 }
 
-export default async function HistoryPage({ params }: PageProps<"/repositories/[repo]/history/[...path]">) {
-  const { repo: slug, path } = await params;
+export default async function HistoryPage({ params }: PageProps<"/libraries/[library]/history/[...path]">) {
+  const { library: slug, path } = await params;
   const docPath = path.join("/");
 
   const email = await getSessionEmail();
   if (!email) {
-    redirect(`/api/auth/signin?callbackUrl=${encodeURIComponent(`/repositories/${slug}/history/${docPath}`)}`);
+    redirect(`/api/auth/signin?callbackUrl=${encodeURIComponent(`/libraries/${slug}/history/${docPath}`)}`);
   }
 
-  const repo = await getAccessibleRepo(email, slug);
-  if (!repo) notFound();
+  const library = await getAccessibleLibrary(email, slug);
+  if (!library) notFound();
 
   const [history, current] = await Promise.all([
     supabase
       .from("document_versions")
       .select("id, content, content_sha, author, note, created_at")
-      .eq("repository_id", repo.id)
+      .eq("library_id", library.id)
       .eq("path", docPath)
       .order("id", { ascending: false })
       .limit(50),
     supabase
       .from("documents")
       .select("content, content_sha, updated_at, updated_by")
-      .eq("repository_id", repo.id)
+      .eq("library_id", library.id)
       .eq("path", docPath)
       .maybeSingle(),
   ]);
@@ -67,12 +67,12 @@ export default async function HistoryPage({ params }: PageProps<"/repositories/[
     <main className="mx-auto w-full max-w-3xl space-y-6 p-8">
       <header className="space-y-1">
         <p className="text-xs text-muted-foreground">
-          <Link href={`/repositories/${repo.slug}`} className="font-mono hover:text-foreground">
-            {repo.slug}
+          <Link href={`/libraries/${library.slug}`} className="font-mono hover:text-foreground">
+            {library.slug}
           </Link>
           {" / "}
           {live ? (
-            <Link href={`/repositories/${repo.slug}/${docPath}`} className="font-mono hover:text-foreground">
+            <Link href={`/libraries/${library.slug}/${docPath}`} className="font-mono hover:text-foreground">
               {docPath}
             </Link>
           ) : (
@@ -103,7 +103,7 @@ export default async function HistoryPage({ params }: PageProps<"/repositories/[
                   {version.note ? <span className="block truncate">{version.note}</span> : null}
                 </span>
                 <form action={restoreVersion}>
-                  <input type="hidden" name="repo" value={repo.slug} />
+                  <input type="hidden" name="library" value={library.slug} />
                   <input type="hidden" name="path" value={docPath} />
                   <input type="hidden" name="version_id" value={version.id} />
                   <Button type="submit" variant="outline" size="xs">

@@ -14,7 +14,7 @@ import { supabase } from "@/lib/supabase";
  * **본문을 덮어쓰기 전에** 부른다. append-only — 갱신·삭제 경로를 만들지 않는다.
  */
 export async function recordVersion(input: {
-  repositoryId: string;
+  libraryId: string;
   path: string;
   content: string;
   contentSha: string;
@@ -22,7 +22,7 @@ export async function recordVersion(input: {
   note?: string | null;
 }): Promise<void> {
   const { error } = await supabase.from("document_versions").insert({
-    repository_id: input.repositoryId,
+    library_id: input.libraryId,
     path: input.path,
     content: input.content,
     content_sha: input.contentSha,
@@ -53,7 +53,7 @@ export async function recordChange(
   const { data, error } = await supabase
     .from("sync_events")
     .insert({
-      repository_id: repo.id,
+      library_id: repo.id,
       author: edit.author,
       changed_paths: edit.after === null ? [] : [edit.path],
       deleted_paths: edit.after === null ? [edit.path] : [],
@@ -68,7 +68,7 @@ export async function recordChange(
   // 비정규화된 최신 이벤트 id (D-012). 쓰기 경로는 여기 하나뿐이라 어긋날 자리가 없다.
   if (eventId !== null) {
     const { error: latestError } = await supabase
-      .from("repositories")
+      .from("libraries")
       .update({ latest_event_id: eventId })
       .eq("id", repo.id);
     if (latestError) console.error("mirror: latest_event_id", latestError);
@@ -118,17 +118,17 @@ async function postWebhook(url: string | null, payload: Record<string, string>):
  */
 export async function advanceCursor(
   tokenId: string,
-  repositoryId: string,
+  libraryId: string,
   eventId: number,
 ): Promise<void> {
   const { error } = await supabase.from("token_cursors").upsert(
     {
       token_id: tokenId,
-      repository_id: repositoryId,
+      library_id: libraryId,
       last_event_id: eventId,
       updated_at: new Date().toISOString(),
     },
-    { onConflict: "token_id,repository_id" },
+    { onConflict: "token_id,library_id" },
   );
   if (error) console.error("mirror: advanceCursor", error);
 }

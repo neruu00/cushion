@@ -3,7 +3,7 @@
  * @description NextAuth v5 Google. 세션에는 lowercase 이메일만 담는다.
  *
  * DB 어댑터를 붙이지 않는다 — 유저 테이블이 없기 때문이다(D-003).
- * 정체성은 여기가, 접근 허용 여부는 `repository_members` 행 존재가 결정한다.
+ * 정체성은 여기가, 접근 허용 여부는 `library_members` 행 존재가 결정한다.
  */
 import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";

@@ -11,11 +11,11 @@ import { auth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { hashFromAuthHeader } from "@/lib/token";
 
-export interface Repo {
+export interface Library {
   id: string;
   slug: string;
   name: string;
-  github_full_name: string | null;
+  github_repos: string[];
   /** 쓰기 경로의 알림이 재조회 없이 쓰도록 같이 실어 온다. 클라이언트로는 안 나간다 */
   mattermost_webhook_url: string | null;
   discord_webhook_url: string | null;
@@ -23,8 +23,8 @@ export interface Repo {
   latest_event_id: number;
 }
 
-const REPO_COLUMNS =
-  "id, slug, name, github_full_name, mattermost_webhook_url, discord_webhook_url, latest_event_id";
+const LIBRARY_COLUMNS =
+  "id, slug, name, github_repos, mattermost_webhook_url, discord_webhook_url, latest_event_id";
 
 // ─── 정체성 ──────────────────────────────────────────────────────────
 
@@ -100,11 +100,11 @@ export async function isAdmin(): Promise<boolean> {
 }
 
 /** 이 이메일이 이 레포의 멤버인가. 셀프서브 멤버 관리의 권한 판정용 (D-013). */
-export async function isMember(email: string, repositoryId: string): Promise<boolean> {
+export async function isMember(email: string, libraryId: string): Promise<boolean> {
   const { count, error } = await supabase
-    .from("repository_members")
+    .from("library_members")
     .select("email", { count: "exact", head: true })
-    .eq("repository_id", repositoryId)
+    .eq("library_id", libraryId)
     .eq("email", email.toLowerCase());
 
   if (error) {
@@ -115,30 +115,30 @@ export async function isMember(email: string, repositoryId: string): Promise<boo
 }
 
 /** 이 이메일이 멤버로 등록된 레포 id 목록. admin 여부는 보지 않는다. */
-export async function getMemberRepoIds(email: string): Promise<string[]> {
+export async function getMemberLibraryIds(email: string): Promise<string[]> {
   const { data, error } = await supabase
-    .from("repository_members")
-    .select("repository_id")
+    .from("library_members")
+    .select("library_id")
     .eq("email", email.toLowerCase());
 
   if (error) {
-    console.error("getMemberRepoIds", error);
+    console.error("getMemberLibraryIds", error);
     return [];
   }
-  return (data ?? []).map((row: { repository_id: string }) => row.repository_id);
+  return (data ?? []).map((row: { library_id: string }) => row.library_id);
 }
 
 /** 이 이메일이 볼 수 있는 레포 전체. admin은 멤버 테이블과 무관하게 전부 본다. */
-export async function getAccessibleRepos(email: string | null): Promise<Repo[]> {
+export async function getAccessibleLibraries(email: string | null): Promise<Library[]> {
   if (!email) return [];
 
-  const query = supabase.from("repositories").select(REPO_COLUMNS).order("slug");
+  const query = supabase.from("libraries").select(LIBRARY_COLUMNS).order("slug");
   const { data, error } = isAdminEmail(email)
     ? await query
-    : await query.in("id", await getMemberRepoIds(email));
+    : await query.in("id", await getMemberLibraryIds(email));
 
   if (error) {
-    console.error("getAccessibleRepos", error);
+    console.error("getAccessibleLibraries", error);
     return [];
   }
   return data ?? [];
@@ -150,33 +150,33 @@ export async function getAccessibleRepos(email: string | null): Promise<Repo[]> 
  * 호출부는 null을 403이 아니라 **404**로 처리한다 — 403은 "그 레포가 존재한다"를 알려준다.
  * (SPEC §6)
  */
-export async function getAccessibleRepo(
+export async function getAccessibleLibrary(
   email: string | null,
   slug: string,
-): Promise<Repo | null> {
+): Promise<Library | null> {
   if (!email) return null;
 
   const { data: repo, error } = await supabase
-    .from("repositories")
-    .select(REPO_COLUMNS)
+    .from("libraries")
+    .select(LIBRARY_COLUMNS)
     .eq("slug", slug)
     .maybeSingle();
 
   if (error) {
-    console.error("getAccessibleRepo", error);
+    console.error("getAccessibleLibrary", error);
     return null;
   }
   if (!repo) return null;
   if (isAdminEmail(email)) return repo;
 
   const { count, error: memberError } = await supabase
-    .from("repository_members")
+    .from("library_members")
     .select("email", { count: "exact", head: true })
-    .eq("repository_id", repo.id)
+    .eq("library_id", repo.id)
     .eq("email", email.toLowerCase());
 
   if (memberError) {
-    console.error("getAccessibleRepo:member", memberError);
+    console.error("getAccessibleLibrary:member", memberError);
     return null;
   }
   return count ? repo : null;

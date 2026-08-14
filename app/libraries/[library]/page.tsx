@@ -1,5 +1,5 @@
 /**
- * @file app/repositories/[repo]/page.tsx
+ * @file app/libraries/[library]/page.tsx
  * @description 문서 목록 + 최근 변경 타임라인 + 예측 절약 (T-501).
  *
  * 타임라인은 `sync_events.summary`를 그대로 보여준다 — 알림·에이전트 델타와 같은 문자열이다.
@@ -10,14 +10,14 @@ import { notFound, redirect } from "next/navigation";
 
 import { Trash2 } from "lucide-react";
 
-import { addMember, removeMember } from "@/actions/repository";
+import { addMember, removeMember } from "@/actions/library";
 import { ActionForm } from "@/components/ActionForm";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { WebhookDialog } from "@/components/WebhookDialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { getAccessibleRepo, getSessionEmail } from "@/lib/authz";
+import { getAccessibleLibrary, getSessionEmail } from "@/lib/authz";
 import { estimateSavings } from "@/lib/savings";
 import { supabase } from "@/lib/supabase";
 
@@ -36,15 +36,15 @@ interface EventRow {
   deleted_paths: string[] | null;
 }
 
-export default async function RepoPage({ params }: PageProps<"/repositories/[repo]">) {
-  const { repo: slug } = await params;
+export default async function LibraryPage({ params }: PageProps<"/libraries/[library]">) {
+  const { library: slug } = await params;
 
   const email = await getSessionEmail();
-  if (!email) redirect(`/api/auth/signin?callbackUrl=${encodeURIComponent(`/repositories/${slug}`)}`);
+  if (!email) redirect(`/api/auth/signin?callbackUrl=${encodeURIComponent(`/libraries/${slug}`)}`);
 
   // 권한이 없으면 404다. 403은 "그 레포가 존재한다"를 알려준다 (SPEC §6).
-  const repo = await getAccessibleRepo(email, slug);
-  if (!repo) notFound();
+  const library = await getAccessibleLibrary(email, slug);
+  if (!library) notFound();
 
   const [docs, events, memberRows] = await Promise.all([
     supabase
@@ -52,24 +52,24 @@ export default async function RepoPage({ params }: PageProps<"/repositories/[rep
       // ponytail: 절약 추정 때문에 본문까지 읽는다. 레포 하나에 문서 수십 개면 충분하고,
       // 무거워지면 documents에 문자수 컬럼을 비정규화한다.
       .select("path, title, updated_at, content")
-      .eq("repository_id", repo.id)
+      .eq("library_id", library.id)
       .order("path"),
     supabase
       .from("sync_events")
       .select("id, summary, created_at, changed_paths, deleted_paths")
-      .eq("repository_id", repo.id)
+      .eq("library_id", library.id)
       .order("id", { ascending: false })
       .limit(10),
     supabase
-      .from("repository_members")
+      .from("library_members")
       .select("email")
-      .eq("repository_id", repo.id)
+      .eq("library_id", library.id)
       .order("email"),
   ]);
   const members: { email: string }[] = memberRows.data ?? [];
 
-  if (docs.error) console.error("RepoPage: documents", docs.error);
-  if (events.error) console.error("RepoPage: events", events.error);
+  if (docs.error) console.error("LibraryPage: documents", docs.error);
+  if (events.error) console.error("LibraryPage: events", events.error);
 
   const documents: DocRow[] = docs.data ?? [];
   const timeline: EventRow[] = events.data ?? [];
@@ -80,36 +80,45 @@ export default async function RepoPage({ params }: PageProps<"/repositories/[rep
     <main className="mx-auto w-full max-w-3xl space-y-8 p-8">
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div className="space-y-1">
-          <h1 className="font-mono text-xl font-semibold">{repo.slug}</h1>
+          <h1 className="font-mono text-xl font-semibold">{library.slug}</h1>
           <p className="text-sm text-muted-foreground">
-            {repo.name}
-            {repo.github_full_name ? (
+            {library.name}
+            {library.github_repos.length > 0 ? (
               <>
                 {" · "}
-                <a
-                  href={`https://github.com/${repo.github_full_name}`}
-                  className="underline underline-offset-4"
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  {repo.github_full_name}
-                </a>
+                {library.github_repos.map((full, i) => (
+                  <span key={full}>
+                    {i > 0 ? ", " : ""}
+                    {full.endsWith("/*") ? (
+                      full
+                    ) : (
+                      <a
+                        href={`https://github.com/${full}`}
+                        className="underline underline-offset-4"
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        {full}
+                      </a>
+                    )}
+                  </span>
+                ))}
               </>
             ) : null}
             {" · "}
             {/* 붙어 있으면 어디에 붙었는지 보여준다 — 없을 때만 알리면 확인할 방법이 없다 */}
             {[
-              repo.mattermost_webhook_url ? "Mattermost" : null,
-              repo.discord_webhook_url ? "Discord" : null,
+              library.mattermost_webhook_url ? "Mattermost" : null,
+              library.discord_webhook_url ? "Discord" : null,
             ]
               .filter(Boolean)
               .join(" · ") || "알림 채널 없음"}
           </p>
         </div>
         <WebhookDialog
-          repositoryId={repo.id}
-          mattermostWebhookUrl={repo.mattermost_webhook_url}
-          discordWebhookUrl={repo.discord_webhook_url}
+          libraryId={library.id}
+          mattermostWebhookUrl={library.mattermost_webhook_url}
+          discordWebhookUrl={library.discord_webhook_url}
         />
       </header>
 
@@ -132,7 +141,7 @@ export default async function RepoPage({ params }: PageProps<"/repositories/[rep
         <div className="flex items-center justify-between gap-4">
           <h2 className="text-sm font-medium">문서</h2>
           <Link
-            href={`/repositories/${repo.slug}/new`}
+            href={`/libraries/${library.slug}/new`}
             className="text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
           >
             새 문서
@@ -147,7 +156,7 @@ export default async function RepoPage({ params }: PageProps<"/repositories/[rep
             {documents.map((doc) => (
               <li key={doc.path}>
                 <Link
-                  href={`/repositories/${repo.slug}/${doc.path}`}
+                  href={`/libraries/${library.slug}/${doc.path}`}
                   className="flex items-center justify-between gap-4 px-3 py-2 hover:bg-muted/40"
                 >
                   <span className="min-w-0">
@@ -190,7 +199,7 @@ export default async function RepoPage({ params }: PageProps<"/repositories/[rep
                         (path) => (
                           <Link
                             key={path}
-                            href={`/repositories/${repo.slug}/history/${path}`}
+                            href={`/libraries/${library.slug}/history/${path}`}
                             className="font-mono text-muted-foreground underline underline-offset-4 hover:text-foreground"
                           >
                             {path} 변경 내역
@@ -221,7 +230,7 @@ export default async function RepoPage({ params }: PageProps<"/repositories/[rep
                 {member.email === email ? " (나)" : ""}
               </span>
               <form action={removeMember}>
-                <input type="hidden" name="repository_id" value={repo.id} />
+                <input type="hidden" name="library_id" value={library.id} />
                 <input type="hidden" name="email" value={member.email} />
                 <Button
                   type="submit"
@@ -236,7 +245,7 @@ export default async function RepoPage({ params }: PageProps<"/repositories/[rep
           ))}
         </ul>
         <ActionForm action={addMember} submitLabel="초대">
-          <input type="hidden" name="repository_id" value={repo.id} />
+          <input type="hidden" name="library_id" value={library.id} />
           <Label className="grid gap-1.5">
             <span>이메일</span>
             <Input name="email" type="email" placeholder="teammate@example.com" required />

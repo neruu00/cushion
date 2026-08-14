@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * @file components/NewRepoDialog.tsx
+ * @file components/NewLibraryDialog.tsx
  * @description "새 레포" 버튼 → 다이얼로그 안에서 생성.
  *
  * 생성 직후 붙여넣을 설정 파일이 결과로 나오므로, 제출해도 닫지 않는다 —
@@ -9,7 +9,7 @@
  */
 import { Plus } from "lucide-react";
 
-import { createRepository } from "@/actions/repository";
+import { createLibrary } from "@/actions/library";
 import { ActionForm } from "@/components/ActionForm";
 import { Field } from "@/components/Field";
 import { Button } from "@/components/ui/button";
@@ -22,7 +22,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 
-export function NewRepoDialog() {
+export function NewLibraryDialog() {
   return (
     <Dialog>
       <DialogTrigger render={<Button />}>
@@ -37,13 +37,13 @@ export function NewRepoDialog() {
           </DialogDescription>
         </DialogHeader>
 
-        <ActionForm action={createRepository} submitLabel="만들기" className="grid gap-3">
+        <ActionForm action={createLibrary} submitLabel="만들기" className="grid gap-3">
           <Field name="slug" label="slug" placeholder="my-project" required />
           <Field name="name" label="이름" placeholder="My Project" required />
           <Field
-            name="github_full_name"
-            label="관련 GitHub (org/repo, 선택)"
-            placeholder="org/repo"
+            name="github_repos"
+            label="이 라이브러리를 보는 GitHub 레포 (선택)"
+            placeholder="acme/web  acme/api  또는 acme/*"
           />
           <Field
             name="mattermost_webhook_url"
