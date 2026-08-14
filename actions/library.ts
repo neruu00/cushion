@@ -33,8 +33,8 @@ export async function createLibrary(
   return {
     success: true,
     data: {
-      hint: `${result.slug} 등록됨. 문서는 /libraries/${result.slug} 에서 만든다`,
-      files: setupFiles(),
+      hint: `${result.slug} 만들었다. 문서는 /libraries/${result.slug} 에서, 붙이는 순서는 /settings/tokens 에서`,
+      files: setupFiles(result.slug),
     },
   };
 }

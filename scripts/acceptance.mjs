@@ -159,6 +159,17 @@ try {
   const memberDash = await page("/dashboard", memberCookie);
   check("멤버 대시보드에 레포와 절약 추정이 보인다", memberDash.status === 200 && memberDash.html.includes(SLUG_A));
 
+  // 여정 전체를 싣는 페이지다. import 하나만 깨져도 500인데, 여기 말고는 아무도 안 연다.
+  const tokensPage = await page("/settings/tokens", memberCookie);
+  check(
+    "/settings/tokens에 온보딩 3단계가 뜬다",
+    tokensPage.status === 200 &&
+      tokensPage.html.includes("붙이는 순서") &&
+      tokensPage.html.includes("/cushion-use") &&
+      tokensPage.html.includes("/api/skills"),
+    String(tokensPage.status),
+  );
+
   // ── 셀프서브 (D-013) ────────────────────────────────────────────
   heading("셀프서브 — 멤버십이 곧 권한이다");
 
@@ -264,9 +275,10 @@ try {
     (await tool("doc_outline", { library: "zz-no-such-repo" }, outsiderPat)).includes("그런 라이브러리가 없다"),
   );
 
-  // 스킬 3종이 실제 툴·출력과 맞는지. 문서가 거짓말하면 에이전트가 그대로 따라 한다.
+  // 스킬이 실제 툴·출력과 맞는지. 문서가 거짓말하면 에이전트가 그대로 따라 한다.
   const mcpSource = readFileSync("lib/mcp.ts", "utf8");
-  for (const skill of ["cushion", "cushion-list", "cushion-use"]) {
+  const SKILLS = ["cushion", "cushion-capture", "cushion-list", "cushion-new", "cushion-use"];
+  for (const skill of SKILLS) {
     const body = readFileSync(`.claude/skills/${skill}/SKILL.md`, "utf8");
     check(
       `${skill} 스킬에 frontmatter가 있다`,
@@ -289,6 +301,37 @@ try {
     check(
       "스킬이 보여주는 줄 형태가 코드와 같다",
       listSkill.includes("· 문서 ") && mcpSource.includes("· 문서 "),
+    );
+  }
+
+  // ── 스킬 배포 (/api/skills) ─────────────────────────────────────
+  heading("스킬 배포 — 사본을 두지 않는다");
+  {
+    const res = await fetch(`${BASE}/api/skills`);
+    const manifest = await res.json().catch(() => null);
+    check("매니페스트가 200으로 온다", res.status === 200, String(res.status));
+    check(
+      `파일 ${SKILLS.length}개가 전부 담긴다`,
+      SKILLS.every((n) => (manifest?.files ?? []).some((f) => f.path === `${n}/SKILL.md`)),
+      (manifest?.files ?? []).map((f) => f.path).join(", "),
+    );
+    check("version이 내용 해시다", /^[0-9a-f]{8}$/.test(manifest?.version ?? ""), manifest?.version);
+    // 도그푸딩하는 파일이 곧 배포본이어야 한쪽만 갱신되는 일이 없다
+    check(
+      "내려주는 내용이 .claude/skills와 같다",
+      (manifest?.files ?? []).length > 0 &&
+        (manifest?.files ?? []).every(
+          (f) =>
+            f.content ===
+            readFileSync(join(".claude", "skills", ...f.path.split("/")), "utf8").replace(
+              /\r\n/g,
+              "\n",
+            ),
+        ),
+    );
+    check(
+      "토큰·라이브러리 정보가 섞이지 않는다",
+      !JSON.stringify(manifest).includes("cshn_pat_") && !JSON.stringify(manifest).includes(SLUG_A),
     );
   }
 
