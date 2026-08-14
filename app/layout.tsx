@@ -38,6 +38,9 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
             <div className="flex items-center gap-4 text-muted-foreground">
               {email ? (
                 <>
+                  <Link href="/dashboard" className="hover:text-foreground">
+                    대시보드
+                  </Link>
                   {/* 링크가 보이는 것과 들어갈 수 있는 것은 별개다. 실제 판정은 각 페이지가 한다 */}
                   {isAdminEmail(email) && (
                     <Link href="/admin" className="hover:text-foreground">

@@ -14,7 +14,7 @@ import { supabase } from "@/lib/supabase";
  * **본문을 덮어쓰기 전에** 부른다. append-only — 갱신·삭제 경로를 만들지 않는다.
  */
 export async function recordVersion(input: {
-  repositoryId: string;
+  libraryId: string;
   path: string;
   content: string;
   contentSha: string;
@@ -22,7 +22,7 @@ export async function recordVersion(input: {
   note?: string | null;
 }): Promise<void> {
   const { error } = await supabase.from("document_versions").insert({
-    repository_id: input.repositoryId,
+    library_id: input.libraryId,
     path: input.path,
     content: input.content,
     content_sha: input.contentSha,
@@ -38,7 +38,12 @@ export async function recordVersion(input: {
  * 두 번 만들면 두 번 드리프트한다. (SPEC §8)
  */
 export async function recordChange(
-  repo: { id: string; slug: string; mattermost_webhook_url: string | null },
+  repo: {
+    id: string;
+    slug: string;
+    mattermost_webhook_url: string | null;
+    discord_webhook_url: string | null;
+  },
   edit: DocumentEdit,
 ): Promise<number | null> {
   const summary = summarizeEdit(edit);
@@ -48,7 +53,7 @@ export async function recordChange(
   const { data, error } = await supabase
     .from("sync_events")
     .insert({
-      repository_id: repo.id,
+      library_id: repo.id,
       author: edit.author,
       changed_paths: edit.after === null ? [] : [edit.path],
       deleted_paths: edit.after === null ? [edit.path] : [],
@@ -63,33 +68,42 @@ export async function recordChange(
   // 비정규화된 최신 이벤트 id (D-012). 쓰기 경로는 여기 하나뿐이라 어긋날 자리가 없다.
   if (eventId !== null) {
     const { error: latestError } = await supabase
-      .from("repositories")
+      .from("libraries")
       .update({ latest_event_id: eventId })
       .eq("id", repo.id);
     if (latestError) console.error("mirror: latest_event_id", latestError);
   }
 
-  await notifyMattermost(repo.mattermost_webhook_url, `**${repo.slug}**\n${summary}`);
+  const text = `**${repo.slug}**\n${summary}`;
+  await Promise.all([
+    postWebhook(repo.mattermost_webhook_url, { text }),
+    // Discord는 `content`만 읽는다 — `text`를 보내면 400이고, 그 실패는 조용하다.
+    // 2000자가 상한이라 넘치면 통째로 거부당한다. 요약은 짧지만 상한을 믿지 않는다.
+    postWebhook(repo.discord_webhook_url, { content: text.slice(0, 1900) }),
+  ]);
   return eventId;
 }
 
 /**
  * 알림 실패가 편집을 되돌리지 않는다. 문서는 이미 저장됐고, 그게 본질이다.
  * URL은 호출부가 이미 읽어 둔 레포 행에서 온다 — 알림 하나에 조회 하나를 더 쓰지 않는다.
+ *
+ * 페이로드는 호출부가 준다. 여기서 URL을 보고 종류를 추측하지 않는다 —
+ * 어느 칸에 넣었는지가 이미 답이고, 추측은 틀리는 날이 온다.
  */
-async function notifyMattermost(url: string | null, text: string): Promise<void> {
+async function postWebhook(url: string | null, payload: Record<string, string>): Promise<void> {
   if (!url) return;
 
   try {
     const response = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text }),
+      body: JSON.stringify(payload),
       signal: AbortSignal.timeout(5000),
     });
-    if (!response.ok) console.error("mirror: mattermost", response.status);
+    if (!response.ok) console.error("mirror: webhook", response.status, await response.text());
   } catch (cause) {
-    console.error("mirror: mattermost", cause);
+    console.error("mirror: webhook", cause);
   }
 }
 
@@ -97,24 +111,24 @@ async function notifyMattermost(url: string | null, text: string): Promise<void>
  * 쓴 사람의 구독 커서를 방금 만든 이벤트까지 밀어 준다.
  *
  * 안 하면 **자기가 쓴 변경 때문에 자기 다음 호출에 `[stale]`이 붙는다.** 에이전트는 편집할
- * 때마다 헛되이 `spec_changes_since`를 부르게 되는데, 그게 정확히 이 도구가 없애려는 낭비다.
+ * 때마다 헛되이 `doc_changes_since`를 부르게 되는데, 그게 정확히 이 도구가 없애려는 낭비다.
  * "안 밀렸으면 그 줄이 아예 없다"(D-005)를 지키려면 쓰기도 커서를 전진시켜야 한다.
  *
  * 웹 편집에는 토큰이 없다 — 그때는 부르지 않는다.
  */
 export async function advanceCursor(
   tokenId: string,
-  repositoryId: string,
+  libraryId: string,
   eventId: number,
 ): Promise<void> {
   const { error } = await supabase.from("token_cursors").upsert(
     {
       token_id: tokenId,
-      repository_id: repositoryId,
+      library_id: libraryId,
       last_event_id: eventId,
       updated_at: new Date().toISOString(),
     },
-    { onConflict: "token_id,repository_id" },
+    { onConflict: "token_id,library_id" },
   );
   if (error) console.error("mirror: advanceCursor", error);
 }

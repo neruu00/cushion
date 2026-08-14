@@ -12,7 +12,7 @@ import {
   scoreSection,
   snippet,
   splitSections,
-} from "./spec.ts";
+} from "./markdown.ts";
 
 const DOC = [
   "# 기능",

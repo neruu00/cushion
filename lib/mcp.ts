@@ -1,19 +1,23 @@
 /**
  * @file lib/mcp.ts
- * @description MCP 툴 — 읽기 4종 + 쓰기 2종 — 과 구독 커서. 전송 계층은 app/api/mcp/route.ts.
+ * @description MCP 툴 — 읽기 4종 + 쓰기 3종 — 과 구독 커서. 전송 계층은 app/api/mcp/route.ts.
  *
  * **원본이 여기 있으므로 쓰기 툴이 있다** (D-011). 그래서 유출된 PAT는 열람뿐 아니라
  * 훼손도 할 수 있다 — 복구 근거는 `document_versions`뿐이다. (SPEC §6)
  *
- * 절감의 본체가 여기다: 목차 먼저(spec_outline) → 필요한 섹션만(spec_get) →
+ * 이름이 `doc_`인 이유: 여기 담기는 건 스펙만이 아니다. ADR·런북·회의록·용어집 무엇이든
+ * 같은 자격으로 들어가는 **문서 도서관**이고, 툴 이름이 곧 에이전트가 읽는 용도 표시다.
+ *
+ * 절감의 본체가 여기다: 목차 먼저(doc_outline) → 필요한 섹션만(doc_get) →
  * 안 바뀌었으면 본문 대신 5토큰(if_none_match) → 밀렸을 때만 한 줄([stale]).
  */
 import { z } from "zod";
 
-import { getAccessibleRepos, type Repo, type TokenIdentity } from "@/lib/authz";
+import { getAccessibleLibraries, type Library, type TokenIdentity } from "@/lib/authz";
 import { deleteDocument, putDocument } from "@/lib/document";
 import { deleteDocumentSchema, putDocumentSchema } from "@/lib/document.schema";
-import { findSection, headings, scoreSection, snippet, splitSections } from "@/lib/spec";
+import { createLibraryFor } from "@/lib/library";
+import { findSection, headings, scoreSection, snippet, splitSections } from "@/lib/markdown";
 import { supabase } from "@/lib/supabase";
 
 export const SERVER_INFO = { name: "cushion", version: "0.1.0" } as const;
@@ -23,83 +27,109 @@ export const SERVER_INFO = { name: "cushion", version: "0.1.0" } as const;
  * 툴 description이 "무엇을"이라면 여기는 "어떤 순서로"다.
  */
 export const INSTRUCTIONS =
-  "문서를 통째로 읽지 말 것: spec_outline → 필요한 섹션만 spec_get(heading). " +
-  "재조회는 if_none_match에 직전 sha. [stale]이 보이면 spec_changes_since. " +
-  "수정은 spec_put — base_sha는 spec_get의 sha, 섹션만 고칠 땐 heading에 그 섹션 전체를 보낸다.";
+  "프로젝트 문서는 여기 있다. 통째로 읽지 말 것: doc_outline → 필요한 섹션만 doc_get(heading). " +
+  "재조회는 if_none_match에 직전 sha. [stale]이면 doc_changes_since. " +
+  "쓰기는 doc_put — base_sha는 직전 sha, 섹션만 고칠 땐 heading에 그 섹션 전체.";
 
 export const TOOLS = [
   {
-    name: "spec_outline",
-    description: "문서 목록과 ## 헤딩. 읽기 전에 먼저 부른다. repo 생략 = 전체 레포.",
+    name: "doc_outline",
+    description:
+      "문서 목록과 ## 헤딩 (스펙·ADR·런북·회의록 등). 먼저 부른다. library 생략 = 접근 가능한 전체.",
     inputSchema: {
       type: "object",
-      properties: { repo: { type: "string", description: "레포 slug. 생략하면 전체" } },
+      properties: {
+        library: { type: "string", description: "라이브러리 slug. 생략하면 전체" },
+        depth: {
+          type: "string",
+          enum: ["libraries", "documents"],
+          description: "libraries = 라이브러리 목록만(이름·GitHub 레포·문서 수). 기본은 documents",
+        },
+      },
     },
   },
   {
-    name: "spec_get",
+    name: "doc_get",
     description:
       "문서 전체 또는 heading의 ## 섹션 하나. if_none_match에 직전 sha를 주면 안 바뀐 경우 unchanged만 온다.",
     inputSchema: {
       type: "object",
       properties: {
-        repo: { type: "string" },
-        path: { type: "string", description: "레포 루트 기준 경로" },
+        library: { type: "string" },
+        path: { type: "string", description: "라이브러리 루트 기준 경로" },
         heading: { type: "string", description: "## 섹션 제목" },
         if_none_match: { type: "string", description: "직전에 받은 sha" },
       },
-      required: ["repo", "path"],
+      required: ["library", "path"],
     },
   },
   {
-    name: "spec_search",
-    description: "본문 검색, 매칭 섹션 상위 몇 개. 어느 문서인지 모를 때.",
+    name: "doc_search",
+    description: "본문 검색, 매칭 섹션 상위 몇 개. 어느 문서에 있는지 모를 때.",
     inputSchema: {
       type: "object",
-      properties: { query: { type: "string" }, repo: { type: "string" } },
+      properties: { query: { type: "string" }, library: { type: "string" } },
       required: ["query"],
     },
   },
   {
-    name: "spec_changes_since",
+    name: "doc_changes_since",
     description: "커서 이후의 변경 요약. 인자 없이 부르면 커서를 전진시킨다.",
     inputSchema: {
       type: "object",
       properties: {
-        repo: { type: "string" },
+        library: { type: "string" },
         since: { type: "number", description: "이벤트 id. 주면 커서를 움직이지 않는다" },
       },
     },
   },
   {
-    name: "spec_put",
+    name: "doc_put",
     description:
-      "문서 생성·수정. 기존 문서는 base_sha 필수 — 그 사이 남이 고쳤으면 거부하고 현재 sha를 준다. heading을 주면 그 섹션만 교체된다.",
+      "문서 생성·수정. 새 경로면 그대로 새 문서가 된다. 기존 문서는 base_sha 필수 — 그 사이 남이 고쳤으면 거부하고 현재 sha를 준다. heading을 주면 그 섹션만 교체된다.",
     inputSchema: {
       type: "object",
       properties: {
-        repo: { type: "string" },
+        library: { type: "string" },
         path: { type: "string", description: ".md 로 끝나는 경로" },
         content: { type: "string", description: "문서 전체. heading을 줬으면 그 섹션 전체(## 줄 포함)" },
         heading: { type: "string", description: "이 ## 섹션만 교체. 문서 전체를 보내지 않아도 된다" },
-        base_sha: { type: "string", description: "직전 spec_get의 sha. 새 문서면 생략" },
+        base_sha: { type: "string", description: "직전 doc_get의 sha. 새 문서면 생략" },
         note: { type: "string", description: "무엇을 왜 바꿨는지 한 줄" },
       },
-      required: ["repo", "path", "content"],
+      required: ["library", "path", "content"],
     },
   },
   {
-    name: "spec_delete",
+    name: "doc_delete",
     description: "삭제. base_sha 필수. 이전 본문은 이력에 남는다.",
     inputSchema: {
       type: "object",
       properties: {
-        repo: { type: "string" },
+        library: { type: "string" },
         path: { type: "string" },
         base_sha: { type: "string" },
         note: { type: "string" },
       },
-      required: ["repo", "path", "base_sha"],
+      required: ["library", "path", "base_sha"],
+    },
+  },
+  {
+    name: "library_create",
+    description:
+      "새 라이브러리(문서 묶음)를 만든다. 부른 토큰의 주인이 첫 멤버가 된다. 넣을 곳이 없을 때만.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        slug: { type: "string", description: "소문자·숫자·하이픈. URL에 쓰인다" },
+        name: { type: "string", description: "사람이 읽는 이름" },
+        github_repos: {
+          type: "array",
+          items: { type: "string" },
+          description: "이 라이브러리를 보는 GitHub 레포. 'org/repo' 또는 조직 전체면 'org/*'",
+        },
+      },
+      required: ["slug", "name"],
     },
   },
 ] as const;
@@ -109,7 +139,7 @@ export interface ToolResult {
   isError?: boolean;
 }
 
-interface RepoState {
+interface LibraryState {
   latest: number;
   cursor: number;
   latestPaths: string[];
@@ -117,26 +147,26 @@ interface RepoState {
 
 export interface McpContext {
   identity: TokenIdentity;
-  repos: Repo[];
-  state: Map<string, RepoState>;
+  repos: Library[];
+  state: Map<string, LibraryState>;
 }
 
 // ─── 컨텍스트 ────────────────────────────────────────────────────────
 
 export async function buildContext(identity: TokenIdentity): Promise<McpContext> {
-  const repos = await getAccessibleRepos(identity.email);
-  const state = new Map<string, RepoState>();
+  const repos = await getAccessibleLibraries(identity.email);
+  const state = new Map<string, LibraryState>();
   if (repos.length === 0) return { identity, repos, state };
 
   const { data, error } = await supabase
     .from("token_cursors")
-    .select("repository_id, last_event_id")
+    .select("library_id, last_event_id")
     .eq("token_id", identity.id);
   if (error) console.error("mcp: cursors", error);
 
   const stored = new Map<string, number>(
-    (data ?? []).map((row: { repository_id: string; last_event_id: number }) => [
-      row.repository_id,
+    (data ?? []).map((row: { library_id: string; last_event_id: number }) => [
+      row.library_id,
       Number(row.last_event_id),
     ]),
   );
@@ -160,11 +190,11 @@ export async function buildContext(identity: TokenIdentity): Promise<McpContext>
   if (behindIds.length > 0) {
     const { data: events, error: eventsError } = await supabase
       .from("sync_events")
-      .select("id, repository_id, changed_paths, deleted_paths")
+      .select("id, library_id, changed_paths, deleted_paths")
       .in("id", behindIds);
     if (eventsError) console.error("mcp: stale paths", eventsError);
     for (const event of events ?? []) {
-      const entry = state.get(event.repository_id as string);
+      const entry = state.get(event.library_id as string);
       if (entry) {
         entry.latestPaths = [...(event.changed_paths ?? []), ...(event.deleted_paths ?? [])];
       }
@@ -176,10 +206,10 @@ export async function buildContext(identity: TokenIdentity): Promise<McpContext>
     const { error: seedError } = await supabase.from("token_cursors").upsert(
       missing.map((repo) => ({
         token_id: identity.id,
-        repository_id: repo.id,
+        library_id: repo.id,
         last_event_id: state.get(repo.id)?.cursor ?? 0,
       })),
-      { onConflict: "token_id,repository_id" },
+      { onConflict: "token_id,library_id" },
     );
     if (seedError) console.error("mcp: cursor seed", seedError);
   }
@@ -202,28 +232,38 @@ export function staleLine(context: McpContext): string | null {
     const paths = (context.state.get(repo.id)?.latestPaths ?? []).slice(0, 3);
     return `${repo.slug}${paths.length ? `: ${paths.join(", ")}` : ""}`;
   });
-  return `[stale] ${parts.join(" / ")} changed — call spec_changes_since`;
+  return `[stale] ${parts.join(" / ")} changed — call doc_changes_since`;
 }
 
 // ─── 툴 ──────────────────────────────────────────────────────────────
 
-const outlineArgs = z.object({ repo: z.string().optional() });
+const outlineArgs = z.object({
+  library: z.string().optional(),
+  depth: z.enum(["libraries", "documents"]).optional(),
+});
+// 형태 검증은 createLibrarySchema가 한다 — 여기서 또 규칙을 쓰면 두 곳이 어긋난다.
+const createArgs = z.object({
+  slug: z.string(),
+  name: z.string(),
+  // 스키마가 문자열을 나누므로 배열이 오면 합쳐서 넘긴다 — 검증 규칙은 한 곳뿐이다
+  github_repos: z.array(z.string()).optional(),
+});
 const getArgs = z.object({
-  repo: z.string(),
+  library: z.string(),
   path: z.string(),
   heading: z.string().optional(),
   if_none_match: z.string().optional(),
 });
-const searchArgs = z.object({ query: z.string().min(1), repo: z.string().optional() });
-const changesArgs = z.object({ repo: z.string().optional(), since: z.number().int().optional() });
+const searchArgs = z.object({ query: z.string().min(1), library: z.string().optional() });
+const changesArgs = z.object({ library: z.string().optional(), since: z.number().int().optional() });
 
 /** 접근 불가와 존재하지 않음을 구분하지 않는다 — 구분하면 레포의 존재가 새어 나간다. */
-function reposFor(context: McpContext, slug?: string): Repo[] {
+function librariesFor(context: McpContext, slug?: string): Library[] {
   return slug ? context.repos.filter((repo) => repo.slug === slug) : context.repos;
 }
 
 interface DocRow {
-  repository_id: string;
+  library_id: string;
   path: string;
   title: string | null;
   content: string;
@@ -234,13 +274,13 @@ interface DocRow {
  * ponytail: 헤딩만 필요할 때도 content를 통째로 읽는다. 헤딩 컬럼을 따로 두면 sync가
  * 그걸 갱신해야 하고 드리프트가 하나 더 는다. 문서 수백 개가 되면 그때 넣는다.
  */
-async function documentsOf(repos: Repo[], path?: string): Promise<DocRow[]> {
+async function documentsOf(repos: Library[], path?: string): Promise<DocRow[]> {
   if (repos.length === 0) return [];
   let query = supabase
     .from("documents")
-    .select("repository_id, path, title, content, content_sha")
+    .select("library_id, path, title, content, content_sha")
     .in(
-      "repository_id",
+      "library_id",
       repos.map((repo) => repo.id),
     )
     .order("path");
@@ -260,18 +300,20 @@ export async function callTool(
   rawArgs: unknown,
 ): Promise<ToolResult> {
   switch (name) {
-    case "spec_outline":
-      return specOutline(context, rawArgs);
-    case "spec_get":
-      return specGet(context, rawArgs);
-    case "spec_search":
-      return specSearch(context, rawArgs);
-    case "spec_changes_since":
-      return specChangesSince(context, rawArgs);
-    case "spec_put":
-      return specPut(context, rawArgs);
-    case "spec_delete":
-      return specDelete(context, rawArgs);
+    case "doc_outline":
+      return docOutline(context, rawArgs);
+    case "doc_get":
+      return docGet(context, rawArgs);
+    case "doc_search":
+      return docSearch(context, rawArgs);
+    case "doc_changes_since":
+      return docChangesSince(context, rawArgs);
+    case "doc_put":
+      return docPut(context, rawArgs);
+    case "doc_delete":
+      return docDelete(context, rawArgs);
+    case "library_create":
+      return libraryCreate(context, rawArgs);
     default:
       return { text: `그런 툴이 없다: ${name}`, isError: true };
   }
@@ -281,36 +323,74 @@ function badArgs(issue: string): ToolResult {
   return { text: `인자가 잘못됐다: ${issue}`, isError: true };
 }
 
-async function specOutline(context: McpContext, rawArgs: unknown): Promise<ToolResult> {
+async function docOutline(context: McpContext, rawArgs: unknown): Promise<ToolResult> {
   const args = outlineArgs.safeParse(rawArgs ?? {});
   if (!args.success) return badArgs(args.error.issues[0].message);
 
-  const repos = reposFor(context, args.data.repo);
-  const bySlug = new Map(repos.map((repo) => [repo.id, repo.slug]));
+  const repos = librariesFor(context, args.data.library);
+  if (repos.length === 0) {
+    // "오타 난 slug"와 "레포가 하나도 없음"을 구분한다. 뭉뚱그리면 오타 하나에
+    // 에이전트가 library_create를 불러 중복 레포를 만든다.
+    return args.data.library
+      ? { text: `그런 라이브러리가 없다: ${args.data.library}`, isError: true }
+      : { text: "접근 가능한 라이브러리가 없다. library_create로 만들 수 있다." };
+  }
+
+  // depth=libraries는 "어디에 넣을까 / 이 코드 레포는 어느 라이브러리를 보나"에 답한다.
+  // 본문도 헤딩도 읽지 않으므로 라이브러리가 늘어도 응답이 거의 안 자란다.
+  if (args.data.depth === "libraries") {
+    const { data, error } = await supabase
+      .from("documents")
+      .select("library_id")
+      .in("library_id", repos.map((library) => library.id));
+    if (error) console.error("mcp: outline counts", error);
+
+    const counts = new Map<string, number>();
+    for (const row of data ?? []) {
+      counts.set(row.library_id, (counts.get(row.library_id) ?? 0) + 1);
+    }
+    return {
+      text: repos
+        .map((library) => {
+          const github = library.github_repos.length ? ` (${library.github_repos.join(", ")})` : "";
+          return `${library.slug} — ${library.name}${github} · 문서 ${counts.get(library.id) ?? 0}`;
+        })
+        .join("\n"),
+    };
+  }
+
   const docs = await documentsOf(repos);
-  if (docs.length === 0) return { text: "문서가 없다." };
+  const byRepo = new Map(repos.map((repo) => [repo.id, [] as DocRow[]]));
+  for (const doc of docs) byRepo.get(doc.library_id)?.push(doc);
 
   const lines: string[] = [];
-  for (const doc of docs) {
-    lines.push(
-      `${bySlug.get(doc.repository_id)}/${doc.path}${doc.title ? ` — ${doc.title}` : ""}`,
-    );
-    for (const heading of headings(doc.content)) lines.push(`  ## ${heading}`);
+  for (const repo of repos) {
+    const own = byRepo.get(repo.id) ?? [];
+    // 빈 레포도 한 줄로 알린다. 안 그러면 방금 만든 레포가 목록에서 사라져
+    // "생성이 실패했나"로 읽힌다 — library_create 직후가 정확히 그 상황이다.
+    if (own.length === 0) {
+      lines.push(`${repo.slug}/ — 문서 없음`);
+      continue;
+    }
+    for (const doc of own) {
+      lines.push(`${repo.slug}/${doc.path}${doc.title ? ` — ${doc.title}` : ""}`);
+      for (const heading of headings(doc.content)) lines.push(`  ## ${heading}`);
+    }
   }
   return { text: lines.join("\n") };
 }
 
-async function specGet(context: McpContext, rawArgs: unknown): Promise<ToolResult> {
+async function docGet(context: McpContext, rawArgs: unknown): Promise<ToolResult> {
   const args = getArgs.safeParse(rawArgs ?? {});
   if (!args.success) return badArgs(args.error.issues[0].message);
 
-  const [repo] = reposFor(context, args.data.repo);
-  if (!repo) return { text: `그런 레포가 없다: ${args.data.repo}`, isError: true };
+  const [library] = librariesFor(context, args.data.library);
+  if (!library) return { text: `그런 라이브러리가 없다: ${args.data.library}`, isError: true };
 
-  const [doc] = await documentsOf([repo], args.data.path);
+  const [doc] = await documentsOf([library], args.data.path);
   if (!doc) return { text: `그런 문서가 없다: ${args.data.path}`, isError: true };
 
-  // 해시가 같으면 본문 대신 5토큰. spec_get 재호출의 대부분이 여기서 끝난다.
+  // 해시가 같으면 본문 대신 5토큰. doc_get 재호출의 대부분이 여기서 끝난다.
   if (args.data.if_none_match && args.data.if_none_match === doc.content_sha) {
     return { text: "unchanged" };
   }
@@ -318,16 +398,16 @@ async function specGet(context: McpContext, rawArgs: unknown): Promise<ToolResul
   const body = args.data.heading ? findSection(doc.content, args.data.heading) : doc.content;
   if (body === null) return { text: `그런 섹션이 없다: ${args.data.heading}`, isError: true };
 
-  return { text: `${repo.slug}/${doc.path} sha:${doc.content_sha}\n\n${body}` };
+  return { text: `${library.slug}/${doc.path} sha:${doc.content_sha}\n\n${body}` };
 }
 
 const SEARCH_LIMIT = 5;
 
-async function specSearch(context: McpContext, rawArgs: unknown): Promise<ToolResult> {
+async function docSearch(context: McpContext, rawArgs: unknown): Promise<ToolResult> {
   const args = searchArgs.safeParse(rawArgs ?? {});
   if (!args.success) return badArgs(args.error.issues[0].message);
 
-  const repos = reposFor(context, args.data.repo);
+  const repos = librariesFor(context, args.data.library);
   const bySlug = new Map(repos.map((repo) => [repo.id, repo.slug]));
   const query = args.data.query;
 
@@ -338,7 +418,7 @@ async function specSearch(context: McpContext, rawArgs: unknown): Promise<ToolRe
       if (score > 0) {
         hits.push({
           score,
-          label: `${bySlug.get(doc.repository_id)}/${doc.path}${
+          label: `${bySlug.get(doc.library_id)}/${doc.path}${
             section.heading ? ` ## ${section.heading}` : ""
           }`,
           // 헤딩은 라벨에 이미 있다. 스니펫에서 다시 싣지 않는다.
@@ -361,11 +441,33 @@ async function specSearch(context: McpContext, rawArgs: unknown): Promise<ToolRe
 
 const CHANGES_LIMIT = 20;
 
-async function specChangesSince(context: McpContext, rawArgs: unknown): Promise<ToolResult> {
+/**
+ * 레포 생성. 토큰이 이미 이메일까지 해석됐으므로 그게 곧 신원이다 (D-013: 로그인이면 누구나).
+ * 생성 로직은 웹 폼과 같은 lib/repository.ts를 지난다 — 두 벌이면 한쪽만 어긋난다.
+ *
+ * 새 레포는 이 요청의 컨텍스트에 없다. 그래서 다음 툴 호출부터 보인다고 알려 준다 —
+ * 안 그러면 에이전트가 바로 doc_put을 부르고 "그런 라이브러리가 없다"를 받는다.
+ */
+async function libraryCreate(context: McpContext, rawArgs: unknown): Promise<ToolResult> {
+  const args = createArgs.safeParse(rawArgs ?? {});
+  if (!args.success) return badArgs(args.error.issues[0].message);
+
+  const result = await createLibraryFor(context.identity.email, {
+    ...args.data,
+    github_repos: args.data.github_repos?.join(" "),
+  });
+  if (!result.ok) return { text: result.message, isError: true };
+
+  return {
+    text: `만들었다 ${result.slug} — 멤버: ${context.identity.email}. doc_put(library:"${result.slug}", …)으로 문서를 넣는다`,
+  };
+}
+
+async function docChangesSince(context: McpContext, rawArgs: unknown): Promise<ToolResult> {
   const args = changesArgs.safeParse(rawArgs ?? {});
   if (!args.success) return badArgs(args.error.issues[0].message);
 
-  const repos = reposFor(context, args.data.repo);
+  const repos = librariesFor(context, args.data.library);
   const blocks: string[] = [];
 
   for (const repo of repos) {
@@ -376,7 +478,7 @@ async function specChangesSince(context: McpContext, rawArgs: unknown): Promise<
     const { data, error } = await supabase
       .from("sync_events")
       .select("id, summary")
-      .eq("repository_id", repo.id)
+      .eq("library_id", repo.id)
       .gt("id", from)
       .order("id")
       .limit(CHANGES_LIMIT);
@@ -400,11 +502,11 @@ async function specChangesSince(context: McpContext, rawArgs: unknown): Promise<
       const { error: cursorError } = await supabase.from("token_cursors").upsert(
         {
           token_id: context.identity.id,
-          repository_id: repo.id,
+          library_id: repo.id,
           last_event_id: advanced,
           updated_at: new Date().toISOString(),
         },
-        { onConflict: "token_id,repository_id" },
+        { onConflict: "token_id,library_id" },
       );
       if (cursorError) console.error("mcp: cursor advance", cursorError);
     }
@@ -416,8 +518,8 @@ async function specChangesSince(context: McpContext, rawArgs: unknown): Promise<
 // ─── 쓰기 ────────────────────────────────────────────────────────────
 
 /** 방금 내가 만든 이벤트는 이미 본 것으로 친다. `advanceCursor`의 메모리 쪽 짝. */
-function markSeen(context: McpContext, repositoryId: string, eventId: number | null): void {
-  const state = context.state.get(repositoryId);
+function markSeen(context: McpContext, libraryId: string, eventId: number | null): void {
+  const state = context.state.get(libraryId);
   if (!state || eventId === null) return;
   state.latest = Math.max(state.latest, eventId);
   state.cursor = state.latest;
@@ -425,15 +527,15 @@ function markSeen(context: McpContext, repositoryId: string, eventId: number | n
 
 /**
  * 충돌은 에러로 돌려주되 **현재 sha를 같이 준다.** 그래야 에이전트가 사람을 부르지 않고
- * spec_get → 다시 편집 → spec_put 으로 스스로 회복한다.
+ * doc_get → 다시 편집 → doc_put 으로 스스로 회복한다.
  */
-async function specPut(context: McpContext, rawArgs: unknown): Promise<ToolResult> {
+async function docPut(context: McpContext, rawArgs: unknown): Promise<ToolResult> {
   const args = putDocumentSchema.safeParse(rawArgs ?? {});
   if (!args.success) return badArgs(args.error.issues[0].message);
 
   const result = await putDocument({
     email: context.identity.email,
-    repo: args.data.repo,
+    repo: args.data.library,
     path: args.data.path,
     content: args.data.content,
     heading: args.data.heading,
@@ -447,17 +549,17 @@ async function specPut(context: McpContext, rawArgs: unknown): Promise<ToolResul
     return { text: `${result.message}${current}`, isError: true };
   }
   // DB뿐 아니라 이번 요청의 컨텍스트도 밀어 준다 — 안 그러면 방금 쓴 응답에 [stale]이 붙는다
-  markSeen(context, result.repositoryId, result.eventId);
-  return { text: `저장했다 ${args.data.repo}/${args.data.path} sha:${result.sha}` };
+  markSeen(context, result.libraryId, result.eventId);
+  return { text: `저장했다 ${args.data.library}/${args.data.path} sha:${result.sha}` };
 }
 
-async function specDelete(context: McpContext, rawArgs: unknown): Promise<ToolResult> {
+async function docDelete(context: McpContext, rawArgs: unknown): Promise<ToolResult> {
   const args = deleteDocumentSchema.safeParse(rawArgs ?? {});
   if (!args.success) return badArgs(args.error.issues[0].message);
 
   const result = await deleteDocument({
     email: context.identity.email,
-    repo: args.data.repo,
+    repo: args.data.library,
     path: args.data.path,
     baseSha: args.data.base_sha,
     note: args.data.note,
@@ -468,6 +570,6 @@ async function specDelete(context: McpContext, rawArgs: unknown): Promise<ToolRe
     const current = result.currentSha ? ` 현재 sha:${result.currentSha}` : "";
     return { text: `${result.message}${current}`, isError: true };
   }
-  markSeen(context, result.repositoryId, result.eventId);
-  return { text: `지웠다 ${args.data.repo}/${args.data.path}` };
+  markSeen(context, result.libraryId, result.eventId);
+  return { text: `지웠다 ${args.data.library}/${args.data.path}` };
 }

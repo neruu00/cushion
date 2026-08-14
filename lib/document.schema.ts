@@ -23,7 +23,7 @@ export const documentPath = z
 const note = z.string().trim().max(200).optional();
 
 export const putDocumentSchema = z.object({
-  repo: z.string().trim().min(1),
+  library: z.string().trim().min(1),
   path: documentPath,
   // 스펙 문서 하나가 512KB를 넘으면 그건 스펙이 아니다.
   content: z.string().max(512 * 1024).transform(crlfToLf),
@@ -38,14 +38,14 @@ export const putDocumentSchema = z.object({
 });
 
 export const deleteDocumentSchema = z.object({
-  repo: z.string().trim().min(1),
+  library: z.string().trim().min(1),
   path: documentPath,
   base_sha: z.string().trim().max(64),
   note,
 });
 
 export const restoreSchema = z.object({
-  repo: z.string().trim().min(1),
+  library: z.string().trim().min(1),
   path: documentPath,
   version_id: z.coerce.number().int().positive(),
 });

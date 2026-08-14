@@ -8,9 +8,9 @@
  */
 import { signIn, signOut } from "@/lib/auth";
 
-/** 프로바이더가 Google 하나뿐이라 중간 선택 화면을 건너뛴다. */
+/** 프로바이더가 Google 하나뿐이라 중간 선택 화면을 건너뛴다. 로그인하면 대시보드로. */
 export async function signInWithGoogle(): Promise<void> {
-  await signIn("google");
+  await signIn("google", { redirectTo: "/dashboard" });
 }
 
 export async function signOutEverywhere(): Promise<void> {
