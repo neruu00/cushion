@@ -1,6 +1,6 @@
 /**
  * @file lib/mcp.ts
- * @description MCP 툴 — 읽기 4종 + 쓰기 2종 — 과 구독 커서. 전송 계층은 app/api/mcp/route.ts.
+ * @description MCP 툴 — 읽기 4종 + 쓰기 3종 — 과 구독 커서. 전송 계층은 app/api/mcp/route.ts.
  *
  * **원본이 여기 있으므로 쓰기 툴이 있다** (D-011). 그래서 유출된 PAT는 열람뿐 아니라
  * 훼손도 할 수 있다 — 복구 근거는 `document_versions`뿐이다. (SPEC §6)
@@ -16,6 +16,7 @@ import { z } from "zod";
 import { getAccessibleRepos, type Repo, type TokenIdentity } from "@/lib/authz";
 import { deleteDocument, putDocument } from "@/lib/document";
 import { deleteDocumentSchema, putDocumentSchema } from "@/lib/document.schema";
+import { createRepositoryFor } from "@/lib/repository";
 import { findSection, headings, scoreSection, snippet, splitSections } from "@/lib/markdown";
 import { supabase } from "@/lib/supabase";
 
@@ -104,6 +105,20 @@ export const TOOLS = [
         note: { type: "string" },
       },
       required: ["repo", "path", "base_sha"],
+    },
+  },
+  {
+    name: "repo_create",
+    description:
+      "새 레포(문서 묶음)를 만든다. 부른 토큰의 주인이 첫 멤버가 된다. 문서를 넣을 곳이 없을 때만.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        slug: { type: "string", description: "소문자·숫자·하이픈. URL에 쓰인다" },
+        name: { type: "string", description: "사람이 읽는 이름" },
+        github_full_name: { type: "string", description: "org/repo. 관련 GitHub 레포가 있으면" },
+      },
+      required: ["slug", "name"],
     },
   },
 ] as const;
@@ -212,6 +227,12 @@ export function staleLine(context: McpContext): string | null {
 // ─── 툴 ──────────────────────────────────────────────────────────────
 
 const outlineArgs = z.object({ repo: z.string().optional() });
+// 형태 검증은 createRepositorySchema가 한다 — 여기서 또 규칙을 쓰면 두 곳이 어긋난다.
+const createArgs = z.object({
+  slug: z.string(),
+  name: z.string(),
+  github_full_name: z.string().optional(),
+});
 const getArgs = z.object({
   repo: z.string(),
   path: z.string(),
@@ -276,6 +297,8 @@ export async function callTool(
       return docPut(context, rawArgs);
     case "doc_delete":
       return docDelete(context, rawArgs);
+    case "repo_create":
+      return repoCreate(context, rawArgs);
     default:
       return { text: `그런 툴이 없다: ${name}`, isError: true };
   }
@@ -290,16 +313,25 @@ async function docOutline(context: McpContext, rawArgs: unknown): Promise<ToolRe
   if (!args.success) return badArgs(args.error.issues[0].message);
 
   const repos = reposFor(context, args.data.repo);
-  const bySlug = new Map(repos.map((repo) => [repo.id, repo.slug]));
+  if (repos.length === 0) return { text: "접근 가능한 레포가 없다. repo_create로 만들 수 있다." };
+
   const docs = await documentsOf(repos);
-  if (docs.length === 0) return { text: "문서가 없다." };
+  const byRepo = new Map(repos.map((repo) => [repo.id, [] as DocRow[]]));
+  for (const doc of docs) byRepo.get(doc.repository_id)?.push(doc);
 
   const lines: string[] = [];
-  for (const doc of docs) {
-    lines.push(
-      `${bySlug.get(doc.repository_id)}/${doc.path}${doc.title ? ` — ${doc.title}` : ""}`,
-    );
-    for (const heading of headings(doc.content)) lines.push(`  ## ${heading}`);
+  for (const repo of repos) {
+    const own = byRepo.get(repo.id) ?? [];
+    // 빈 레포도 한 줄로 알린다. 안 그러면 방금 만든 레포가 목록에서 사라져
+    // "생성이 실패했나"로 읽힌다 — repo_create 직후가 정확히 그 상황이다.
+    if (own.length === 0) {
+      lines.push(`${repo.slug}/ — 문서 없음`);
+      continue;
+    }
+    for (const doc of own) {
+      lines.push(`${repo.slug}/${doc.path}${doc.title ? ` — ${doc.title}` : ""}`);
+      for (const heading of headings(doc.content)) lines.push(`  ## ${heading}`);
+    }
   }
   return { text: lines.join("\n") };
 }
@@ -364,6 +396,25 @@ async function docSearch(context: McpContext, rawArgs: unknown): Promise<ToolRes
 }
 
 const CHANGES_LIMIT = 20;
+
+/**
+ * 레포 생성. 토큰이 이미 이메일까지 해석됐으므로 그게 곧 신원이다 (D-013: 로그인이면 누구나).
+ * 생성 로직은 웹 폼과 같은 lib/repository.ts를 지난다 — 두 벌이면 한쪽만 어긋난다.
+ *
+ * 새 레포는 이 요청의 컨텍스트에 없다. 그래서 다음 툴 호출부터 보인다고 알려 준다 —
+ * 안 그러면 에이전트가 바로 doc_put을 부르고 "그런 레포가 없다"를 받는다.
+ */
+async function repoCreate(context: McpContext, rawArgs: unknown): Promise<ToolResult> {
+  const args = createArgs.safeParse(rawArgs ?? {});
+  if (!args.success) return badArgs(args.error.issues[0].message);
+
+  const result = await createRepositoryFor(context.identity.email, args.data);
+  if (!result.ok) return { text: result.message, isError: true };
+
+  return {
+    text: `만들었다 ${result.slug} — 멤버: ${context.identity.email}. doc_put(repo:"${result.slug}", …)으로 문서를 넣는다`,
+  };
+}
 
 async function docChangesSince(context: McpContext, rawArgs: unknown): Promise<ToolResult> {
   const args = changesArgs.safeParse(rawArgs ?? {});

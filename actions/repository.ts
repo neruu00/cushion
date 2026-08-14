@@ -12,7 +12,8 @@ import { revalidatePath } from "next/cache";
 
 import type { SecretState } from "@/lib/action.type";
 import { getSessionEmail, isAdmin, isMember } from "@/lib/authz";
-import { createRepositorySchema, memberSchema, webhooksSchema } from "@/lib/repository.schema";
+import { createRepositoryFor } from "@/lib/repository";
+import { memberSchema, webhooksSchema } from "@/lib/repository.schema";
 import { setupFiles } from "@/lib/snippets";
 import { supabase } from "@/lib/supabase";
 
@@ -24,43 +25,15 @@ export async function createRepository(
   const email = await getSessionEmail();
   if (!email) return { success: false, error: "로그인이 필요합니다." };
 
-  const parsed = createRepositorySchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) {
-    return { success: false, error: parsed.error.issues[0].message };
-  }
-
-  const { data: repo, error } = await supabase
-    .from("repositories")
-    .insert(parsed.data)
-    .select("id")
-    .single();
-
-  if (error || !repo) {
-    console.error("createRepository", error);
-    return {
-      success: false,
-      // 23505 = unique_violation. 그 외는 내부 사정이므로 사용자에게 말하지 않는다.
-      error: error?.code === "23505" ? "이미 있는 slug입니다." : "레포 생성에 실패했습니다.",
-    };
-  }
-
-  // 만든 사람이 첫 멤버다. 실패하면 레포를 지워 보상한다 —
-  // 안 그러면 만든 사람이 자기 레포를 못 보는 고아가 태어난다.
-  const { error: memberError } = await supabase
-    .from("repository_members")
-    .insert({ repository_id: repo.id, email });
-
-  if (memberError) {
-    console.error("createRepository: 첫 멤버 등록 실패, 보상 삭제", memberError);
-    await supabase.from("repositories").delete().eq("id", repo.id);
-    return { success: false, error: "레포 생성에 실패했습니다." };
-  }
+  // 생성 로직은 lib/repository.ts 하나뿐이다. MCP repo_create도 같은 함수를 지난다.
+  const result = await createRepositoryFor(email, Object.fromEntries(formData));
+  if (!result.ok) return { success: false, error: result.message };
 
   revalidatePath("/dashboard");
   return {
     success: true,
     data: {
-      hint: `${parsed.data.slug} 등록됨. 문서는 /repositories/${parsed.data.slug} 에서 만든다`,
+      hint: `${result.slug} 등록됨. 문서는 /repositories/${result.slug} 에서 만든다`,
       files: setupFiles(),
     },
   };

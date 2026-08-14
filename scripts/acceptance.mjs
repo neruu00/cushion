@@ -188,18 +188,57 @@ try {
 
   // 액션 고유 로직은 소스로 검사한다 — 빠지면 셀프서브가 조용히 반쪽이 된다
   const repoActions = readFileSync("actions/repository.ts", "utf8");
+  // 생성 로직은 lib/repository.ts 한 곳이다. 웹 폼과 MCP가 같은 함수를 지나야
+  // "한쪽만 멤버를 안 넣는" 드리프트가 생기지 않는다.
+  const repoLib = readFileSync("lib/repository.ts", "utf8");
   check(
-    "createRepository가 생성자를 멤버로 등록한다 (소스)",
-    /createRepository[\s\S]*?repository_members[\s\S]*?insert/.test(repoActions),
+    "생성자를 첫 멤버로 등록한다 (소스)",
+    /repository_members[\s\S]*?insert/.test(repoLib),
+  );
+  check("멤버 등록 실패 시 레포를 지워 보상한다 (소스)", repoLib.includes("보상"));
+  check(
+    "웹 폼과 MCP가 같은 생성 함수를 쓴다 (소스)",
+    repoActions.includes("createRepositoryFor") &&
+      readFileSync("lib/mcp.ts", "utf8").includes("createRepositoryFor"),
   );
   check(
-    "멤버 등록 실패 시 레포를 지워 보상한다 (소스)",
-    repoActions.includes("보상"),
+    "액션에 생성 로직 사본이 없다 (소스)",
+    !/createRepository\([\s\S]{0,600}?from\("repositories"\)/.test(repoActions),
   );
   check(
     "멤버 관리가 멤버십 기준이다 (소스)",
     repoActions.includes("canManageMembers") && repoActions.includes("isMember"),
   );
+  // 에이전트가 스스로 레포를 만든다 (repo_create). 생성 경로는 웹 폼과 같은 lib/repository.ts다.
+  const SLUG_AGENT = "zz-agent-made";
+  await db.from("repositories").delete().eq("slug", SLUG_AGENT);
+  const created = await tool(
+    "repo_create",
+    { slug: SLUG_AGENT, name: "에이전트가 만든 레포", github_full_name: "neruu00/cushion" },
+    outsiderPat,
+  );
+  check("repo_create로 레포를 만든다", created.startsWith("만들었다"), created.slice(0, 60));
+  check(
+    "만든 레포가 다음 호출부터 보인다 (문서 0개라도)",
+    (await tool("doc_outline", {}, outsiderPat)).includes(`${SLUG_AGENT}/`),
+  );
+  check(
+    "만든 사람이 바로 쓸 수 있다",
+    (await tool("doc_put", { repo: SLUG_AGENT, path: "NOTE.md", content: "# 메모" }, outsiderPat)).startsWith("저장했다"),
+  );
+  check(
+    "남의 토큰에는 안 보인다",
+    !(await tool("doc_outline", {}, pat)).includes(SLUG_AGENT),
+  );
+  check(
+    "같은 slug 두 번은 거부",
+    (await tool("repo_create", { slug: SLUG_AGENT, name: "중복" }, outsiderPat)).includes("이미 있는"),
+  );
+  check(
+    "slug 형식 위반은 거부",
+    (await tool("repo_create", { slug: "Bad Slug!", name: "x" }, outsiderPat)).includes("slug"),
+  );
+
   check(
     "웹훅 갱신도 같은 문턱을 쓴다 (소스)",
     /updateWebhooks[\s\S]*?canManageMembers/.test(repoActions),
@@ -492,10 +531,16 @@ try {
 
   const toolNames = ((await mcp("tools/list", {}, pat)).json?.result?.tools ?? []).map((t) => t.name);
   check(
-    "읽기 4종 + 쓰기 2종",
-    ["doc_outline", "doc_get", "doc_search", "doc_changes_since", "doc_put", "doc_delete"].every(
-      (n) => toolNames.includes(n),
-    ),
+    "읽기 4종 + 쓰기 3종",
+    [
+      "doc_outline",
+      "doc_get",
+      "doc_search",
+      "doc_changes_since",
+      "doc_put",
+      "doc_delete",
+      "repo_create",
+    ].every((n) => toolNames.includes(n)),
     toolNames.join(", "),
   );
 
