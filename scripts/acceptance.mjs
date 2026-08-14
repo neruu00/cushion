@@ -159,6 +159,17 @@ try {
   const memberDash = await page("/dashboard", memberCookie);
   check("멤버 대시보드에 레포와 절약 추정이 보인다", memberDash.status === 200 && memberDash.html.includes(SLUG_A));
 
+  // 여정 전체를 싣는 페이지다. import 하나만 깨져도 500인데, 여기 말고는 아무도 안 연다.
+  const tokensPage = await page("/settings/tokens", memberCookie);
+  check(
+    "/settings/tokens에 온보딩 3단계가 뜬다",
+    tokensPage.status === 200 &&
+      tokensPage.html.includes("붙이는 순서") &&
+      tokensPage.html.includes("/cushion-use") &&
+      tokensPage.html.includes("/api/skills"),
+    String(tokensPage.status),
+  );
+
   // ── 셀프서브 (D-013) ────────────────────────────────────────────
   heading("셀프서브 — 멤버십이 곧 권한이다");
 

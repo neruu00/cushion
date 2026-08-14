@@ -6,6 +6,7 @@ import { notFound } from "next/navigation";
 
 import { createAccessToken, revokeAccessToken } from "@/actions/token";
 import { ActionForm } from "@/components/ActionForm";
+import { OnboardingSteps } from "@/components/OnboardingSteps";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -16,6 +17,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { skillsUrl } from "@/lib/snippets";
 import {
   Table,
   TableBody,
@@ -66,21 +68,32 @@ export default async function TokensPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>새 토큰</CardTitle>
+          <CardTitle>붙이는 순서</CardTitle>
           <CardDescription>
-            발급하면 붙여넣을 <code>claude mcp add</code> 명령이 같이 나온다. 아무 디렉터리에서
-            한 번 실행하면 끝 — 레포를 받을 필요도, 환경변수를 심을 필요도 없다.
-            토큰은 <code>~/.claude.json</code> 에 평문으로 남는다(환경변수를 dotfile에 두는 것과
-            같은 등급이다). 새면 재발급하면 되고, 그 순간 옛 토큰은 죽는다.
+            세 단계다. ①만 해도 에이전트가 문서를 읽고 쓴다 — ②는 사용법을 깊게 알려 주고,
+            ③은 <strong>다음 세션부터 알아서 찾게</strong> 만든다.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <ActionForm action={createAccessToken} submitLabel="발급">
-            <Label className="grid gap-1.5">
-              <span>이름</span>
-              <Input name="name" placeholder="노트북 Claude Code" />
-            </Label>
-          </ActionForm>
+          <OnboardingSteps
+            skillsUrl={skillsUrl()}
+            connectSlot={
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground">
+                  발급하면 토큰이 박힌 명령이 같이 나온다. 아무 디렉터리에서 한 번 실행하면 끝 —
+                  레포를 받을 필요도, 환경변수를 심을 필요도 없다. 토큰은{" "}
+                  <code>~/.claude.json</code> 에 평문으로 남는다(환경변수를 dotfile에 두는 것과
+                  같은 등급이다). 새면 재발급하면 되고, 그 순간 옛 토큰은 죽는다.
+                </p>
+                <ActionForm action={createAccessToken} submitLabel="발급">
+                  <Label className="grid gap-1.5">
+                    <span>이름</span>
+                    <Input name="name" placeholder="노트북 Claude Code" />
+                  </Label>
+                </ActionForm>
+              </div>
+            }
+          />
         </CardContent>
       </Card>
 

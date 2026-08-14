@@ -11,7 +11,9 @@ import { redirect } from "next/navigation";
 import { signInWithGoogle } from "@/actions/session";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { OnboardingSteps } from "@/components/OnboardingSteps";
 import { getSessionEmail } from "@/lib/authz";
+import { connectCommand, skillsUrl } from "@/lib/snippets";
 
 export default async function LandingPage() {
   if (await getSessionEmail()) redirect("/dashboard");
@@ -85,15 +87,26 @@ export default async function LandingPage() {
         </p>
       </section>
 
-      <section className="space-y-3">
-        <h2 className="text-lg font-medium">연결은 명령 한 줄</h2>
-        <pre className="overflow-x-auto rounded-lg border bg-muted/40 p-4 font-mono text-xs leading-relaxed">
-          {`claude mcp add --transport http --scope user cushion https://<cushion>/api/mcp --header "Authorization: Bearer cshn_pat_..."`}
-        </pre>
+      <section className="space-y-4">
+        <div className="space-y-1">
+          <h2 className="text-lg font-medium">붙이는 데 세 단계</h2>
+          <p className="text-sm text-muted-foreground">
+            레포를 받을 필요도, 환경변수를 심을 필요도 없다. ①만 해도 읽고 쓴다.
+          </p>
+        </div>
+        <OnboardingSteps
+          skillsUrl={skillsUrl()}
+          connectSlot={
+            <pre className="overflow-x-auto rounded-lg border bg-muted/40 p-3 font-mono text-xs leading-relaxed">
+              {connectCommand("cshn_pat_…")}
+            </pre>
+          }
+        />
         <p className="text-xs text-muted-foreground">
-          토큰 발급 화면이 이 명령을 통째로 준다. 레포를 받을 필요도, 환경변수를 심을 필요도 없다.
+          토큰을 발급하면 ①의 명령이 토큰이 박힌 채로 나온다.
         </p>
       </section>
+
     </main>
   );
 }
