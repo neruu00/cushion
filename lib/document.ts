@@ -6,15 +6,15 @@
  *
  * **동시 편집은 병합하지 않는다.** 원본이 DB에 있고 브랜치가 없으므로 병합할 근거가 없다.
  * 읽을 때 받은 sha를 쓸 때 되돌려 주게 하고(`base_sha`), 어긋나면 거부한 뒤 현재 sha를 알려준다.
- * `spec_get`의 `if_none_match`와 정확히 대칭이다.
+ * `doc_get`의 `if_none_match`와 정확히 대칭이다.
  *
  * 잠금의 실체는 앱의 비교가 아니라 **DB의 조건부 쓰기다** (`content_sha = base_sha`인 행만
  * 갱신). 읽고-비교하고-쓰는 사이에 남이 끼어들면 앱 비교는 통과하고도 편집이 유실된다 —
  * 조건이 DB에 있으면 그 창이 없다.
  */
-import { getAccessibleRepo } from "@/lib/authz";
+import { getAccessibleLibrary } from "@/lib/authz";
 import { advanceCursor, recordChange, recordVersion } from "@/lib/mirror";
-import { replaceSection } from "@/lib/spec";
+import { replaceSection } from "@/lib/markdown";
 import { supabase } from "@/lib/supabase";
 import { documentTitle } from "@/lib/summary";
 import { sha256 } from "@/lib/token";
@@ -22,7 +22,7 @@ import { sha256 } from "@/lib/token";
 export type WriteFailure = "not_found" | "conflict" | "invalid" | "failed";
 
 export type WriteResult =
-  | { ok: true; sha: string; eventId: number | null; repositoryId: string }
+  | { ok: true; sha: string; eventId: number | null; libraryId: string }
   | {
       ok: false;
       code: WriteFailure;
@@ -40,13 +40,13 @@ interface Existing {
 
 /** 권한 없음과 없음을 구분하지 않는다 — 구분하면 레포의 존재가 새어 나간다. (SPEC §6) */
 async function resolve(email: string, slug: string, path: string) {
-  const repo = await getAccessibleRepo(email, slug);
-  if (!repo) return { repo: null, existing: null as Existing | null };
+  const repo = await getAccessibleLibrary(email, slug);
+  if (!repo) return { library: null, existing: null as Existing | null };
 
   const { data, error } = await supabase
     .from("documents")
     .select("id, content, content_sha")
-    .eq("repository_id", repo.id)
+    .eq("library_id", repo.id)
     .eq("path", path)
     .maybeSingle();
 
@@ -55,11 +55,11 @@ async function resolve(email: string, slug: string, path: string) {
 }
 
 /** CAS가 빗나갔을 때 현재 상태를 다시 읽어 conflict 응답을 만든다. */
-async function conflictNow(repositoryId: string, path: string): Promise<WriteResult> {
+async function conflictNow(libraryId: string, path: string): Promise<WriteResult> {
   const { data } = await supabase
     .from("documents")
     .select("content, content_sha")
-    .eq("repository_id", repositoryId)
+    .eq("library_id", libraryId)
     .eq("path", path)
     .maybeSingle();
 
@@ -71,7 +71,7 @@ async function conflictNow(repositoryId: string, path: string): Promise<WriteRes
     code: "conflict",
     currentSha: data.content_sha,
     currentContent: data.content,
-    message: "그 사이 문서가 바뀌었다. spec_get으로 다시 읽고 새 sha로 다시 쓸 것",
+    message: "그 사이 문서가 바뀌었다. doc_get으로 다시 읽고 새 sha로 다시 쓸 것",
   };
 }
 
@@ -88,7 +88,7 @@ export async function putDocument(input: {
   tokenId?: string;
 }): Promise<WriteResult> {
   const { repo, existing } = await resolve(input.email, input.repo, input.path);
-  if (!repo) return { ok: false, code: "not_found", message: `그런 레포가 없다: ${input.repo}` };
+  if (!repo) return { ok: false, code: "not_found", message: `그런 라이브러리가 없다: ${input.repo}` };
 
   // 빠른 실패용 사전 비교. 실제 방어선은 아래 CAS다.
   if (existing && input.baseSha !== existing.content_sha) {
@@ -98,8 +98,8 @@ export async function putDocument(input: {
       currentSha: existing.content_sha,
       currentContent: existing.content,
       message: input.baseSha
-        ? "그 사이 문서가 바뀌었다. spec_get으로 다시 읽고 새 sha로 다시 쓸 것"
-        : "이미 있는 문서다. 덮어쓰려면 spec_get으로 받은 base_sha를 함께 보낼 것",
+        ? "그 사이 문서가 바뀌었다. doc_get으로 다시 읽고 새 sha로 다시 쓸 것"
+        : "이미 있는 문서다. 덮어쓰려면 doc_get으로 받은 base_sha를 함께 보낼 것",
     };
   }
   if (!existing && input.baseSha) {
@@ -120,7 +120,7 @@ export async function putDocument(input: {
       return {
         ok: false,
         code: "invalid",
-        message: `그런 섹션이 없다: ${input.heading}. spec_outline으로 헤딩을 확인할 것`,
+        message: `그런 섹션이 없다: ${input.heading}. doc_outline으로 헤딩을 확인할 것`,
       };
     }
     content = merged;
@@ -141,7 +141,7 @@ export async function putDocument(input: {
     const { data: updated, error } = await supabase
       .from("documents")
       .update(row)
-      .eq("repository_id", repo.id)
+      .eq("library_id", repo.id)
       .eq("path", input.path)
       .eq("content_sha", input.baseSha as string)
       .select("id");
@@ -153,7 +153,7 @@ export async function putDocument(input: {
     if (!updated || updated.length === 0) return conflictNow(repo.id, input.path);
   } else {
     const { error } = await supabase.from("documents").insert({
-      repository_id: repo.id,
+      library_id: repo.id,
       path: input.path,
       ...row,
     });
@@ -170,7 +170,7 @@ export async function putDocument(input: {
   // CAS가 통과했다는 것 자체가 existing.content가 직전 본문이었다는 증명이다.
   if (existing) {
     await recordVersion({
-      repositoryId: repo.id,
+      libraryId: repo.id,
       path: input.path,
       content: existing.content,
       contentSha: existing.content_sha,
@@ -188,7 +188,7 @@ export async function putDocument(input: {
   });
   if (input.tokenId && eventId !== null) await advanceCursor(input.tokenId, repo.id, eventId);
 
-  return { ok: true, sha, eventId, repositoryId: repo.id };
+  return { ok: true, sha, eventId, libraryId: repo.id };
 }
 
 export async function deleteDocument(input: {
@@ -200,7 +200,7 @@ export async function deleteDocument(input: {
   tokenId?: string;
 }): Promise<WriteResult> {
   const { repo, existing } = await resolve(input.email, input.repo, input.path);
-  if (!repo) return { ok: false, code: "not_found", message: `그런 레포가 없다: ${input.repo}` };
+  if (!repo) return { ok: false, code: "not_found", message: `그런 라이브러리가 없다: ${input.repo}` };
   if (!existing) return { ok: false, code: "not_found", message: `그런 문서가 없다: ${input.path}` };
 
   if (input.baseSha !== existing.content_sha) {
@@ -229,7 +229,7 @@ export async function deleteDocument(input: {
 
   // 마지막 본문을 남긴다 — 삭제야말로 되돌릴 수 있어야 한다.
   await recordVersion({
-    repositoryId: repo.id,
+    libraryId: repo.id,
     path: input.path,
     content: existing.content,
     contentSha: existing.content_sha,
@@ -246,5 +246,5 @@ export async function deleteDocument(input: {
   });
   if (input.tokenId && eventId !== null) await advanceCursor(input.tokenId, repo.id, eventId);
 
-  return { ok: true, sha: existing.content_sha, eventId, repositoryId: repo.id };
+  return { ok: true, sha: existing.content_sha, eventId, libraryId: repo.id };
 }

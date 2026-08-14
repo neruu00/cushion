@@ -1,5 +1,5 @@
 /**
- * @file app/[repo]/[...path]/page.tsx
+ * @file app/[library]/[...path]/page.tsx
  * @description 문서 보기 (T-502).
  *
  * 원본이 여기 있으므로 편집 링크가 있다 (D-011). GitHub 링크는 문서가 아니라
@@ -10,25 +10,25 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { Markdown } from "@/components/Markdown";
-import { getAccessibleRepo, getSessionEmail } from "@/lib/authz";
+import { getAccessibleLibrary, getSessionEmail } from "@/lib/authz";
 import { supabase } from "@/lib/supabase";
 
-export default async function DocumentPage({ params }: PageProps<"/repositories/[repo]/[...path]">) {
-  const { repo: slug, path } = await params;
+export default async function DocumentPage({ params }: PageProps<"/libraries/[library]/[...path]">) {
+  const { library: slug, path } = await params;
   const docPath = path.join("/");
 
   const email = await getSessionEmail();
   if (!email) {
-    redirect(`/api/auth/signin?callbackUrl=${encodeURIComponent(`/repositories/${slug}/${docPath}`)}`);
+    redirect(`/api/auth/signin?callbackUrl=${encodeURIComponent(`/libraries/${slug}/${docPath}`)}`);
   }
 
-  const repo = await getAccessibleRepo(email, slug);
-  if (!repo) notFound();
+  const library = await getAccessibleLibrary(email, slug);
+  if (!library) notFound();
 
   const { data: doc, error } = await supabase
     .from("documents")
     .select("path, title, content, updated_at, updated_by")
-    .eq("repository_id", repo.id)
+    .eq("library_id", library.id)
     .eq("path", docPath)
     .maybeSingle();
 
@@ -36,16 +36,16 @@ export default async function DocumentPage({ params }: PageProps<"/repositories/
   if (!doc) notFound();
 
   // 문서는 여기 있고 레포는 관련 코드일 뿐이다 — 문서 파일이 아니라 레포로 건다.
-  const source = repo.github_full_name
-    ? `https://github.com/${repo.github_full_name}`
-    : null;
+  // 여러 레포가 이 라이브러리를 볼 수 있다. 첫 항목만 건다 — 와일드카드(org/*)는 링크가 안 된다.
+  const linkable = library.github_repos.find((name) => !name.endsWith("/*"));
+  const source = linkable ? `https://github.com/${linkable}` : null;
 
   return (
     <main className="mx-auto w-full max-w-3xl space-y-6 p-8">
       <header className="space-y-2 border-b pb-4">
         <p className="text-xs text-muted-foreground">
-          <Link href={`/repositories/${repo.slug}`} className="font-mono hover:text-foreground">
-            {repo.slug}
+          <Link href={`/libraries/${library.slug}`} className="font-mono hover:text-foreground">
+            {library.slug}
           </Link>
           {" / "}
           <span className="font-mono">{doc.path}</span>
@@ -56,13 +56,13 @@ export default async function DocumentPage({ params }: PageProps<"/repositories/
             {doc.updated_by ? ` · ${doc.updated_by}` : ""}
           </span>
           <Link
-            href={`/repositories/${repo.slug}/edit/${doc.path}`}
+            href={`/libraries/${library.slug}/edit/${doc.path}`}
             className="inline-flex items-center gap-1 underline underline-offset-4 hover:text-foreground"
           >
             편집 <Pencil className="size-3" />
           </Link>
           <Link
-            href={`/repositories/${repo.slug}/history/${doc.path}`}
+            href={`/libraries/${library.slug}/history/${doc.path}`}
             className="inline-flex items-center gap-1 underline underline-offset-4 hover:text-foreground"
           >
             이력 <History className="size-3" />

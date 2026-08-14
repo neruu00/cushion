@@ -8,15 +8,15 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
-import { NewRepoDialog } from "@/components/NewRepoDialog";
+import { NewLibraryDialog } from "@/components/NewLibraryDialog";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { getAccessibleRepos, getSessionEmail } from "@/lib/authz";
+import { getAccessibleLibraries, getSessionEmail } from "@/lib/authz";
 
 export default async function DashboardPage() {
   const email = await getSessionEmail();
   if (!email) redirect("/api/auth/signin?callbackUrl=%2Fdashboard");
 
-  const repos = await getAccessibleRepos(email);
+  const repos = await getAccessibleLibraries(email);
 
   return (
     <main className="mx-auto w-full max-w-3xl space-y-6 p-8">
@@ -27,7 +27,7 @@ export default async function DashboardPage() {
             문서 원본은 Cushion에 있다. 여기서 만들고, 에이전트는 MCP로 읽고 쓴다.
           </p>
         </div>
-        <NewRepoDialog />
+        <NewLibraryDialog />
       </header>
 
       {repos.length === 0 ? (
@@ -36,15 +36,21 @@ export default async function DashboardPage() {
         </p>
       ) : (
         <ul className="space-y-3">
-          {repos.map((repo) => (
-            <li key={repo.id}>
-              <Link href={`/repositories/${repo.slug}`} className="block">
+          {repos.map((library) => (
+            <li key={library.id}>
+              <Link href={`/libraries/${library.slug}`} className="block">
                 <Card className="transition-colors hover:bg-muted/40">
                   <CardHeader>
-                    <CardTitle className="font-mono text-base">{repo.slug}</CardTitle>
+                    <CardTitle className="font-mono text-base">{library.slug}</CardTitle>
                     <CardDescription>
-                      {repo.name}
-                      {repo.github_full_name ? ` · ${repo.github_full_name}` : ""}
+                      {library.name}
+                      {library.github_repos.length > 0
+                        ? ` · ${library.github_repos.slice(0, 2).join(", ")}${
+                            library.github_repos.length > 2
+                              ? ` 외 ${library.github_repos.length - 2}`
+                              : ""
+                          }`
+                        : ""}
                     </CardDescription>
                   </CardHeader>
                 </Card>

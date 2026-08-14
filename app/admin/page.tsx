@@ -7,10 +7,10 @@
 import { Trash2 } from "lucide-react";
 import { notFound } from "next/navigation";
 
-import { addMember, removeMember } from "@/actions/repository";
+import { addMember, removeMember } from "@/actions/library";
 import { ActionForm } from "@/components/ActionForm";
 import { Field } from "@/components/Field";
-import { NewRepoDialog } from "@/components/NewRepoDialog";
+import { NewLibraryDialog } from "@/components/NewLibraryDialog";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -22,14 +22,14 @@ import {
 import { isAdmin } from "@/lib/authz";
 import { supabase } from "@/lib/supabase";
 
-interface RepoRow {
+interface LibraryRow {
   id: string;
   slug: string;
   name: string;
-  github_full_name: string | null;
+  github_repos: string[];
   mattermost_webhook_url: string | null;
   discord_webhook_url: string | null;
-  repository_members: { email: string }[];
+  library_members: { email: string }[];
 }
 
 export default async function AdminPage() {
@@ -37,14 +37,14 @@ export default async function AdminPage() {
   if (!(await isAdmin())) notFound();
 
   const { data, error } = await supabase
-    .from("repositories")
+    .from("libraries")
     .select(
-      "id, slug, name, github_full_name, mattermost_webhook_url, discord_webhook_url, repository_members(email)",
+      "id, slug, name, github_repos, mattermost_webhook_url, discord_webhook_url, library_members(email)",
     )
     .order("slug");
 
   if (error) console.error("AdminPage", error);
-  const repos: RepoRow[] = data ?? [];
+  const repos: LibraryRow[] = data ?? [];
 
   return (
     <main className="mx-auto w-full max-w-3xl space-y-8 p-8">
@@ -60,7 +60,7 @@ export default async function AdminPage() {
         </p>
       </header>
 
-      <NewRepoDialog />
+      <NewLibraryDialog />
 
       {repos.length === 0 ? (
         <p className="text-sm text-muted-foreground">등록된 레포가 없다.</p>
@@ -71,7 +71,7 @@ export default async function AdminPage() {
               <CardTitle className="font-mono text-base">{repo.slug}</CardTitle>
               <CardDescription>
                 {repo.name}
-                {repo.github_full_name ? ` · ${repo.github_full_name}` : ""}
+                {repo.github_repos.length > 0 ? ` · ${repo.github_repos.join(", ")}` : ""}
                 {repo.mattermost_webhook_url ? " · Mattermost" : ""}
                 {repo.discord_webhook_url ? " · Discord" : ""}
                 {!repo.mattermost_webhook_url && !repo.discord_webhook_url ? " · webhook 없음" : ""}
@@ -81,20 +81,20 @@ export default async function AdminPage() {
             <CardContent className="space-y-5">
               <section className="space-y-2">
                 <h2 className="text-sm font-medium">멤버</h2>
-                {repo.repository_members.length === 0 ? (
+                {repo.library_members.length === 0 ? (
                   <p className="text-sm text-muted-foreground">
                     없음 — 등록 전까지 admin 외에는 아무도 못 본다.
                   </p>
                 ) : (
                   <ul className="divide-y rounded-lg border">
-                    {repo.repository_members.map((member) => (
+                    {repo.library_members.map((member) => (
                       <li
                         key={member.email}
                         className="flex items-center justify-between gap-2 px-3 py-1.5"
                       >
                         <span className="truncate font-mono text-sm">{member.email}</span>
                         <form action={removeMember}>
-                          <input type="hidden" name="repository_id" value={repo.id} />
+                          <input type="hidden" name="library_id" value={repo.id} />
                           <input type="hidden" name="email" value={member.email} />
                           <Button
                             type="submit"
@@ -111,7 +111,7 @@ export default async function AdminPage() {
                 )}
 
                 <ActionForm action={addMember} submitLabel="추가">
-                  <input type="hidden" name="repository_id" value={repo.id} />
+                  <input type="hidden" name="library_id" value={repo.id} />
                   <Field name="email" label="이메일" type="email" placeholder="teammate@example.com" required />
                 </ActionForm>
               </section>

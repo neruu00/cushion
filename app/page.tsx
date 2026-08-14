@@ -20,12 +20,13 @@ export default async function LandingPage() {
     <main className="mx-auto w-full max-w-3xl space-y-14 p-8 py-16">
       <section className="space-y-5">
         <h1 className="text-3xl font-semibold leading-tight">
-          에이전트가 스펙을 통째로 읽지 않게.
+          에이전트를 위한 문서 도서관.
         </h1>
         <p className="max-w-xl text-muted-foreground">
-          Cushion은 여러 레포가 함께 보는 스펙 문서를 한곳에 둔다. 에이전트에는 MCP로{" "}
-          <strong className="text-foreground">필요한 조각만</strong> 읽고 쓰게 하고, 팀에는 변경
-          알림을 보낸다. 같은 문서를 세션마다 컨텍스트에 싣느라 태우는 토큰이 목적의 전부다.
+          스펙·ADR·런북·회의록·용어집 — 프로젝트 문서를 한곳에 두고, 에이전트에는 MCP로{" "}
+          <strong className="text-foreground">필요한 조각만</strong> 읽고 쓰게 한다. 사람이 아니라
+          에이전트를 1차 독자로 삼은 서가다. 같은 문서를 세션마다 컨텍스트에 싣느라 태우는
+          토큰이 목적의 전부다.
         </p>
         <form action={signInWithGoogle}>
           <Button type="submit" size="lg">
@@ -45,8 +46,8 @@ export default async function LandingPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground">
-            스펙의 원본이 여기 있다. 웹에서도, 에이전트의 <code>spec_put</code>으로도 고친다.
-            모든 변경은 이력에 남고 되돌릴 수 있다.
+            문서의 원본이 여기 있다. 웹에서도, 에이전트의 <code>doc_put</code>으로도 만들고
+            고친다. 모든 변경은 이력에 남고 되돌릴 수 있다.
           </CardContent>
         </Card>
         <Card>
@@ -67,7 +68,7 @@ export default async function LandingPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground">
-            폴링도 상시 연결도 없다. 스펙이 바뀌면 다음 응답 끝에 <code>[stale]</code> 한 줄이
+            폴링도 상시 연결도 없다. 문서가 바뀌면 다음 응답 끝에 <code>[stale]</code> 한 줄이
             붙고, 팀 채널에는 무엇이 왜 바뀌었는지가 간다.
           </CardContent>
         </Card>

@@ -6,7 +6,7 @@
  * 실제로 필요한 건 POST 하나에 JSON-RPC 2.0을 태우는 것뿐이다 — 그게 아래 전부다.
  * 서버가 먼저 말을 걸어야 할 일이 생기면 그때 SSE와 함께 SDK를 검토한다.
  *
- * 권한은 요청마다 다시 조회한다(`buildContext` → `getAccessibleRepos`).
+ * 권한은 요청마다 다시 조회한다(`buildContext` → `getAccessibleLibraries`).
  * 토큰에 권한을 굽지 않으므로 멤버에서 빼면 다음 호출부터 바로 막힌다. (SPEC §6)
  */
 import type { NextRequest } from "next/server";

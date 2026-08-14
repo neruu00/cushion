@@ -55,12 +55,13 @@ function mcpJson(): string {
  * 툴이 있다고 에이전트가 쓰는 게 아니다. 이 3줄이 없으면 그냥 로컬 파일을 읽는다. (SPEC §7)
  */
 function agentsSnippet(): string {
-  return `## 스펙
+  return `## 문서
 
-이 프로젝트의 스펙 문서는 레포가 아니라 Cushion에 있다. MCP 서버 \`cushion\`으로 읽고 쓴다.
-\`spec_outline\`으로 목차를 먼저 보고 필요한 섹션만 \`spec_get\`으로 가져온다.
-응답에 \`[stale]\`이 보이면 \`spec_changes_since\`를 부른다.
-고칠 때는 \`spec_get\`으로 받은 sha를 \`spec_put\`의 \`base_sha\`에 그대로 넘긴다.
+이 프로젝트의 문서(스펙·ADR·런북·회의록 등)는 레포가 아니라 Cushion에 있다.
+MCP 서버 \`cushion\`으로 읽고 쓴다.
+\`doc_outline\`으로 목차를 먼저 보고 필요한 섹션만 \`doc_get\`으로 가져온다.
+응답에 \`[stale]\`이 보이면 \`doc_changes_since\`를 부른다.
+고칠 때는 \`doc_get\`으로 받은 sha를 \`doc_put\`의 \`base_sha\`에 그대로 넘긴다.
 `;
 }
 
