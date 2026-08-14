@@ -11,6 +11,7 @@ import { redirect } from "next/navigation";
 import { signInWithGoogle } from "@/actions/session";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CushionDrop } from "@/components/CushionDrop";
 import { OnboardingSteps } from "@/components/OnboardingSteps";
 import { getSessionEmail } from "@/lib/authz";
 import { connectCommand, skillsUrl } from "@/lib/snippets";
@@ -37,6 +38,14 @@ export default async function LandingPage() {
         </form>
         <p className="text-xs text-muted-foreground">
           로그인하면 바로 레포를 만들 수 있다. 문서 열람은 레포 멤버만 가능하다.
+        </p>
+      </section>
+
+      <section className="space-y-1">
+        <CushionDrop />
+        <p className="text-center text-xs text-muted-foreground">
+          떨어지는 공의 운동 에너지를 쿠션이 흡수하듯 — 에이전트가 컨텍스트에 태울 토큰을
+          Cushion이 흡수한다.
         </p>
       </section>
 
