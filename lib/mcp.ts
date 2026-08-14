@@ -5,7 +5,10 @@
  * **원본이 여기 있으므로 쓰기 툴이 있다** (D-011). 그래서 유출된 PAT는 열람뿐 아니라
  * 훼손도 할 수 있다 — 복구 근거는 `document_versions`뿐이다. (SPEC §6)
  *
- * 절감의 본체가 여기다: 목차 먼저(spec_outline) → 필요한 섹션만(spec_get) →
+ * 이름이 `doc_`인 이유: 여기 담기는 건 스펙만이 아니다. ADR·런북·회의록·용어집 무엇이든
+ * 같은 자격으로 들어가는 **문서 도서관**이고, 툴 이름이 곧 에이전트가 읽는 용도 표시다.
+ *
+ * 절감의 본체가 여기다: 목차 먼저(doc_outline) → 필요한 섹션만(doc_get) →
  * 안 바뀌었으면 본문 대신 5토큰(if_none_match) → 밀렸을 때만 한 줄([stale]).
  */
 import { z } from "zod";
@@ -13,7 +16,7 @@ import { z } from "zod";
 import { getAccessibleRepos, type Repo, type TokenIdentity } from "@/lib/authz";
 import { deleteDocument, putDocument } from "@/lib/document";
 import { deleteDocumentSchema, putDocumentSchema } from "@/lib/document.schema";
-import { findSection, headings, scoreSection, snippet, splitSections } from "@/lib/spec";
+import { findSection, headings, scoreSection, snippet, splitSections } from "@/lib/markdown";
 import { supabase } from "@/lib/supabase";
 
 export const SERVER_INFO = { name: "cushion", version: "0.1.0" } as const;
@@ -23,21 +26,22 @@ export const SERVER_INFO = { name: "cushion", version: "0.1.0" } as const;
  * 툴 description이 "무엇을"이라면 여기는 "어떤 순서로"다.
  */
 export const INSTRUCTIONS =
-  "문서를 통째로 읽지 말 것: spec_outline → 필요한 섹션만 spec_get(heading). " +
-  "재조회는 if_none_match에 직전 sha. [stale]이 보이면 spec_changes_since. " +
-  "수정은 spec_put — base_sha는 spec_get의 sha, 섹션만 고칠 땐 heading에 그 섹션 전체를 보낸다.";
+  "프로젝트 문서는 여기 있다. 통째로 읽지 말 것: doc_outline → 필요한 섹션만 doc_get(heading). " +
+  "재조회는 if_none_match에 직전 sha. [stale]이면 doc_changes_since. " +
+  "쓰기는 doc_put — base_sha는 직전 sha, 섹션만 고칠 땐 heading에 그 섹션 전체.";
 
 export const TOOLS = [
   {
-    name: "spec_outline",
-    description: "문서 목록과 ## 헤딩. 읽기 전에 먼저 부른다. repo 생략 = 전체 레포.",
+    name: "doc_outline",
+    description:
+      "문서 목록과 ## 헤딩 (스펙·ADR·런북·회의록 등). 먼저 부른다. repo 생략 = 접근 가능한 전체.",
     inputSchema: {
       type: "object",
       properties: { repo: { type: "string", description: "레포 slug. 생략하면 전체" } },
     },
   },
   {
-    name: "spec_get",
+    name: "doc_get",
     description:
       "문서 전체 또는 heading의 ## 섹션 하나. if_none_match에 직전 sha를 주면 안 바뀐 경우 unchanged만 온다.",
     inputSchema: {
@@ -52,8 +56,8 @@ export const TOOLS = [
     },
   },
   {
-    name: "spec_search",
-    description: "본문 검색, 매칭 섹션 상위 몇 개. 어느 문서인지 모를 때.",
+    name: "doc_search",
+    description: "본문 검색, 매칭 섹션 상위 몇 개. 어느 문서에 있는지 모를 때.",
     inputSchema: {
       type: "object",
       properties: { query: { type: "string" }, repo: { type: "string" } },
@@ -61,7 +65,7 @@ export const TOOLS = [
     },
   },
   {
-    name: "spec_changes_since",
+    name: "doc_changes_since",
     description: "커서 이후의 변경 요약. 인자 없이 부르면 커서를 전진시킨다.",
     inputSchema: {
       type: "object",
@@ -72,9 +76,9 @@ export const TOOLS = [
     },
   },
   {
-    name: "spec_put",
+    name: "doc_put",
     description:
-      "문서 생성·수정. 기존 문서는 base_sha 필수 — 그 사이 남이 고쳤으면 거부하고 현재 sha를 준다. heading을 주면 그 섹션만 교체된다.",
+      "문서 생성·수정. 새 경로면 그대로 새 문서가 된다. 기존 문서는 base_sha 필수 — 그 사이 남이 고쳤으면 거부하고 현재 sha를 준다. heading을 주면 그 섹션만 교체된다.",
     inputSchema: {
       type: "object",
       properties: {
@@ -82,14 +86,14 @@ export const TOOLS = [
         path: { type: "string", description: ".md 로 끝나는 경로" },
         content: { type: "string", description: "문서 전체. heading을 줬으면 그 섹션 전체(## 줄 포함)" },
         heading: { type: "string", description: "이 ## 섹션만 교체. 문서 전체를 보내지 않아도 된다" },
-        base_sha: { type: "string", description: "직전 spec_get의 sha. 새 문서면 생략" },
+        base_sha: { type: "string", description: "직전 doc_get의 sha. 새 문서면 생략" },
         note: { type: "string", description: "무엇을 왜 바꿨는지 한 줄" },
       },
       required: ["repo", "path", "content"],
     },
   },
   {
-    name: "spec_delete",
+    name: "doc_delete",
     description: "삭제. base_sha 필수. 이전 본문은 이력에 남는다.",
     inputSchema: {
       type: "object",
@@ -202,7 +206,7 @@ export function staleLine(context: McpContext): string | null {
     const paths = (context.state.get(repo.id)?.latestPaths ?? []).slice(0, 3);
     return `${repo.slug}${paths.length ? `: ${paths.join(", ")}` : ""}`;
   });
-  return `[stale] ${parts.join(" / ")} changed — call spec_changes_since`;
+  return `[stale] ${parts.join(" / ")} changed — call doc_changes_since`;
 }
 
 // ─── 툴 ──────────────────────────────────────────────────────────────
@@ -260,18 +264,18 @@ export async function callTool(
   rawArgs: unknown,
 ): Promise<ToolResult> {
   switch (name) {
-    case "spec_outline":
-      return specOutline(context, rawArgs);
-    case "spec_get":
-      return specGet(context, rawArgs);
-    case "spec_search":
-      return specSearch(context, rawArgs);
-    case "spec_changes_since":
-      return specChangesSince(context, rawArgs);
-    case "spec_put":
-      return specPut(context, rawArgs);
-    case "spec_delete":
-      return specDelete(context, rawArgs);
+    case "doc_outline":
+      return docOutline(context, rawArgs);
+    case "doc_get":
+      return docGet(context, rawArgs);
+    case "doc_search":
+      return docSearch(context, rawArgs);
+    case "doc_changes_since":
+      return docChangesSince(context, rawArgs);
+    case "doc_put":
+      return docPut(context, rawArgs);
+    case "doc_delete":
+      return docDelete(context, rawArgs);
     default:
       return { text: `그런 툴이 없다: ${name}`, isError: true };
   }
@@ -281,7 +285,7 @@ function badArgs(issue: string): ToolResult {
   return { text: `인자가 잘못됐다: ${issue}`, isError: true };
 }
 
-async function specOutline(context: McpContext, rawArgs: unknown): Promise<ToolResult> {
+async function docOutline(context: McpContext, rawArgs: unknown): Promise<ToolResult> {
   const args = outlineArgs.safeParse(rawArgs ?? {});
   if (!args.success) return badArgs(args.error.issues[0].message);
 
@@ -300,7 +304,7 @@ async function specOutline(context: McpContext, rawArgs: unknown): Promise<ToolR
   return { text: lines.join("\n") };
 }
 
-async function specGet(context: McpContext, rawArgs: unknown): Promise<ToolResult> {
+async function docGet(context: McpContext, rawArgs: unknown): Promise<ToolResult> {
   const args = getArgs.safeParse(rawArgs ?? {});
   if (!args.success) return badArgs(args.error.issues[0].message);
 
@@ -310,7 +314,7 @@ async function specGet(context: McpContext, rawArgs: unknown): Promise<ToolResul
   const [doc] = await documentsOf([repo], args.data.path);
   if (!doc) return { text: `그런 문서가 없다: ${args.data.path}`, isError: true };
 
-  // 해시가 같으면 본문 대신 5토큰. spec_get 재호출의 대부분이 여기서 끝난다.
+  // 해시가 같으면 본문 대신 5토큰. doc_get 재호출의 대부분이 여기서 끝난다.
   if (args.data.if_none_match && args.data.if_none_match === doc.content_sha) {
     return { text: "unchanged" };
   }
@@ -323,7 +327,7 @@ async function specGet(context: McpContext, rawArgs: unknown): Promise<ToolResul
 
 const SEARCH_LIMIT = 5;
 
-async function specSearch(context: McpContext, rawArgs: unknown): Promise<ToolResult> {
+async function docSearch(context: McpContext, rawArgs: unknown): Promise<ToolResult> {
   const args = searchArgs.safeParse(rawArgs ?? {});
   if (!args.success) return badArgs(args.error.issues[0].message);
 
@@ -361,7 +365,7 @@ async function specSearch(context: McpContext, rawArgs: unknown): Promise<ToolRe
 
 const CHANGES_LIMIT = 20;
 
-async function specChangesSince(context: McpContext, rawArgs: unknown): Promise<ToolResult> {
+async function docChangesSince(context: McpContext, rawArgs: unknown): Promise<ToolResult> {
   const args = changesArgs.safeParse(rawArgs ?? {});
   if (!args.success) return badArgs(args.error.issues[0].message);
 
@@ -425,9 +429,9 @@ function markSeen(context: McpContext, repositoryId: string, eventId: number | n
 
 /**
  * 충돌은 에러로 돌려주되 **현재 sha를 같이 준다.** 그래야 에이전트가 사람을 부르지 않고
- * spec_get → 다시 편집 → spec_put 으로 스스로 회복한다.
+ * doc_get → 다시 편집 → doc_put 으로 스스로 회복한다.
  */
-async function specPut(context: McpContext, rawArgs: unknown): Promise<ToolResult> {
+async function docPut(context: McpContext, rawArgs: unknown): Promise<ToolResult> {
   const args = putDocumentSchema.safeParse(rawArgs ?? {});
   if (!args.success) return badArgs(args.error.issues[0].message);
 
@@ -451,7 +455,7 @@ async function specPut(context: McpContext, rawArgs: unknown): Promise<ToolResul
   return { text: `저장했다 ${args.data.repo}/${args.data.path} sha:${result.sha}` };
 }
 
-async function specDelete(context: McpContext, rawArgs: unknown): Promise<ToolResult> {
+async function docDelete(context: McpContext, rawArgs: unknown): Promise<ToolResult> {
   const args = deleteDocumentSchema.safeParse(rawArgs ?? {});
   if (!args.success) return badArgs(args.error.issues[0].message);
 

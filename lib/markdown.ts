@@ -69,8 +69,8 @@ export function findSection(content: string, heading: string): string | null {
 /**
  * `heading` 섹션만 `replacement`로 바꾼 전문을 돌려준다. 섹션이 없으면 null.
  *
- * `spec_put(heading)`의 본체다 — 에이전트가 섹션 하나 고치는 데 문서 전체를 보내지 않게 한다.
- * `replacement`는 `spec_get(heading)`이 돌려주는 모양 그대로, 즉 `## 헤딩` 줄을 포함한
+ * `doc_put(heading)`의 본체다 — 에이전트가 섹션 하나 고치는 데 문서 전체를 보내지 않게 한다.
+ * `replacement`는 `doc_get(heading)`이 돌려주는 모양 그대로, 즉 `## 헤딩` 줄을 포함한
  * 섹션 전체다.
  *
  * `splitSections()`로 재조립하지 않는다 — 그건 섹션을 trim해서 손대지 않은 부분의

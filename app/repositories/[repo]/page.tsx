@@ -140,7 +140,7 @@ export default async function RepoPage({ params }: PageProps<"/repositories/[rep
         </div>
         {documents.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            아직 문서가 없다. 위의 &quot;새 문서&quot;로 만들거나, 에이전트가 <code>spec_put</code>으로 만든다.
+            아직 문서가 없다. 위의 &quot;새 문서&quot;로 만들거나, 에이전트가 <code>doc_put</code>으로 만든다.
           </p>
         ) : (
           <ul className="divide-y rounded-lg border">

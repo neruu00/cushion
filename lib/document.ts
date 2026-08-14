@@ -6,7 +6,7 @@
  *
  * **동시 편집은 병합하지 않는다.** 원본이 DB에 있고 브랜치가 없으므로 병합할 근거가 없다.
  * 읽을 때 받은 sha를 쓸 때 되돌려 주게 하고(`base_sha`), 어긋나면 거부한 뒤 현재 sha를 알려준다.
- * `spec_get`의 `if_none_match`와 정확히 대칭이다.
+ * `doc_get`의 `if_none_match`와 정확히 대칭이다.
  *
  * 잠금의 실체는 앱의 비교가 아니라 **DB의 조건부 쓰기다** (`content_sha = base_sha`인 행만
  * 갱신). 읽고-비교하고-쓰는 사이에 남이 끼어들면 앱 비교는 통과하고도 편집이 유실된다 —
@@ -14,7 +14,7 @@
  */
 import { getAccessibleRepo } from "@/lib/authz";
 import { advanceCursor, recordChange, recordVersion } from "@/lib/mirror";
-import { replaceSection } from "@/lib/spec";
+import { replaceSection } from "@/lib/markdown";
 import { supabase } from "@/lib/supabase";
 import { documentTitle } from "@/lib/summary";
 import { sha256 } from "@/lib/token";
@@ -71,7 +71,7 @@ async function conflictNow(repositoryId: string, path: string): Promise<WriteRes
     code: "conflict",
     currentSha: data.content_sha,
     currentContent: data.content,
-    message: "그 사이 문서가 바뀌었다. spec_get으로 다시 읽고 새 sha로 다시 쓸 것",
+    message: "그 사이 문서가 바뀌었다. doc_get으로 다시 읽고 새 sha로 다시 쓸 것",
   };
 }
 
@@ -98,8 +98,8 @@ export async function putDocument(input: {
       currentSha: existing.content_sha,
       currentContent: existing.content,
       message: input.baseSha
-        ? "그 사이 문서가 바뀌었다. spec_get으로 다시 읽고 새 sha로 다시 쓸 것"
-        : "이미 있는 문서다. 덮어쓰려면 spec_get으로 받은 base_sha를 함께 보낼 것",
+        ? "그 사이 문서가 바뀌었다. doc_get으로 다시 읽고 새 sha로 다시 쓸 것"
+        : "이미 있는 문서다. 덮어쓰려면 doc_get으로 받은 base_sha를 함께 보낼 것",
     };
   }
   if (!existing && input.baseSha) {
@@ -120,7 +120,7 @@ export async function putDocument(input: {
       return {
         ok: false,
         code: "invalid",
-        message: `그런 섹션이 없다: ${input.heading}. spec_outline으로 헤딩을 확인할 것`,
+        message: `그런 섹션이 없다: ${input.heading}. doc_outline으로 헤딩을 확인할 것`,
       };
     }
     content = merged;

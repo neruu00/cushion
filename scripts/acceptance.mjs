@@ -129,9 +129,9 @@ const outsiderCookie = await cookieFor(OUTSIDER);
 
 try {
   // 자기 자신의 문서를 실제 쓰기 경로로 넣는다. 절감 실측을 장난감 문서로 하면 의미가 없고,
-  // 시드까지 spec_put으로 하면 그 자체가 쓰기 경로 검증이 된다.
+  // 시드까지 doc_put으로 하면 그 자체가 쓰기 경로 검증이 된다.
   for (const doc of docs) {
-    await tool("spec_put", { repo: SLUG_A, ...doc, note: "인수 검증 시드" }, pat);
+    await tool("doc_put", { repo: SLUG_A, ...doc, note: "인수 검증 시드" }, pat);
   }
 
   // ── 라우팅 재편 (랜딩 / 대시보드) ───────────────────────────────
@@ -175,7 +175,7 @@ try {
 
   check(
     "멤버가 되면 바로 쓴다 (outsider의 자기 레포)",
-    (await tool("spec_put", { repo: SLUG_SELF, path: "MINE.md", content: "# 내 레포" }, outsiderPat)).startsWith("저장했다"),
+    (await tool("doc_put", { repo: SLUG_SELF, path: "MINE.md", content: "# 내 레포" }, outsiderPat)).startsWith("저장했다"),
   );
   check(
     "자기 레포는 대시보드에 보인다",
@@ -183,7 +183,7 @@ try {
   );
   check(
     "다른 멤버(MEMBER)에게는 이 레포가 안 보인다",
-    !(await tool("spec_outline", {}, pat)).includes(SLUG_SELF),
+    !(await tool("doc_outline", {}, pat)).includes(SLUG_SELF),
   );
 
   // 액션 고유 로직은 소스로 검사한다 — 빠지면 셀프서브가 조용히 반쪽이 된다
@@ -243,7 +243,7 @@ try {
   );
   check(
     "미등록 이메일의 토큰 → MCP도 빈손",
-    !(await tool("spec_outline", {}, outsiderPat)).includes(SLUG_A),
+    !(await tool("doc_outline", {}, outsiderPat)).includes(SLUG_A),
   );
 
   check(
@@ -254,12 +254,12 @@ try {
   check("접두사가 다른 키 → 거부", (await mcp("ping", {}, "ghp_notourtoken")).status === 401);
 
   // 멤버가 아닌 레포에는 쓰지도 못한다. 읽기와 쓰기의 문턱이 같다.
-  await tool("spec_put", { repo: SLUG_B, path: "INTRUDER.md", content: "#" }, pat);
+  await tool("doc_put", { repo: SLUG_B, path: "INTRUDER.md", content: "#" }, pat);
   const { count: bDocs } = await db
     .from("documents")
     .select("path", { count: "exact", head: true })
     .eq("repository_id", repos[SLUG_B]);
-  check("멤버 아닌 레포에 spec_put → 거부", bDocs === 0, `B 문서 ${bDocs}건`);
+  check("멤버 아닌 레포에 doc_put → 거부", bDocs === 0, `B 문서 ${bDocs}건`);
 
   const memberSees = await page(`/repositories/${SLUG_A}`, memberCookie);
   check("멤버는 본다", memberSees.status === 200);
@@ -268,7 +268,7 @@ try {
   await db.from("repository_members").delete().eq("repository_id", repos[SLUG_A]).eq("email", MEMBER);
   check(
     "멤버 제거 → 같은 토큰으로 즉시 차단",
-    !(await tool("spec_outline", {}, pat)).includes(SLUG_A),
+    !(await tool("doc_outline", {}, pat)).includes(SLUG_A),
   );
   check("멤버 제거 → 화면도 즉시 404", (await page(`/repositories/${SLUG_A}`, memberCookie)).status === 404);
   await db.from("repository_members").insert({ repository_id: repos[SLUG_A], email: MEMBER });
@@ -317,15 +317,15 @@ try {
     .from("documents")
     .select("path", { count: "exact", head: true })
     .eq("repository_id", repos[SLUG_A]);
-  check("spec_put으로 넣은 문서가 남아 있다", seeded === docs.length, `${seeded}건`);
+  check("doc_put으로 넣은 문서가 남아 있다", seeded === docs.length, `${seeded}건`);
 
-  const readBack = await tool("spec_get", { repo: SLUG_A, path: MAIN }, pat);
+  const readBack = await tool("doc_get", { repo: SLUG_A, path: MAIN }, pat);
   const seedSha = /sha:([0-9a-f]+)/.exec(readBack)?.[1] ?? "";
   check("sha를 돌려준다", seedSha.length === 64);
 
   // 낙관적 잠금 — 이 검사가 이 모델 전체를 지탱한다
   const stale = await tool(
-    "spec_put",
+    "doc_put",
     { repo: SLUG_A, path: MAIN, content: "덮어쓰기", base_sha: "0".repeat(64) },
     pat,
   );
@@ -340,7 +340,7 @@ try {
 
   check(
     "base_sha 없이 기존 문서를 덮으려 하면 거부",
-    (await tool("spec_put", { repo: SLUG_A, path: MAIN, content: "x" }, pat)).includes("base_sha"),
+    (await tool("doc_put", { repo: SLUG_A, path: MAIN, content: "x" }, pat)).includes("base_sha"),
   );
 
   // 정상 수정 → 이력이 남는다
@@ -351,7 +351,7 @@ try {
 추가.
 `;
   await tool(
-    "spec_put",
+    "doc_put",
     { repo: SLUG_A, path: MAIN, content: edited, base_sha: seedSha, note: "섹션 추가" },
     pat,
   );
@@ -376,12 +376,12 @@ try {
   // CAS — 같은 base_sha로 **동시에** 쓰면 정확히 하나만 이겨야 한다.
   // 순차 호출은 사전 비교에 걸려 CAS까지 안 간다. 동시 호출이라야 읽기-비교-쓰기 사이의
   // 창을 실제로 연다. 어느 쪽이 이기는지는 비결정적이지만 "하나만 이긴다"는 불변식이다.
-  const editedSha = /sha:([0-9a-f]+)/.exec(await tool("spec_get", { repo: SLUG_A, path: MAIN }, pat))?.[1];
+  const editedSha = /sha:([0-9a-f]+)/.exec(await tool("doc_get", { repo: SLUG_A, path: MAIN }, pat))?.[1];
   const contentA = `${edited}\nA가 이겼다.\n`;
   const contentB = `${edited}\nB가 이겼다.\n`;
   const [raceA, raceB] = await Promise.all([
-    tool("spec_put", { repo: SLUG_A, path: MAIN, content: contentA, base_sha: editedSha, note: "CAS A" }, pat),
-    tool("spec_put", { repo: SLUG_A, path: MAIN, content: contentB, base_sha: editedSha, note: "CAS B" }, editorPat),
+    tool("doc_put", { repo: SLUG_A, path: MAIN, content: contentA, base_sha: editedSha, note: "CAS A" }, pat),
+    tool("doc_put", { repo: SLUG_A, path: MAIN, content: contentB, base_sha: editedSha, note: "CAS B" }, editorPat),
   ]);
   const wins = [raceA, raceB].filter((r) => r.startsWith("저장했다"));
   const { data: afterCas } = await db
@@ -401,15 +401,15 @@ try {
 
   // 다음 검증(섹션 스코프)이 이어서 쓰도록 본문을 되돌려 둔다
   {
-    const s = /sha:([0-9a-f]+)/.exec(await tool("spec_get", { repo: SLUG_A, path: MAIN }, pat))?.[1];
-    await tool("spec_put", { repo: SLUG_A, path: MAIN, content: edited, base_sha: s, note: "CAS 검증 정리" }, pat);
+    const s = /sha:([0-9a-f]+)/.exec(await tool("doc_get", { repo: SLUG_A, path: MAIN }, pat))?.[1];
+    await tool("doc_put", { repo: SLUG_A, path: MAIN, content: edited, base_sha: s, note: "CAS 검증 정리" }, pat);
   }
 
-  // 섹션 스코프 쓰기 — 문서 전체를 실어 보내지 않는다 (spec_put + heading)
-  const beforeSection = await tool("spec_get", { repo: SLUG_A, path: MAIN }, pat);
+  // 섹션 스코프 쓰기 — 문서 전체를 실어 보내지 않는다 (doc_put + heading)
+  const beforeSection = await tool("doc_get", { repo: SLUG_A, path: MAIN }, pat);
   const sectionSha = /sha:([0-9a-f]+)/.exec(beforeSection)?.[1];
   const sectionPut = await tool(
-    "spec_put",
+    "doc_put",
     {
       repo: SLUG_A,
       path: MAIN,
@@ -433,12 +433,12 @@ try {
   );
   // base_sha 충돌이 heading 검증보다 먼저 걸린다(낡은 sha면 어차피 다시 읽어야 하니 맞는
   // 순서다). 그래서 이 검사는 반드시 현재 sha로 불러야 heading 경로에 도달한다.
-  const freshSha = /sha:([0-9a-f]+)/.exec(await tool("spec_get", { repo: SLUG_A, path: MAIN }, pat))?.[1];
+  const freshSha = /sha:([0-9a-f]+)/.exec(await tool("doc_get", { repo: SLUG_A, path: MAIN }, pat))?.[1];
   check(
     "없는 섹션을 heading으로 주면 거부",
     (
       await tool(
-        "spec_put",
+        "doc_put",
         { repo: SLUG_A, path: MAIN, heading: "존재하지 않는 섹션", content: "## x\n\ny", base_sha: freshSha },
         pat,
       )
@@ -446,10 +446,10 @@ try {
   );
 
   // 삭제 — 이력은 살아남아야 한다
-  await tool("spec_put", { repo: SLUG_A, path: "TEMP.md", content: "# 임시\n" }, pat);
-  const tempRead = await tool("spec_get", { repo: SLUG_A, path: "TEMP.md" }, pat);
+  await tool("doc_put", { repo: SLUG_A, path: "TEMP.md", content: "# 임시\n" }, pat);
+  const tempRead = await tool("doc_get", { repo: SLUG_A, path: "TEMP.md" }, pat);
   const tempSha = /sha:([0-9a-f]+)/.exec(tempRead)?.[1];
-  await tool("spec_delete", { repo: SLUG_A, path: "TEMP.md", base_sha: tempSha }, pat);
+  await tool("doc_delete", { repo: SLUG_A, path: "TEMP.md", base_sha: tempSha }, pat);
   const { count: tempLeft } = await db
     .from("documents")
     .select("path", { count: "exact", head: true })
@@ -464,8 +464,8 @@ try {
   check("삭제해도 이력은 남는다 — 되돌릴 수 있어야 한다", tempHistory === 1, `${tempHistory}건`);
 
   check(
-    "삭제된 문서는 spec_get으로도 안 나온다",
-    (await tool("spec_get", { repo: SLUG_A, path: "TEMP.md" }, pat)).includes("그런 문서가 없다"),
+    "삭제된 문서는 doc_get으로도 안 나온다",
+    (await tool("doc_get", { repo: SLUG_A, path: "TEMP.md" }, pat)).includes("그런 문서가 없다"),
   );
 
   // 되돌리기 — 이력이 읽히는지까지 확인한다. 쓰기만 하고 못 꺼내면 없는 것과 같다.
@@ -479,7 +479,7 @@ try {
 
   check(
     ".md가 아닌 경로는 거부",
-    (await tool("spec_put", { repo: SLUG_A, path: "notes.txt", content: "x" }, pat)).includes(".md"),
+    (await tool("doc_put", { repo: SLUG_A, path: "notes.txt", content: "x" }, pat)).includes(".md"),
   );
 
   // ── SPEC §11.5 MCP ──────────────────────────────────────────────
@@ -493,20 +493,20 @@ try {
   const toolNames = ((await mcp("tools/list", {}, pat)).json?.result?.tools ?? []).map((t) => t.name);
   check(
     "읽기 4종 + 쓰기 2종",
-    ["spec_outline", "spec_get", "spec_search", "spec_changes_since", "spec_put", "spec_delete"].every(
+    ["doc_outline", "doc_get", "doc_search", "doc_changes_since", "doc_put", "doc_delete"].every(
       (n) => toolNames.includes(n),
     ),
     toolNames.join(", "),
   );
 
-  const outline = await tool("spec_outline", {}, pat);
-  const full = await tool("spec_get", { repo: SLUG_A, path: MAIN }, pat);
+  const outline = await tool("doc_outline", {}, pat);
+  const full = await tool("doc_get", { repo: SLUG_A, path: MAIN }, pat);
   const sha = /sha:([0-9a-f]+)/.exec(full)?.[1] ?? "";
   check(
     "if_none_match 일치 → 본문 대신 unchanged",
-    (await tool("spec_get", { repo: SLUG_A, path: MAIN, if_none_match: sha }, pat)).trim() === "unchanged",
+    (await tool("doc_get", { repo: SLUG_A, path: MAIN, if_none_match: sha }, pat)).trim() === "unchanged",
   );
-  check("spec_search가 섹션을 짚는다", (await tool("spec_search", { query: "코드 규칙" }, pat)).includes("/"));
+  check("doc_search가 섹션을 짚는다", (await tool("doc_search", { query: "코드 규칙" }, pat)).includes("/"));
 
   // ── SPEC §11.4 구독 ─────────────────────────────────────────────
   heading("§11.4 구독");
@@ -514,9 +514,9 @@ try {
   check("최신 상태에서는 [stale]이 없다", !outline.includes("[stale]"));
 
   // 다른 세션(editorPat)이 고친다 — pat의 커서는 그대로이므로 밀린 상태가 된다
-  const beforeEdit = await tool("spec_get", { repo: SLUG_A, path: MAIN }, editorPat);
+  const beforeEdit = await tool("doc_get", { repo: SLUG_A, path: MAIN }, editorPat);
   await tool(
-    "spec_put",
+    "doc_put",
     {
       repo: SLUG_A,
       path: MAIN,
@@ -526,11 +526,11 @@ try {
     },
     editorPat,
   );
-  check("남이 고친 뒤 → 다음 툴 응답에 [stale]", (await tool("spec_outline", {}, pat)).includes("[stale]"));
+  check("남이 고친 뒤 → 다음 툴 응답에 [stale]", (await tool("doc_outline", {}, pat)).includes("[stale]"));
 
-  const changes = await tool("spec_changes_since", {}, pat);
-  check("spec_changes_since가 요약을 준다", changes.includes(MAIN));
-  check("커서 전진 → [stale]이 사라진다", !(await tool("spec_outline", {}, pat)).includes("[stale]"));
+  const changes = await tool("doc_changes_since", {}, pat);
+  check("doc_changes_since가 요약을 준다", changes.includes(MAIN));
+  check("커서 전진 → [stale]이 사라진다", !(await tool("doc_outline", {}, pat)).includes("[stale]"));
 
   // ── 내보내기 (git을 버린 뒤의 유일한 탈출구) ────────────────────
   heading("내보내기");
@@ -556,7 +556,7 @@ try {
 
   const control = docs.reduce((sum, d) => sum + d.content.length, 0);
   console.log(`  대조군: 문서 ${docs.length}개 전량 로드  ${control.toLocaleString()}자  (${docs.map((d) => d.path).join(", ")})`);
-  console.log(`  실험군: spec_outline 1회 + 작업당 필요한 섹션 1개  (outline ${outline.length.toLocaleString()}자)\n`);
+  console.log(`  실험군: doc_outline 1회 + 작업당 필요한 섹션 1개  (outline ${outline.length.toLocaleString()}자)\n`);
 
   // 헤딩 문자열을 박아 두지 않는다 — 문서가 바뀌면 같이 틀어진다. outline에서 찾는다.
   const outlineIndex = [];
@@ -579,7 +579,7 @@ try {
       check(`실측: ${task}`, false, `outline에서 '${keyword}' 섹션을 못 찾았다`);
       continue;
     }
-    const text = await tool("spec_get", { repo: SLUG_A, path: hit.doc, heading: hit.heading }, pat);
+    const text = await tool("doc_get", { repo: SLUG_A, path: hit.doc, heading: hit.heading }, pat);
     experiment += text.length;
     console.log(`  ${task}\n    → ${hit.doc} ## ${hit.heading}  ${text.length.toLocaleString()}자`);
   }

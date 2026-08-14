@@ -8,7 +8,7 @@
  *
  * 순수 함수만 둔다. `node --test`가 직접 실행하므로 확장자 포함 상대 경로 (D-008).
  */
-import { headings, splitSections } from "./spec.ts";
+import { headings, splitSections } from "./markdown.ts";
 
 export interface SavingsInput {
   path: string;
@@ -45,7 +45,7 @@ export function estimateSavings(docs: SavingsInput[]): Savings | null {
     // 대조군(원문 그대로)과 섹션(splitSections가 접음)의 기준이 달라 비율이 흔들린다.
     const content = doc.content.replace(/\r\n/g, "\n");
     controlChars += content.length;
-    // spec_outline 한 줄: "slug/path — 제목" + 헤딩당 "  ## 제목"
+    // doc_outline 한 줄: "slug/path — 제목" + 헤딩당 "  ## 제목"
     outlineChars += doc.path.length + (doc.title?.length ?? 0) + 4;
     for (const heading of headings(content)) outlineChars += heading.length + 6;
 
