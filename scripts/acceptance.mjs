@@ -246,6 +246,19 @@ try {
     (await tool("library_create", { slug: "zz-gh", name: "gh", github_repos: ["acme/*", "acme/web"] }, outsiderPat)).startsWith("만들었다"),
   );
 
+  // depth=libraries — /cushion-list와 /cushion-use가 여기에 기대는 형태다
+  const libs = await tool("doc_outline", { depth: "libraries" }, outsiderPat);
+  check(
+    "depth=libraries가 GitHub 레포와 문서 수를 준다",
+    /zz-agent-made — .*\(acme\/\*\) · 문서 \d+/.test(libs),
+    libs.split("\n")[0],
+  );
+  check("depth=libraries에는 ## 헤딩이 없다", !libs.includes("  ##"));
+  check(
+    "기본 depth는 여전히 문서+헤딩",
+    (await tool("doc_outline", {}, pat)).includes("  ##"),
+  );
+
   check(
     "없는 라이브러리를 물으면 그렇게 말한다",
     (await tool("doc_outline", { library: "zz-no-such-repo" }, outsiderPat)).includes("그런 라이브러리가 없다"),
@@ -263,12 +276,21 @@ try {
     const unknown = referenced.filter((n) => !toolNames.includes(n));
     check(`${skill} 스킬이 없는 툴을 부르지 않는다`, unknown.length === 0, unknown.join(", "));
   }
-  // 빈 레포 표기가 어긋나면 /cushion-list가 엉뚱한 걸 세거나 놓친다
-  check(
-    "cushion-list의 빈 레포 표기가 코드와 같다",
-    readFileSync(".claude/skills/cushion-list/SKILL.md", "utf8").includes("문서 없음") &&
-      mcpSource.includes("문서 없음"),
-  );
+  // 스킬이 기대는 출력 형태가 코드와 어긋나면 /cushion-list가 엉뚱한 걸 세고
+  // /cushion-use는 GitHub 대조를 못 한다 — 둘 다 조용히 틀린다
+  {
+    const listSkill = readFileSync(".claude/skills/cushion-list/SKILL.md", "utf8");
+    const useSkill = readFileSync(".claude/skills/cushion-use/SKILL.md", "utf8");
+    check(
+      "두 스킬이 depth:\"libraries\"를 쓴다",
+      listSkill.includes('depth:"libraries"') && useSkill.includes('depth:"libraries"'),
+    );
+    check("코드가 그 depth 값을 안다", mcpSource.includes('"libraries", "documents"'));
+    check(
+      "스킬이 보여주는 줄 형태가 코드와 같다",
+      listSkill.includes("· 문서 ") && mcpSource.includes("· 문서 "),
+    );
+  }
 
   check(
     "웹훅 갱신도 같은 문턱을 쓴다 (소스)",

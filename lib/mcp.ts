@@ -35,10 +35,17 @@ export const TOOLS = [
   {
     name: "doc_outline",
     description:
-      "문서 목록과 ## 헤딩 (스펙·ADR·런북·회의록 등). 먼저 부른다. repo 생략 = 접근 가능한 전체.",
+      "문서 목록과 ## 헤딩 (스펙·ADR·런북·회의록 등). 먼저 부른다. library 생략 = 접근 가능한 전체.",
     inputSchema: {
       type: "object",
-      properties: { library: { type: "string", description: "라이브러리 slug. 생략하면 전체" } },
+      properties: {
+        library: { type: "string", description: "라이브러리 slug. 생략하면 전체" },
+        depth: {
+          type: "string",
+          enum: ["libraries", "documents"],
+          description: "libraries = 라이브러리 목록만(이름·GitHub 레포·문서 수). 기본은 documents",
+        },
+      },
     },
   },
   {
@@ -230,7 +237,10 @@ export function staleLine(context: McpContext): string | null {
 
 // ─── 툴 ──────────────────────────────────────────────────────────────
 
-const outlineArgs = z.object({ library: z.string().optional() });
+const outlineArgs = z.object({
+  library: z.string().optional(),
+  depth: z.enum(["libraries", "documents"]).optional(),
+});
 // 형태 검증은 createLibrarySchema가 한다 — 여기서 또 규칙을 쓰면 두 곳이 어긋난다.
 const createArgs = z.object({
   slug: z.string(),
@@ -324,6 +334,29 @@ async function docOutline(context: McpContext, rawArgs: unknown): Promise<ToolRe
     return args.data.library
       ? { text: `그런 라이브러리가 없다: ${args.data.library}`, isError: true }
       : { text: "접근 가능한 라이브러리가 없다. library_create로 만들 수 있다." };
+  }
+
+  // depth=libraries는 "어디에 넣을까 / 이 코드 레포는 어느 라이브러리를 보나"에 답한다.
+  // 본문도 헤딩도 읽지 않으므로 라이브러리가 늘어도 응답이 거의 안 자란다.
+  if (args.data.depth === "libraries") {
+    const { data, error } = await supabase
+      .from("documents")
+      .select("library_id")
+      .in("library_id", repos.map((library) => library.id));
+    if (error) console.error("mcp: outline counts", error);
+
+    const counts = new Map<string, number>();
+    for (const row of data ?? []) {
+      counts.set(row.library_id, (counts.get(row.library_id) ?? 0) + 1);
+    }
+    return {
+      text: repos
+        .map((library) => {
+          const github = library.github_repos.length ? ` (${library.github_repos.join(", ")})` : "";
+          return `${library.slug} — ${library.name}${github} · 문서 ${counts.get(library.id) ?? 0}`;
+        })
+        .join("\n"),
+    };
   }
 
   const docs = await documentsOf(repos);
