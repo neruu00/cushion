@@ -25,7 +25,7 @@ export async function saveDocument(
   formData: FormData,
 ): Promise<SaveResult> {
   const email = await getSessionEmail();
-  if (!email) return { success: false, error: "로그인이 필요합니다." };
+  if (!email) return { success: false, error: "로그인이 필요해요." };
 
   const parsed = putDocumentSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { success: false, error: parsed.error.issues[0].message };
@@ -99,7 +99,7 @@ export async function restoreVersion(formData: FormData): Promise<void> {
     .maybeSingle();
 
   if (error || !version) {
-    console.error("restoreVersion: 버전을 찾을 수 없다", error);
+    console.error("restoreVersion: 버전을 찾을 수 없어요", error);
     return;
   }
 

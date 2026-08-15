@@ -64,14 +64,14 @@ async function conflictNow(libraryId: string, path: string): Promise<WriteResult
     .maybeSingle();
 
   if (!data) {
-    return { ok: false, code: "conflict", message: "그 사이 문서가 삭제됐다" };
+    return { ok: false, code: "conflict", message: "그 사이 문서가 삭제됐어요" };
   }
   return {
     ok: false,
     code: "conflict",
     currentSha: data.content_sha,
     currentContent: data.content,
-    message: "그 사이 문서가 바뀌었다. doc_get으로 다시 읽고 새 sha로 다시 쓸 것",
+    message: "그 사이 문서가 바뀌었어요. doc_get으로 다시 읽고 새 sha로 다시 쓰세요",
   };
 }
 
@@ -88,7 +88,7 @@ export async function putDocument(input: {
   tokenId?: string;
 }): Promise<WriteResult> {
   const { repo, existing } = await resolve(input.email, input.repo, input.path);
-  if (!repo) return { ok: false, code: "not_found", message: `그런 라이브러리가 없다: ${input.repo}` };
+  if (!repo) return { ok: false, code: "not_found", message: `그런 라이브러리가 없어요: ${input.repo}` };
 
   // 빠른 실패용 사전 비교. 실제 방어선은 아래 CAS다.
   if (existing && input.baseSha !== existing.content_sha) {
@@ -98,12 +98,12 @@ export async function putDocument(input: {
       currentSha: existing.content_sha,
       currentContent: existing.content,
       message: input.baseSha
-        ? "그 사이 문서가 바뀌었다. doc_get으로 다시 읽고 새 sha로 다시 쓸 것"
-        : "이미 있는 문서다. 덮어쓰려면 doc_get으로 받은 base_sha를 함께 보낼 것",
+        ? "그 사이 문서가 바뀌었어요. doc_get으로 다시 읽고 새 sha로 다시 쓰세요"
+        : "이미 있는 문서예요. 덮어쓰려면 doc_get으로 받은 base_sha를 함께 보내세요",
     };
   }
   if (!existing && input.baseSha) {
-    return { ok: false, code: "conflict", message: "그 사이 문서가 삭제됐다" };
+    return { ok: false, code: "conflict", message: "그 사이 문서가 삭제됐어요" };
   }
 
   // 섹션 스코프 쓰기 — 문서 전체를 실어 보내지 않기 위한 것 (SPEC §7).
@@ -112,7 +112,7 @@ export async function putDocument(input: {
   let content = input.content;
   if (input.heading !== undefined) {
     if (!existing) {
-      return { ok: false, code: "invalid", message: "섹션 수정은 기존 문서에만 쓸 수 있다. 새 문서는 heading 없이 전체를 보낼 것" };
+      return { ok: false, code: "invalid", message: "섹션 수정은 기존 문서에만 쓸 수 있어요. 새 문서는 heading 없이 전체를 보내세요" };
     }
     const merged = replaceSection(existing.content, input.heading, input.content);
     if (merged === null) {
@@ -120,7 +120,7 @@ export async function putDocument(input: {
       return {
         ok: false,
         code: "invalid",
-        message: `그런 섹션이 없다: ${input.heading}. doc_outline으로 헤딩을 확인할 것`,
+        message: `그런 섹션이 없어요: ${input.heading}. doc_outline으로 헤딩을 확인하세요`,
       };
     }
     content = merged;
@@ -148,7 +148,7 @@ export async function putDocument(input: {
 
     if (error) {
       console.error("document: put", error);
-      return { ok: false, code: "failed", message: "저장에 실패했다" };
+      return { ok: false, code: "failed", message: "저장하지 못했어요" };
     }
     if (!updated || updated.length === 0) return conflictNow(repo.id, input.path);
   } else {
@@ -162,7 +162,7 @@ export async function putDocument(input: {
       // 23505 = 유니크 충돌. 같은 경로를 동시에 만들었다 — 조용히 덮지 않고 알린다.
       if (error.code === "23505") return conflictNow(repo.id, input.path);
       console.error("document: put", error);
-      return { ok: false, code: "failed", message: "저장에 실패했다" };
+      return { ok: false, code: "failed", message: "저장하지 못했어요" };
     }
   }
 
@@ -200,7 +200,7 @@ export async function deleteDocument(input: {
   tokenId?: string;
 }): Promise<WriteResult> {
   const { repo, existing } = await resolve(input.email, input.repo, input.path);
-  if (!repo) return { ok: false, code: "not_found", message: `그런 라이브러리가 없다: ${input.repo}` };
+  if (!repo) return { ok: false, code: "not_found", message: `그런 라이브러리가 없어요: ${input.repo}` };
   if (!existing) return { ok: false, code: "not_found", message: `그런 문서가 없다: ${input.path}` };
 
   if (input.baseSha !== existing.content_sha) {
@@ -223,7 +223,7 @@ export async function deleteDocument(input: {
 
   if (error) {
     console.error("document: delete", error);
-    return { ok: false, code: "failed", message: "삭제에 실패했다" };
+    return { ok: false, code: "failed", message: "삭제하지 못했어요" };
   }
   if (!deleted || deleted.length === 0) return conflictNow(repo.id, input.path);
 

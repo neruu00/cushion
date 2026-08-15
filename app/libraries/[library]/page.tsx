@@ -10,6 +10,8 @@ import { notFound, redirect } from "next/navigation";
 
 import { Trash2 } from "lucide-react";
 
+import { PageHeader } from "@/components/PageHeader";
+import { PageShell } from "@/components/PageShell";
 import { addMember, removeMember } from "@/actions/library";
 import { ActionForm } from "@/components/ActionForm";
 import { Button } from "@/components/ui/button";
@@ -77,11 +79,11 @@ export default async function LibraryPage({ params }: PageProps<"/libraries/[lib
   const fmt = (n: number) => n.toLocaleString();
 
   return (
-    <main className="mx-auto w-full max-w-3xl space-y-8 p-8">
-      <header className="flex flex-wrap items-start justify-between gap-4">
-        <div className="space-y-1">
-          <h1 className="font-mono text-xl font-semibold">{library.slug}</h1>
-          <p className="text-sm text-muted-foreground">
+    <PageShell className="space-y-8">
+      <PageHeader
+        title={<span className="font-mono">{library.slug}</span>}
+        description={
+          <>
             {library.name}
             {library.github_repos.length > 0 ? (
               <>
@@ -113,28 +115,30 @@ export default async function LibraryPage({ params }: PageProps<"/libraries/[lib
             ]
               .filter(Boolean)
               .join(" · ") || "알림 채널 없음"}
-          </p>
-        </div>
-        <LibrarySettingsDialog
+          </>
+        }
+        action={
+          <LibrarySettingsDialog
           libraryId={library.id}
           name={library.name}
           githubRepos={library.github_repos}
           mattermostWebhookUrl={library.mattermost_webhook_url}
           discordWebhookUrl={library.discord_webhook_url}
         />
-      </header>
+        }
+      />
 
       {/* 이 도구가 존재하는 이유를 그 레포의 숫자로 보여준다. 추정이라고 명시한다. */}
       {savings && savings.savedTokens > 0 ? (
         <section className="rounded-lg border bg-muted/30 p-4 text-sm">
           <p>
-            에이전트가 이 레포의 문서를 전부 읽으면 <strong>~{fmt(savings.controlTokens)} tok</strong>.
+            에이전트가 이 라이브러리의 문서를 전부 읽으면 <strong>~{fmt(savings.controlTokens)} tok</strong>.
             목차 1회 + 작업당 섹션 1개면 <strong>~{fmt(savings.outlineTokens + savings.perTaskTokens)} tok</strong> —
-            세션당 <strong>~{fmt(savings.savedTokens)} tok</strong> 아낀다.
+            세션당 <strong>~{fmt(savings.savedTokens)} tok</strong> 아껴요.
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
             추정 · {savings.ratio.toFixed(1)}배 · 문서 {documents.length}개 기준. 목차는 세션당
-            한 번이라 작업이 늘수록 더 벌어진다.
+            한 번이라 작업이 늘수록 더 벌어져요.
           </p>
         </section>
       ) : null}
@@ -151,7 +155,7 @@ export default async function LibraryPage({ params }: PageProps<"/libraries/[lib
         </div>
         {documents.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            아직 문서가 없다. 위의 &quot;새 문서&quot;로 만들거나, 에이전트가 <code>doc_put</code>으로 만든다.
+            아직 문서가 없어요. 위의 &quot;새 문서&quot;로 만들거나, 에이전트가 <code>doc_put</code>으로 만들 수 있어요.
           </p>
         ) : (
           <ul className="divide-y rounded-lg border">
@@ -182,7 +186,7 @@ export default async function LibraryPage({ params }: PageProps<"/libraries/[lib
       <section className="space-y-2">
         <h2 className="text-sm font-medium">최근 변경</h2>
         {timeline.length === 0 ? (
-          <p className="text-sm text-muted-foreground">기록 없음.</p>
+          <p className="text-sm text-muted-foreground">아직 변경 기록이 없어요.</p>
         ) : (
           <ul className="space-y-3">
             {timeline.map((event) => (
@@ -221,8 +225,8 @@ export default async function LibraryPage({ params }: PageProps<"/libraries/[lib
       <section className="space-y-2 border-t pt-6">
         <h2 className="text-sm font-medium">멤버</h2>
         <p className="text-sm text-muted-foreground">
-          멤버는 이 레포의 문서를 읽고 쓸 수 있고, 다른 멤버를 초대할 수 있다.
-          자기 자신을 지우면 나가기다 — 마지막 멤버가 나가면 아무도 못 보게 된다.
+          멤버는 이 라이브러리의 문서를 읽고 쓸 수 있고, 다른 멤버를 초대할 수 있어요.
+          자기 자신을 지우면 나가는 거예요 — 마지막 멤버가 나가면 아무도 볼 수 없게 돼요.
         </p>
         <ul className="divide-y rounded-lg border">
           {members.map((member) => (
@@ -254,6 +258,6 @@ export default async function LibraryPage({ params }: PageProps<"/libraries/[lib
           </Label>
         </ActionForm>
       </section>
-    </main>
+    </PageShell>
   );
 }

@@ -17,7 +17,10 @@ interface MarkdownProps {
 
 export function Markdown({ children }: MarkdownProps) {
   return (
-    <div className="prose prose-neutral dark:prose-invert max-w-none prose-pre:overflow-x-auto">
+    // prose 기본값은 영어 산문 기준(16px · 행간 1.75 · 리스트 여백 0.5em)이라 한국어에는
+    // 성글다 — 글자가 조밀해 같은 값이면 훨씬 벌어져 보인다. prose-sm(14px)을 바닥으로
+    // 깔고 문단·리스트 행간만 1.7로 살짝 되올린다(한글은 라틴보다 행간이 조금 더 필요하다).
+    <div className="prose prose-sm prose-neutral dark:prose-invert max-w-none prose-p:leading-[1.7] prose-li:leading-[1.7] prose-li:my-0.5 prose-ul:my-2 prose-ol:my-2 prose-pre:overflow-x-auto">
       <ReactMarkdown remarkPlugins={[remarkGfm]}>{children}</ReactMarkdown>
     </div>
   );

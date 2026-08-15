@@ -14,7 +14,7 @@ const webhookUrl = z
   .trim()
   .optional()
   .transform((v) => v || null)
-  .pipe(z.url("웹훅은 https:// 로 시작하는 URL이어야 합니다.").nullable());
+  .pipe(z.url("웹훅은 https:// 로 시작하는 URL이어야 해요.").nullable());
 
 /**
  * 이 라이브러리를 보는 GitHub 레포들. **여러 개인 게 기본이다** — FE·BE 레포가 API 계약
@@ -96,6 +96,6 @@ export const memberSchema = z.object({
   email: z
     .string()
     .transform((v) => v.trim().toLowerCase())
-    .pipe(z.email("이메일 형식이 아닙니다.")),
+    .pipe(z.email("이메일 형식이 아니에요.")),
 });
 

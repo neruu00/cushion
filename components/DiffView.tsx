@@ -31,7 +31,7 @@ export function DiffView({ before, after }: DiffViewProps) {
 
   const { added, removed } = countChanges(lines);
   if (added === 0 && removed === 0) {
-    return <p className="px-3 py-2 text-xs text-muted-foreground">내용 변경 없음.</p>;
+    return <p className="px-3 py-2 text-xs text-muted-foreground">내용 변경이 없어요.</p>;
   }
 
   return (

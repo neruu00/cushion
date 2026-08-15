@@ -50,8 +50,8 @@ export function LibrarySettingsDialog({
         <DialogHeader>
           <DialogTitle>라이브러리 설정</DialogTitle>
           <DialogDescription>
-            <strong>칸을 비우면 지워진다.</strong> slug는 여기서 못 바꾼다 — 팀원의 URL과
-            에이전트가 쓰던 <code>library</code> 인자가 죽는다.
+            <strong>칸을 비우면 지워져요.</strong> slug는 여기서 바꿀 수 없어요 — 바꾸면 팀원의
+            URL과 에이전트가 쓰던 <code>library</code> 인자가 깨져요.
           </DialogDescription>
         </DialogHeader>
 
@@ -69,7 +69,7 @@ export function LibrarySettingsDialog({
             name="github_repos"
             label="이 라이브러리를 보는 GitHub 레포"
             placeholder={"acme/web\nacme/api"}
-            hint="한 줄에 하나씩. 조직 전체는 acme/* 로 한 줄이면 된다"
+            hint="한 줄에 하나씩. 조직 전체는 acme/* 한 줄이면 돼요"
             defaultValue={githubRepos.join("\n")}
           />
           <Field

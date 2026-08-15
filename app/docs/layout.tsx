@@ -12,6 +12,7 @@
 import type { Metadata } from "next";
 
 import { DocsNav } from "@/components/DocsNav";
+import { PageShell } from "@/components/PageShell";
 
 export const metadata: Metadata = {
   title: { template: "%s · Cushion 문서", default: "Cushion 문서" },
@@ -19,7 +20,7 @@ export const metadata: Metadata = {
 
 export default function DocsLayout({ children }: LayoutProps<"/docs">) {
   return (
-    <main className="mx-auto grid w-full max-w-4xl gap-x-10 gap-y-6 p-8 py-12 md:grid-cols-[12rem_minmax(0,1fr)] md:items-start">
+    <PageShell className="grid gap-x-10 gap-y-6 md:grid-cols-[12rem_minmax(0,1fr)] md:items-start">
       <aside
         style={{ viewTransitionName: "docs-sidebar" }}
         className="md:sticky md:top-8"
@@ -27,6 +28,6 @@ export default function DocsLayout({ children }: LayoutProps<"/docs">) {
         <DocsNav />
       </aside>
       <div className="min-w-0">{children}</div>
-    </main>
+    </PageShell>
   );
 }

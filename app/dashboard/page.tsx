@@ -8,6 +8,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { PageHeader } from "@/components/PageHeader";
+import { PageShell } from "@/components/PageShell";
 import { NewLibraryDialog } from "@/components/NewLibraryDialog";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getAccessibleLibraries, getSessionEmail } from "@/lib/authz";
@@ -19,21 +21,23 @@ export default async function DashboardPage() {
   const repos = await getAccessibleLibraries(email);
 
   return (
-    <main className="mx-auto w-full max-w-3xl space-y-6 p-8">
-      <header className="flex flex-wrap items-start justify-between gap-4">
-        <div className="space-y-1">
-          <h1 className="text-xl font-semibold">대시보드</h1>
-          <p className="text-sm text-muted-foreground">
-            문서 원본은 Cushion에 있다. 여기서 만들고, 에이전트는 MCP로 읽고 쓴다.
-          </p>
-        </div>
-        <NewLibraryDialog />
-      </header>
+    <PageShell className="space-y-6">
+      <PageHeader
+        title="대시보드"
+        description="문서 원본은 Cushion에 있어요. 여기서 만들면 에이전트가 MCP로 읽고 써요."
+        // 비어 있으면 아래 빈 상태가 곧 CTA다 — 버튼이 두 군데면 눈이 갈린다
+        action={repos.length > 0 ? <NewLibraryDialog /> : undefined}
+      />
 
       {repos.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          아직 레포가 없다. &quot;새 레포&quot;로 만들거나, 팀원에게 초대를 부탁할 것.
-        </p>
+        <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed px-6 py-12 text-center">
+          <p className="text-sm text-muted-foreground">
+            아직 라이브러리가 없어요.
+            <br />
+            새로 만들거나, 팀원에게 초대를 요청하세요 — 초대되면 여기에 바로 보여요.
+          </p>
+          <NewLibraryDialog />
+        </div>
       ) : (
         <ul className="space-y-3">
           {repos.map((library) => (
@@ -59,6 +63,6 @@ export default async function DashboardPage() {
           ))}
         </ul>
       )}
-    </main>
+    </PageShell>
   );
 }

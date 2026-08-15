@@ -24,10 +24,10 @@ export async function createAccessToken(
   formData: FormData,
 ): Promise<SecretState> {
   const email = await getSessionEmail();
-  if (!email) return { success: false, error: "로그인이 필요합니다." };
+  if (!email) return { success: false, error: "로그인이 필요해요." };
 
   const parsed = nameSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return { success: false, error: "이름이 너무 깁니다." };
+  if (!parsed.success) return { success: false, error: "이름이 너무 길어요." };
 
   const token = generateToken("access");
   const { error } = await supabase.from("access_tokens").insert({
@@ -38,7 +38,7 @@ export async function createAccessToken(
 
   if (error) {
     console.error("createAccessToken", error);
-    return { success: false, error: "발급에 실패했습니다." };
+    return { success: false, error: "발급하지 못했어요. 잠시 후 다시 시도해 주세요." };
   }
 
   revalidatePath("/settings/tokens");
@@ -46,7 +46,7 @@ export async function createAccessToken(
     success: true,
     data: {
       secret: token.plaintext,
-      hint: "이 값은 다시 볼 수 없다. 대개는 아래 명령만 복사하면 된다",
+      hint: "이 값은 다시 볼 수 없어요. 대개는 아래 명령만 복사하면 돼요",
       // 붙여넣기 한 번으로 끝나게 한다 — 레포 클론도 환경변수도 없이.
       files: [
         { name: "Claude Code에 연결 — 이 한 줄", content: connectCommand(token.plaintext) },
