@@ -20,7 +20,10 @@ import { LibrarySettingsDialog } from "@/components/LibrarySettingsDialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { getAccessibleLibrary, getSessionEmail } from "@/lib/authz";
+import { UsageChart } from "@/components/UsageChart";
 import { estimateSavings } from "@/lib/savings";
+import { parseRange } from "@/lib/usage";
+import { getUsage } from "@/lib/usage.db";
 import { supabase } from "@/lib/supabase";
 
 interface DocRow {
@@ -38,8 +41,13 @@ interface EventRow {
   deleted_paths: string[] | null;
 }
 
-export default async function LibraryPage({ params }: PageProps<"/libraries/[library]">) {
+export default async function LibraryPage({
+  params,
+  searchParams,
+}: PageProps<"/libraries/[library]">) {
   const { library: slug } = await params;
+  // Next 16은 searchParams도 await다 (동기 접근 제거)
+  const range = parseRange((await searchParams).range);
 
   const email = await getSessionEmail();
   if (!email) redirect(`/api/auth/signin?callbackUrl=${encodeURIComponent(`/libraries/${slug}`)}`);
@@ -76,7 +84,7 @@ export default async function LibraryPage({ params }: PageProps<"/libraries/[lib
   const documents: DocRow[] = docs.data ?? [];
   const timeline: EventRow[] = events.data ?? [];
   const savings = estimateSavings(documents);
-  const fmt = (n: number) => n.toLocaleString();
+  const usage = await getUsage(library.id, range);
 
   return (
     <PageShell className="space-y-8">
@@ -128,20 +136,15 @@ export default async function LibraryPage({ params }: PageProps<"/libraries/[lib
         }
       />
 
-      {/* 이 도구가 존재하는 이유를 그 레포의 숫자로 보여준다. 추정이라고 명시한다. */}
-      {savings && savings.savedTokens > 0 ? (
-        <section className="rounded-lg border bg-muted/30 p-4 text-sm">
-          <p>
-            에이전트가 이 라이브러리의 문서를 전부 읽으면 <strong>~{fmt(savings.controlTokens)} tok</strong>.
-            목차 1회 + 작업당 섹션 1개면 <strong>~{fmt(savings.outlineTokens + savings.perTaskTokens)} tok</strong> —
-            세션당 <strong>~{fmt(savings.savedTokens)} tok</strong> 아껴요.
-          </p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            추정 · {savings.ratio.toFixed(1)}배 · 문서 {documents.length}개 기준. 목차는 세션당
-            한 번이라 작업이 늘수록 더 벌어져요.
-          </p>
-        </section>
-      ) : null}
+      {/* 이 도구가 존재하는 이유를 그 라이브러리의 숫자로 보여준다. 실측(그래프)과
+          추정(절약)을 한 카드에 두되 역할을 나눈다 — 자세한 건 UsageChart 주석에. */}
+      <UsageChart
+        summary={usage}
+        range={range}
+        savings={savings}
+        documentCount={documents.length}
+        basePath={`/libraries/${library.slug}`}
+      />
 
       <section className="space-y-2">
         <div className="flex items-center justify-between gap-4">
