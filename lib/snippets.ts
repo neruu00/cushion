@@ -30,6 +30,11 @@ function baseUrl(): string {
  * 한 줄로 낸다. 백슬래시 줄바꿈은 PowerShell·cmd에서 깨진다 —
  * 큰따옴표 하나만 쓰면 bash·PowerShell·cmd 셋 다에 그대로 붙는다.
  */
+/** 스킬 매니페스트 주소. 배포 도메인을 화면에 박지 않기 위해 여기서 만든다. */
+export function skillsUrl(): string {
+  return `${baseUrl()}/api/skills`;
+}
+
 export function connectCommand(token: string): string {
   return `claude mcp add --transport http --scope user cushion ${baseUrl()}/api/mcp --header "Authorization: Bearer ${token}"\n`;
 }
@@ -54,25 +59,28 @@ function mcpJson(): string {
 /**
  * 툴이 있다고 에이전트가 쓰는 게 아니다. 이 3줄이 없으면 그냥 로컬 파일을 읽는다. (SPEC §7)
  */
-function agentsSnippet(): string {
+/**
+ * `AGENTS.md`에 남길 **한 줄**. 사용법 전문은 `cushion` 스킬에 있다 (D-016).
+ *
+ * 이 한 줄이 유일한 방아쇠다 — 로컬에 문서가 없는 게 이 구조의 정상 상태라,
+ * 이게 없으면 에이전트는 "문서가 없네" 하고 그냥 지나간다.
+ */
+function agentsSnippet(slug: string): string {
   return `## 문서
 
-이 프로젝트의 문서(스펙·ADR·런북·회의록 등)는 레포가 아니라 Cushion에 있다.
-MCP 서버 \`cushion\`으로 읽고 쓴다.
-\`doc_outline\`으로 목차를 먼저 보고 필요한 섹션만 \`doc_get\`으로 가져온다.
-응답에 \`[stale]\`이 보이면 \`doc_changes_since\`를 부른다.
-고칠 때는 \`doc_get\`으로 받은 sha를 \`doc_put\`의 \`base_sha\`에 그대로 넘긴다.
+이 프로젝트의 문서(스펙·ADR·런북·회의록 등)는 레포가 아니라 Cushion의 \`${slug}\` 라이브러리에 있다.
+MCP 서버 \`cushion\`의 \`doc_*\` 툴로 읽고 쓴다. 사용법은 \`cushion\` 스킬에 있다.
 `;
 }
 
-export function setupFiles(): { name: string; content: string }[] {
+export function setupFiles(slug: string): { name: string; content: string }[] {
   return [
-    // 개인 연결은 /settings/tokens의 명령 한 줄이면 끝난다. 이 파일까지 두면
+    // 개인 연결은 /settings/tokens의 온보딩(붙여넣기 두 번)이면 끝난다. 이 파일까지 두면
     // 프로젝트 스코프가 user 스코프를 덮어 `CUSHION_TOKEN` 없이는 그 안에서만 401이 난다.
     {
-      name: ".mcp.json — 팀 전체에 배포할 때만. 개인은 /settings/tokens 명령 한 줄로 충분하다",
+      name: ".mcp.json — 팀 전체에 배포할 때만. 개인은 /settings/tokens 온보딩으로 충분하다",
       content: mcpJson(),
     },
-    { name: "AGENTS.md 에 덧붙일 것", content: agentsSnippet() },
+    { name: "AGENTS.md 에 덧붙일 것 — 이 한 줄이 방아쇠다", content: agentsSnippet(slug) },
   ];
 }
