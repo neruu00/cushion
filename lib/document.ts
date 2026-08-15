@@ -201,7 +201,7 @@ export async function deleteDocument(input: {
 }): Promise<WriteResult> {
   const { repo, existing } = await resolve(input.email, input.repo, input.path);
   if (!repo) return { ok: false, code: "not_found", message: `그런 라이브러리가 없어요: ${input.repo}` };
-  if (!existing) return { ok: false, code: "not_found", message: `그런 문서가 없다: ${input.path}` };
+  if (!existing) return { ok: false, code: "not_found", message: `그런 문서가 없어요: ${input.path}` };
 
   if (input.baseSha !== existing.content_sha) {
     return {
@@ -209,7 +209,7 @@ export async function deleteDocument(input: {
       code: "conflict",
       currentSha: existing.content_sha,
       currentContent: existing.content,
-      message: "그 사이 문서가 바뀌었다. 다시 읽고 확인한 뒤 지울 것",
+      message: "그 사이 문서가 바뀌었어요. 다시 읽고 확인한 뒤 지우세요",
     };
   }
 

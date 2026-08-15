@@ -164,7 +164,7 @@ try {
   check(
     "/settings/tokens에 온보딩 3단계가 뜬다",
     tokensPage.status === 200 &&
-      tokensPage.html.includes("붙이는 순서") &&
+      tokensPage.html.includes("연결하는 순서") &&
       tokensPage.html.includes("/cushion-use") &&
       tokensPage.html.includes("/api/skills"),
     String(tokensPage.status),
@@ -577,7 +577,9 @@ try {
         { library: SLUG_A, path: MAIN, heading: "존재하지 않는 섹션", content: "## x\n\ny", base_sha: freshSha },
         pat,
       )
-    ).includes("그런 섹션이 없다"),
+    // 쓰기 경로(lib/document.ts)의 문구다. 읽기 경로(lib/mcp.ts)와 문체가 다르므로
+    // 여기서 mcp.ts 쪽 문구를 기대하면 조용히 어긋난다.
+    ).includes("그런 섹션이 없어요"),
   );
 
   // 삭제 — 이력은 살아남아야 한다
