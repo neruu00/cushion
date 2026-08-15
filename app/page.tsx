@@ -44,7 +44,7 @@ export default async function LandingPage() {
       <section className="space-y-1">
         <CushionDrop />
         <p className="text-center text-xs text-muted-foreground">
-          떨어지는 공의 운동 에너지를 쿠션이 흡수하듯 — 에이전트가 컨텍스트에 태울 토큰을
+          떨어지는 것을 튕겨내지 않고 푹 꺼지며 삼키듯 — 에이전트가 컨텍스트에 태울 토큰을
           Cushion이 흡수한다.
         </p>
       </section>
