@@ -13,6 +13,7 @@ import type { NextRequest } from "next/server";
 
 import { identityFromAccessToken } from "@/lib/authz";
 import { buildContext, callTool, INSTRUCTIONS, SERVER_INFO, staleLine, TOOLS } from "@/lib/mcp";
+import { recordUsage } from "@/lib/usage.db";
 
 /** 우리가 쓰는 표면(initialize/tools.*)은 이 리비전들에서 동일하다. */
 const DEFAULT_PROTOCOL = "2025-06-18";
@@ -82,11 +83,37 @@ export async function POST(request: NextRequest): Promise<Response> {
       if (typeof name !== "string") return rpcError(id, -32602, "tool name required");
 
       const context = await buildContext(identity);
-      const result = await callTool(context, name, message.params?.arguments);
+      const args = message.params?.arguments;
+      const result = await callTool(context, name, args);
 
       // 밀렸을 때만 한 줄 얹는다. 안 밀렸으면 아무것도 붙지 않는다 → 구독 비용 0 (D-005).
       const stale = staleLine(context);
       const text = stale ? `${result.text}\n\n${stale}` : result.text;
+
+      // 사용량 기록. 여기가 유일한 지점이다 — 툴 하나하나에 흩으면 새 툴을 추가할 때
+      // 빠뜨린다. 응답을 이미 문자열로 들고 있어 길이는 공짜다.
+      //
+      // 라이브러리로 귀속되는 호출만 센다. library 인자가 없는 doc_outline은 접근 가능한
+      // 전 라이브러리를 훑으므로 어느 하나에 달 수가 없고, 억지로 달면 그 라이브러리의
+      // 숫자가 부풀어 오른다. 그만큼 과소집계된다는 건 화면이 밝힌다.
+      // 외부 입력이라 단언하지 않고 좁힌다. 여기서 필요한 건 slug 하나뿐이라
+      // Zod를 한 벌 더 두지 않는다 — 인자 검증은 callTool 안에서 이미 했다.
+      const slug =
+        typeof args === "object" && args !== null && "library" in args &&
+        typeof args.library === "string"
+          ? args.library
+          : null;
+      const target = slug ? context.repos.find((repo) => repo.slug === slug) : undefined;
+      if (target) {
+        await recordUsage({
+          libraryId: target.id,
+          tool: name,
+          // 에이전트가 만들어 보낸 것 = 그쪽의 출력 토큰이었다
+          inChars: JSON.stringify(args ?? {}).length,
+          // 에이전트가 받아 싣는 것 = 그쪽의 입력 토큰이 된다
+          outChars: text.length,
+        });
+      }
 
       return rpcResult(id, {
         content: [{ type: "text", text }],

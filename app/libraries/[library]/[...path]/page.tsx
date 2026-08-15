@@ -9,6 +9,7 @@ import { ExternalLink, History, Pencil } from "lucide-react";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
+import { PageShell } from "@/components/PageShell";
 import { Markdown } from "@/components/Markdown";
 import { getAccessibleLibrary, getSessionEmail } from "@/lib/authz";
 import { supabase } from "@/lib/supabase";
@@ -41,7 +42,7 @@ export default async function DocumentPage({ params }: PageProps<"/libraries/[li
   const source = linkable ? `https://github.com/${linkable}` : null;
 
   return (
-    <main className="mx-auto w-full max-w-3xl space-y-6 p-8">
+    <PageShell className="space-y-6">
       <header className="space-y-2 border-b pb-4">
         <p className="text-xs text-muted-foreground">
           <Link href={`/libraries/${library.slug}`} className="font-mono hover:text-foreground">
@@ -74,13 +75,13 @@ export default async function DocumentPage({ params }: PageProps<"/libraries/[li
               target="_blank"
               rel="noreferrer"
             >
-              관련 레포 <ExternalLink className="size-3" />
+              관련 GitHub 레포 <ExternalLink className="size-3" />
             </a>
           ) : null}
         </div>
       </header>
 
       <Markdown>{doc.content}</Markdown>
-    </main>
+    </PageShell>
   );
 }

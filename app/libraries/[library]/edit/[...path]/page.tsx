@@ -6,6 +6,8 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
+import { PageHeader } from "@/components/PageHeader";
+import { PageShell } from "@/components/PageShell";
 import { removeDocument } from "@/actions/document";
 import { DocumentForm } from "@/components/DocumentForm";
 import { Button } from "@/components/ui/button";
@@ -36,34 +38,39 @@ export default async function EditDocumentPage({ params }: PageProps<"/libraries
   if (!doc) notFound();
 
   return (
-    <main className="mx-auto w-full max-w-3xl space-y-6 p-8">
-      <header className="space-y-1">
-        <p className="text-xs text-muted-foreground">
-          <Link href={`/libraries/${library.slug}`} className="font-mono hover:text-foreground">
-            {library.slug}
-          </Link>
-          {" / "}
-          <Link href={`/libraries/${library.slug}/${doc.path}`} className="font-mono hover:text-foreground">
-            {doc.path}
-          </Link>
-        </p>
-        <h1 className="text-xl font-semibold">편집</h1>
-        <p className="text-xs text-muted-foreground">
+    <PageShell className="space-y-6">
+      <PageHeader
+        breadcrumb={
+          <>
+            <Link href={`/libraries/${library.slug}`} className="font-mono hover:text-foreground">
+              {library.slug}
+            </Link>
+            {" / "}
+            <Link
+              href={`/libraries/${library.slug}/${doc.path}`}
+              className="font-mono hover:text-foreground"
+            >
+              {doc.path}
+            </Link>
+          </>
+        }
+        title="편집"
+        description={
           <Link
             href={`/libraries/${library.slug}/history/${doc.path}`}
             className="underline underline-offset-4 hover:text-foreground"
           >
             변경 이력
           </Link>
-        </p>
-      </header>
+        }
+      />
 
       <DocumentForm library={library.slug} path={doc.path} content={doc.content} sha={doc.content_sha} />
 
       <section className="space-y-2 border-t pt-4">
         <h2 className="text-sm font-medium">삭제</h2>
         <p className="text-sm text-muted-foreground">
-          이전 본문은 이력에 남고, 이력 화면에서 되돌릴 수 있다. 목차에서만 사라진다.
+          이전 본문은 이력에 남고, 이력 화면에서 되돌릴 수 있어요. 목차에서만 사라져요.
         </p>
         <form action={removeDocument}>
           <input type="hidden" name="library" value={library.slug} />
@@ -74,6 +81,6 @@ export default async function EditDocumentPage({ params }: PageProps<"/libraries
           </Button>
         </form>
       </section>
-    </main>
+    </PageShell>
   );
 }

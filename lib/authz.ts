@@ -34,6 +34,7 @@ export async function getSessionEmail(): Promise<string | null> {
   return session?.user?.email?.toLowerCase() ?? null;
 }
 
+
 export interface TokenIdentity {
   /** `token_cursors`가 이 id로 구독 커서를 매단다 */
   id: string;

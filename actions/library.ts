@@ -23,7 +23,7 @@ export async function createLibrary(
 ): Promise<SecretState> {
   // 로그인이면 누구나 만든다 (D-013). 열람·쓰기는 여전히 멤버만이다.
   const email = await getSessionEmail();
-  if (!email) return { success: false, error: "로그인이 필요합니다." };
+  if (!email) return { success: false, error: "로그인이 필요해요." };
 
   // 생성 로직은 lib/repository.ts 하나뿐이다. MCP library_create도 같은 함수를 지난다.
   const result = await createLibraryFor(email, Object.fromEntries(formData));
@@ -48,13 +48,13 @@ async function canManageMembers(email: string, libraryId: string): Promise<boole
 export async function addMember(_prev: SecretState, formData: FormData): Promise<SecretState> {
   // 세션부터 — 레포 단위 판정은 library_id를 알아야 해서 Zod 뒤에 온다
   const email = await getSessionEmail();
-  if (!email) return { success: false, error: "로그인이 필요합니다." };
+  if (!email) return { success: false, error: "로그인이 필요해요." };
 
   const parsed = memberSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { success: false, error: parsed.error.issues[0].message };
 
   if (!(await canManageMembers(email, parsed.data.library_id))) {
-    return { success: false, error: "이 레포의 멤버만 초대할 수 있습니다." };
+    return { success: false, error: "이 라이브러리의 멤버만 초대할 수 있어요." };
   }
 
   const { error } = await supabase.from("library_members").insert(parsed.data);
@@ -62,7 +62,7 @@ export async function addMember(_prev: SecretState, formData: FormData): Promise
     console.error("addMember", error);
     return {
       success: false,
-      error: error.code === "23505" ? "이미 등록된 멤버입니다." : "등록에 실패했습니다.",
+      error: error.code === "23505" ? "이미 등록된 멤버예요." : "등록하지 못했어요. 잠시 후 다시 시도해 주세요.",
     };
   }
 
@@ -74,14 +74,14 @@ export async function addMember(_prev: SecretState, formData: FormData): Promise
 /** 이미 만든 라이브러리의 설정 갱신. 권한은 멤버 관리와 같은 문턱이다 (그 라이브러리의 멤버). */
 export async function updateLibrary(_prev: SecretState, formData: FormData): Promise<SecretState> {
   const email = await getSessionEmail();
-  if (!email) return { success: false, error: "로그인이 필요합니다." };
+  if (!email) return { success: false, error: "로그인이 필요해요." };
 
   const parsed = librarySettingsSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { success: false, error: parsed.error.issues[0].message };
 
   const { library_id, ...settings } = parsed.data;
   if (!(await canManageMembers(email, library_id))) {
-    return { success: false, error: "이 라이브러리의 멤버만 바꿀 수 있습니다." };
+    return { success: false, error: "이 라이브러리의 멤버만 바꿀 수 있어요." };
   }
 
   // slug를 되받아 재검증에 쓴다 — 폼이 준 값을 믿고 경로를 만들지 않는다.
@@ -94,7 +94,7 @@ export async function updateLibrary(_prev: SecretState, formData: FormData): Pro
 
   if (error || !data) {
     console.error("updateLibrary", error);
-    return { success: false, error: "저장에 실패했습니다." };
+    return { success: false, error: "저장하지 못했어요. 잠시 후 다시 시도해 주세요." };
   }
 
   revalidatePath(`/libraries/${data.slug}`);

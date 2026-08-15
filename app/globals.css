@@ -10,8 +10,12 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans);
-  --font-mono: var(--font-geist-mono);
+  /* Geist(라틴) → Pretendard(한글) 순. Geist에 한글이 없어 한글만 뒤로 넘어간다.
+     var(--font-sans) 자기 참조였던 것을 고쳤다 — 순환이라 통째로 무효가 돼서
+     화면 전체가 브라우저 기본 폰트로 렌더되고 있었다. */
+  --font-sans: var(--font-geist-sans), var(--font-pretendard), ui-sans-serif, system-ui, sans-serif;
+  /* 코드 블록 안의 한글(주석·안내문)도 Pretendard가 받게 한다 */
+  --font-mono: var(--font-geist-mono), var(--font-pretendard), ui-monospace, monospace;
   --font-heading: var(--font-sans);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
@@ -129,6 +133,11 @@
   }
   html {
     @apply font-sans;
+    /* 스크롤바 자리를 항상 확보한다. 없으면 내용이 짧은 페이지(스크롤바 없음)와 긴
+       페이지(있음)의 뷰포트 폭이 달라져, 가운데 정렬된 헤더·본문이 페이지를 옮길
+       때마다 좌우로 반 스크롤바만큼 튄다 — "내용 크기에 따라 헤더가 움직인다"의 정체.
+       다이얼로그가 스크롤을 잠글 때의 튐도 같이 사라진다. */
+    scrollbar-gutter: stable;
   }
 }
 /* ── 문서 화면 전환 (app/docs) ─────────────────────────────────────────────

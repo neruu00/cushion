@@ -4,6 +4,8 @@
  */
 import { notFound } from "next/navigation";
 
+import { PageHeader } from "@/components/PageHeader";
+import { PageShell } from "@/components/PageShell";
 import { createAccessToken, revokeAccessToken } from "@/actions/token";
 import { ActionForm } from "@/components/ActionForm";
 import { OnboardingSteps } from "@/components/OnboardingSteps";
@@ -57,21 +59,23 @@ export default async function TokensPage() {
   const tokens: TokenRow[] = data ?? [];
 
   return (
-    <main className="mx-auto w-full max-w-3xl space-y-8 p-8">
-      <header className="space-y-1">
-        <h1 className="text-xl font-semibold">access token</h1>
-        <p className="text-sm text-muted-foreground">
-          에이전트가 MCP로 붙을 때 쓴다. 권한은 토큰이 아니라 <code>{email}</code> 에 붙어 있어서,
-          멤버에서 빠지면 재발급 없이 바로 막힌다.
-        </p>
-      </header>
+    <PageShell className="space-y-8">
+      <PageHeader
+        title="access token"
+        description={
+          <>
+            에이전트가 MCP로 연결할 때 써요. 권한은 토큰이 아니라 <code>{email}</code> 에 붙어
+            있어서, 멤버에서 빠지면 재발급 없이 바로 막혀요.
+          </>
+        }
+      />
 
       <Card>
         <CardHeader>
-          <CardTitle>붙이는 순서</CardTitle>
+          <CardTitle>연결하는 순서</CardTitle>
           <CardDescription>
-            세 단계다. ①만 해도 에이전트가 문서를 읽고 쓴다 — ②는 사용법을 깊게 알려 주고,
-            ③은 <strong>다음 세션부터 알아서 찾게</strong> 만든다.
+            세 단계예요. ①만 해도 에이전트가 문서를 읽고 써요 — ②는 사용법을 깊게 알려 주고,
+            ③은 <strong>다음 세션부터 알아서 찾게</strong> 만들어요.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -80,10 +84,10 @@ export default async function TokensPage() {
             connectSlot={
               <div className="space-y-2">
                 <p className="text-sm text-muted-foreground">
-                  발급하면 토큰이 박힌 명령이 같이 나온다. 아무 디렉터리에서 한 번 실행하면 끝 —
-                  레포를 받을 필요도, 환경변수를 심을 필요도 없다. 토큰은{" "}
-                  <code>~/.claude.json</code> 에 평문으로 남는다(환경변수를 dotfile에 두는 것과
-                  같은 등급이다). 새면 재발급하면 되고, 그 순간 옛 토큰은 죽는다.
+                  발급하면 토큰이 포함된 명령이 같이 나와요. 아무 디렉터리에서 한 번 실행하면 끝
+                  — 레포를 클론할 필요도, 환경변수를 설정할 필요도 없어요. 토큰은{" "}
+                  <code>~/.claude.json</code> 에 평문으로 남아요(환경변수를 dotfile에 두는 것과
+                  같은 수준이에요). 유출되면 재발급하세요 — 그 즉시 이전 토큰은 무효가 돼요.
                 </p>
                 <ActionForm action={createAccessToken} submitLabel="발급">
                   <Label className="grid gap-1.5">
@@ -98,7 +102,7 @@ export default async function TokensPage() {
       </Card>
 
       {tokens.length === 0 ? (
-        <p className="text-sm text-muted-foreground">발급한 토큰이 없다.</p>
+        <p className="text-sm text-muted-foreground">아직 발급한 토큰이 없어요.</p>
       ) : (
         <Table>
           <TableHeader>
@@ -132,6 +136,6 @@ export default async function TokensPage() {
           </TableBody>
         </Table>
       )}
-    </main>
+    </PageShell>
   );
 }

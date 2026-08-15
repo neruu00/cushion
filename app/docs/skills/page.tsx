@@ -39,17 +39,17 @@ export default function DocsSkillsPage() {
         <header className="space-y-3">
           <h1 className="text-2xl font-semibold">스킬</h1>
           <p className="text-muted-foreground">
-            에이전트가 언제 무엇을 해야 하는지 적어 둔 파일 묶음이다. 없어도 <code>doc_*</code> 툴은
-            동작한다 — 스킬은 <strong className="text-foreground">관례</strong>를 준다. 충돌이 났을
+            에이전트가 언제 무엇을 해야 하는지 적어 둔 파일 묶음이에요. 없어도 <code>doc_*</code> 툴은
+            동작해요 — 스킬은 <strong className="text-foreground">관례</strong>를 줘요. 충돌이 났을
             때 어떻게 복구할지, 새 ADR을 어떤 형식으로 만들지, 어느 라이브러리를 볼지.
           </p>
           <p className="text-sm text-muted-foreground">
             아래 본문은 <code>{skillsUrl()}</code>가 배포하는{" "}
-            <strong className="text-foreground">그 파일 그대로</strong>다. 설치 방법은{" "}
+            <strong className="text-foreground">그 파일 그대로</strong>예요. 설치 방법은{" "}
             <a href="/docs/install" className="underline underline-offset-4">
               설치
             </a>{" "}
-            2단계에 있다.
+            2단계에 있어요.
           </p>
         </header>
 
@@ -86,8 +86,8 @@ export default function DocsSkillsPage() {
         ))}
 
         <p className="text-xs text-muted-foreground">
-          매니페스트 버전 <code>{version}</code> — 손으로 올리는 번호가 아니라 파일 내용의 해시다.
-          설치한 사본이 낡았는지는 이 값으로 대조한다.
+          매니페스트 버전 <code>{version}</code> — 손으로 올리는 번호가 아니라 파일 내용의 해시예요.
+          설치한 사본이 낡았는지 이 값으로 대조할 수 있어요.
         </p>
 
         <DocsPager current="/docs/skills" />

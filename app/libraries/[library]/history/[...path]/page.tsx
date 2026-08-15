@@ -8,6 +8,8 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
+import { PageHeader } from "@/components/PageHeader";
+import { PageShell } from "@/components/PageShell";
 import { restoreVersion } from "@/actions/document";
 import { DiffView } from "@/components/DiffView";
 import { Button } from "@/components/ui/button";
@@ -64,32 +66,37 @@ export default async function HistoryPage({ params }: PageProps<"/libraries/[lib
     index === 0 ? (live?.content ?? "") : versions[index - 1].content;
 
   return (
-    <main className="mx-auto w-full max-w-3xl space-y-6 p-8">
-      <header className="space-y-1">
-        <p className="text-xs text-muted-foreground">
-          <Link href={`/libraries/${library.slug}`} className="font-mono hover:text-foreground">
-            {library.slug}
-          </Link>
-          {" / "}
-          {live ? (
-            <Link href={`/libraries/${library.slug}/${docPath}`} className="font-mono hover:text-foreground">
-              {docPath}
+    <PageShell className="space-y-6">
+      <PageHeader
+        breadcrumb={
+          <>
+            <Link href={`/libraries/${library.slug}`} className="font-mono hover:text-foreground">
+              {library.slug}
             </Link>
-          ) : (
-            <span className="font-mono">{docPath}</span>
-          )}
-        </p>
-        <h1 className="text-xl font-semibold">변경 이력</h1>
-        <p className="text-sm text-muted-foreground">
-          {live
+            {" / "}
+            {live ? (
+              <Link
+                href={`/libraries/${library.slug}/${docPath}`}
+                className="font-mono hover:text-foreground"
+              >
+                {docPath}
+              </Link>
+            ) : (
+              <span className="font-mono">{docPath}</span>
+            )}
+          </>
+        }
+        title="변경 이력"
+        description={
+          live
             ? `현재 ${live.updated_at.slice(0, 19)}${live.updated_by ? ` · ${live.updated_by}` : ""}`
-            : "이 문서는 삭제됐다. 아래에서 되돌릴 수 있다."}
-        </p>
-      </header>
+            : "이 문서는 삭제됐어요. 아래에서 되돌릴 수 있어요."
+        }
+      />
 
       {versions.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          아직 이력이 없다. 처음 저장된 뒤 한 번도 안 바뀌었다는 뜻이다.
+          아직 이력이 없어요. 처음 저장된 뒤 한 번도 바뀌지 않았다는 뜻이에요.
         </p>
       ) : (
         <ul className="space-y-3">
@@ -128,8 +135,8 @@ export default async function HistoryPage({ params }: PageProps<"/libraries/[lib
 
       {/* 되돌리기는 덮어쓰기가 아니라 새 저장이다 — 그 사실이 화면에도 보여야 한다 */}
       <p className="border-t pt-4 text-xs text-muted-foreground">
-        되돌리기는 지우지 않는다. 현재 내용을 이력에 남기고 그 위에 새로 쓴다.
+        되돌려도 지워지지 않아요. 현재 내용을 이력에 남기고 그 위에 새로 써요.
       </p>
-    </main>
+    </PageShell>
   );
 }

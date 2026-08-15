@@ -28,16 +28,18 @@ export function SkillInstall({ skillsUrl }: SkillInstallProps) {
 
       <TabsContent value="user" className="space-y-2">
         <p className="text-sm text-muted-foreground">
-          <code>~/.claude/skills/</code> 에 심는다. 한 번 설치하면 <strong>모든 프로젝트</strong>에서
-          쓴다. 스킬 파일에는 프로젝트 정보가 없으므로 보통 이쪽이 맞다.
+          <code>~/.claude/skills/</code> 에 설치해요. 한 번 설치하면{" "}
+          <strong>모든 프로젝트</strong>에서 쓸 수 있어요. 스킬 파일에는 프로젝트 정보가 없어서
+          보통 이쪽이 맞아요.
         </p>
         <CopyBlock value={sentence("~/.claude/skills/")} label="에이전트에게 그대로" />
       </TabsContent>
 
       <TabsContent value="project" className="space-y-2">
         <p className="text-sm text-muted-foreground">
-          <code>.claude/skills/</code> 에 심는다. 커밋하면 <strong>팀 전원</strong>이 자동으로
-          얻는다. 대신 프로젝트마다 설치해야 하고, 나중에 스킬이 갱신돼도 커밋된 사본은 그대로다.
+          <code>.claude/skills/</code> 에 설치해요. 커밋하면 <strong>팀 전원</strong>이 자동으로
+          받아요. 대신 프로젝트마다 설치해야 하고, 나중에 스킬이 갱신돼도 커밋된 사본은
+          그대로예요.
         </p>
         <CopyBlock value={sentence(".claude/skills/")} label="에이전트에게 그대로" />
       </TabsContent>

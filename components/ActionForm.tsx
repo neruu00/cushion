@@ -48,9 +48,9 @@ export function ActionForm({ action, submitLabel, children, className }: ActionF
           {state.data.secret ? (
             <>
               <Alert>
-                <AlertTitle>지금 한 번만 보인다</AlertTitle>
+                <AlertTitle>지금 한 번만 보여요</AlertTitle>
                 <AlertDescription>
-                  서버는 해시만 저장한다. 이 화면을 벗어나면 다시 볼 수 없고, 재발급만 가능하다.
+                  서버에는 해시만 저장돼요. 이 화면을 벗어나면 다시 볼 수 없고, 재발급만 할 수 있어요.
                 </AlertDescription>
               </Alert>
               <CopyBlock value={state.data.secret} label={state.data.hint} />
