@@ -1,6 +1,6 @@
 /**
  * @file lib/usage.db.ts
- * @description `usage_hourly` 읽기·쓰기 (0002_usage.sql).
+ * @description `usage_hourly` 읽기·쓰기 (스키마는 supabase/migrations/0001_schema.sql).
  *
  * 계산은 `lib/usage.ts`에 있고 여기는 DB만 만진다. 나눈 이유는 테스트다 —
  * `lib/supabase.ts`가 env 없으면 모듈 로드 시점에 죽어서, 순수 함수가 같은 파일에
@@ -9,7 +9,7 @@
 import { supabase } from "./supabase";
 import { bucketize, dayKeys, rangeDays, type UsageRange, type UsageRow, type UsageSummary } from "./usage";
 
-/** PostgREST: 스키마 캐시에 테이블/함수가 없다 = 0002 마이그레이션 실행 전 */
+/** PostgREST: 스키마 캐시에 테이블/함수가 없다 = 스키마를 아직 안 돌렸다 */
 const MISSING_TABLE = "PGRST205";
 const MISSING_FUNCTION = "PGRST202";
 
@@ -39,7 +39,7 @@ function isMissingMigration(error: PostgrestErrorish): boolean {
   if (!migrationNoticeShown) {
     migrationNoticeShown = true;
     console.warn(
-      "usage: supabase/migrations/0002_usage.sql 이 아직 실행되지 않았다. " +
+      "usage: supabase/migrations/0001_schema.sql 을 다시 돌려야 한다(usage_hourly 없음). " +
         "사용량 기록·차트는 비어 있고 나머지 기능은 정상이다.",
     );
   }

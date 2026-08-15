@@ -8,17 +8,11 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
-import { Trash2 } from "lucide-react";
-
 import { PageHeader } from "@/components/PageHeader";
 import { PageShell } from "@/components/PageShell";
-import { addMember, removeMember } from "@/actions/library";
-import { ActionForm } from "@/components/ActionForm";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ChangeCard, type ChangeEvent } from "@/components/ChangeCard";
 import { LibrarySettingsDialog } from "@/components/LibrarySettingsDialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { MembersDialog } from "@/components/MembersDialog";
 import { getAccessibleLibrary, getSessionEmail } from "@/lib/authz";
 import { UsageChart } from "@/components/UsageChart";
 import { estimateSavings } from "@/lib/savings";
@@ -31,14 +25,6 @@ interface DocRow {
   title: string | null;
   updated_at: string;
   content: string;
-}
-
-interface EventRow {
-  id: number;
-  summary: string | null;
-  created_at: string;
-  changed_paths: string[] | null;
-  deleted_paths: string[] | null;
 }
 
 export default async function LibraryPage({
@@ -66,10 +52,11 @@ export default async function LibraryPage({
       .order("path"),
     supabase
       .from("sync_events")
-      .select("id, summary, created_at, changed_paths, deleted_paths")
+      .select("id, summary, author, created_at, changed_paths, deleted_paths")
       .eq("library_id", library.id)
       .order("id", { ascending: false })
-      .limit(10),
+      // 최신 1건만 보여준다. 2건을 읽는 건 "더보기"를 걸지 말지 알기 위해서다.
+      .limit(2),
     supabase
       .from("library_members")
       .select("email")
@@ -82,7 +69,7 @@ export default async function LibraryPage({
   if (events.error) console.error("LibraryPage: events", events.error);
 
   const documents: DocRow[] = docs.data ?? [];
-  const timeline: EventRow[] = events.data ?? [];
+  const timeline: ChangeEvent[] = events.data ?? [];
   const savings = estimateSavings(documents);
   const usage = await getUsage(library.id, range);
 
@@ -126,25 +113,45 @@ export default async function LibraryPage({
           </>
         }
         action={
-          <LibrarySettingsDialog
-          libraryId={library.id}
-          name={library.name}
-          githubRepos={library.github_repos}
-          mattermostWebhookUrl={library.mattermost_webhook_url}
-          discordWebhookUrl={library.discord_webhook_url}
-        />
+          <div className="flex shrink-0 items-center gap-2">
+            {/* 이 화면을 보는 것과 멤버를 관리하는 것의 권한 문턱이 같다 (D-013) */}
+            <MembersDialog libraryId={library.id} members={members} currentEmail={email} />
+            <LibrarySettingsDialog
+              libraryId={library.id}
+              name={library.name}
+              githubRepos={library.github_repos}
+              mattermostWebhookUrl={library.mattermost_webhook_url}
+              discordWebhookUrl={library.discord_webhook_url}
+            />
+          </div>
         }
       />
 
-      {/* 이 도구가 존재하는 이유를 그 라이브러리의 숫자로 보여준다. 실측(그래프)과
-          추정(절약)을 한 카드에 두되 역할을 나눈다 — 자세한 건 UsageChart 주석에. */}
-      <UsageChart
-        summary={usage}
-        range={range}
-        savings={savings}
-        documentCount={documents.length}
-        basePath={`/libraries/${library.slug}`}
-      />
+      {/* 위에서부터 최근 변경 → 문서 → 토큰 사용량. 무슨 일이 있었나 → 무엇이 있나 →
+          얼마나 썼나 순이다. 멤버는 헤더의 다이얼로그로 옮겼다. */}
+      <section className="space-y-2">
+        <div className="flex items-center justify-between gap-4">
+          <h2 className="text-sm font-medium">최근 변경</h2>
+          {timeline.length > 0 ? (
+            <Link
+              href={`/libraries/${library.slug}/changes`}
+              className="text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
+            >
+              더보기
+            </Link>
+          ) : null}
+        </div>
+        {timeline.length === 0 ? (
+          <p className="text-sm text-muted-foreground">아직 변경 기록이 없어요.</p>
+        ) : (
+          <ul className="divide-y rounded-lg border">
+            {/* 최신 하나만. 나머지는 더보기로 간다 */}
+            <li>
+              <ChangeCard event={timeline[0]} librarySlug={library.slug} />
+            </li>
+          </ul>
+        )}
+      </section>
 
       <section className="space-y-2">
         <div className="flex items-center justify-between gap-4">
@@ -158,7 +165,8 @@ export default async function LibraryPage({
         </div>
         {documents.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            아직 문서가 없어요. 위의 &quot;새 문서&quot;로 만들거나, 에이전트가 <code>doc_put</code>으로 만들 수 있어요.
+            아직 문서가 없어요. 위의 &quot;새 문서&quot;로 만들거나, 에이전트가{" "}
+            <code>doc_put</code>으로 만들 수 있어요.
           </p>
         ) : (
           <ul className="divide-y rounded-lg border">
@@ -186,81 +194,16 @@ export default async function LibraryPage({
         )}
       </section>
 
-      <section className="space-y-2">
-        <h2 className="text-sm font-medium">최근 변경</h2>
-        {timeline.length === 0 ? (
-          <p className="text-sm text-muted-foreground">아직 변경 기록이 없어요.</p>
-        ) : (
-          <ul className="space-y-3">
-            {timeline.map((event) => (
-              <li key={event.id}>
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-xs font-normal text-muted-foreground">
-                      {event.created_at.slice(0, 10)}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-2">
-                    <p className="text-sm whitespace-pre-line">{event.summary ?? "요약 없음"}</p>
-                    {/* 요약만 보이고 상세로 갈 길이 없으면 "뭐가 바뀌었나"를 못 본다 */}
-                    <p className="flex flex-wrap gap-3 text-xs">
-                      {[...(event.changed_paths ?? []), ...(event.deleted_paths ?? [])].map(
-                        (path) => (
-                          <Link
-                            key={path}
-                            href={`/libraries/${library.slug}/history/${path}`}
-                            className="font-mono text-muted-foreground underline underline-offset-4 hover:text-foreground"
-                          >
-                            {path} 변경 내역
-                          </Link>
-                        ),
-                      )}
-                    </p>
-                  </CardContent>
-                </Card>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      {/* 이 도구가 존재하는 이유를 그 라이브러리의 숫자로 보여준다. 실측(그래프)과
+          추정(절약)을 한 카드에 두되 역할을 나눈다 — 자세한 건 UsageChart 주석에. */}
+      <UsageChart
+        summary={usage}
+        range={range}
+        savings={savings}
+        documentCount={documents.length}
+        basePath={`/libraries/${library.slug}`}
+      />
 
-      {/* 이 페이지 자체가 멤버만 보므로, 멤버 관리의 권한 문턱과 정확히 일치한다 (D-013) */}
-      <section className="space-y-2 border-t pt-6">
-        <h2 className="text-sm font-medium">멤버</h2>
-        <p className="text-sm text-muted-foreground">
-          멤버는 이 라이브러리의 문서를 읽고 쓸 수 있고, 다른 멤버를 초대할 수 있어요.
-          자기 자신을 지우면 나가는 거예요 — 마지막 멤버가 나가면 아무도 볼 수 없게 돼요.
-        </p>
-        <ul className="divide-y rounded-lg border">
-          {members.map((member) => (
-            <li key={member.email} className="flex items-center justify-between gap-2 px-3 py-1.5">
-              <span className="truncate font-mono text-sm">
-                {member.email}
-                {member.email === email ? " (나)" : ""}
-              </span>
-              <form action={removeMember}>
-                <input type="hidden" name="library_id" value={library.id} />
-                <input type="hidden" name="email" value={member.email} />
-                <Button
-                  type="submit"
-                  variant="destructive"
-                  size="xs"
-                  aria-label={`${member.email} 제거`}
-                >
-                  <Trash2 />
-                </Button>
-              </form>
-            </li>
-          ))}
-        </ul>
-        <ActionForm action={addMember} submitLabel="초대">
-          <input type="hidden" name="library_id" value={library.id} />
-          <Label className="grid gap-1.5">
-            <span>이메일</span>
-            <Input name="email" type="email" placeholder="teammate@example.com" required />
-          </Label>
-        </ActionForm>
-      </section>
     </PageShell>
   );
 }
