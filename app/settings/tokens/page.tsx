@@ -4,6 +4,7 @@
  */
 import { notFound } from "next/navigation";
 
+import { formatDate } from "@/lib/datetime";
 import { PageHeader } from "@/components/PageHeader";
 import { PageShell } from "@/components/PageShell";
 import { createAccessToken, revokeAccessToken } from "@/actions/token";
@@ -39,9 +40,10 @@ interface TokenRow {
   revoked_at: string | null;
 }
 
-/** timestamptz → YYYY-MM-DD. 로케일 포맷은 서버·클라이언트가 갈릴 수 있어 쓰지 않는다. */
+/** timestamptz → YYYY-MM-DD. 없으면 대시. 변환은 `lib/datetime.ts`가 한다 —
+ *  로케일·타임존을 명시하지 않으면 서버·클라이언트가 갈린다. */
 function day(value: string | null): string {
-  return value ? value.slice(0, 10) : "—";
+  return value ? formatDate(value) : "—";
 }
 
 export default async function TokensPage() {

@@ -9,8 +9,8 @@ import { notFound, redirect } from "next/navigation";
 import { PageHeader } from "@/components/PageHeader";
 import { PageShell } from "@/components/PageShell";
 import { removeDocument } from "@/actions/document";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { DocumentForm } from "@/components/DocumentForm";
-import { Button } from "@/components/ui/button";
 import { getAccessibleLibrary, getSessionEmail } from "@/lib/authz";
 import { supabase } from "@/lib/supabase";
 
@@ -72,14 +72,29 @@ export default async function EditDocumentPage({ params }: PageProps<"/libraries
         <p className="text-sm text-muted-foreground">
           이전 본문은 이력에 남고, 이력 화면에서 되돌릴 수 있어요. 목차에서만 사라져요.
         </p>
-        <form action={removeDocument}>
-          <input type="hidden" name="library" value={library.slug} />
-          <input type="hidden" name="path" value={doc.path} />
-          <input type="hidden" name="base_sha" value={doc.content_sha} />
-          <Button type="submit" variant="destructive" size="sm">
-            이 문서 삭제
-          </Button>
-        </form>
+        <ConfirmDialog
+          trigger="이 문서 삭제"
+          triggerVariant="destructive"
+          triggerSize="sm"
+          title="이 문서를 삭제할까요?"
+          confirmLabel="삭제"
+          destructive
+          description={
+            <>
+              <span className="block font-mono text-xs">{doc.path}</span>
+              <span className="mt-2 block">
+                본문은 이력에 남아요. 목차에서 사라지고, 이력 화면에서 되돌릴 수 있어요.
+              </span>
+            </>
+          }
+          formId="delete-document"
+        >
+          <form id="delete-document" action={removeDocument}>
+            <input type="hidden" name="library" value={library.slug} />
+            <input type="hidden" name="path" value={doc.path} />
+            <input type="hidden" name="base_sha" value={doc.content_sha} />
+          </form>
+        </ConfirmDialog>
       </section>
     </PageShell>
   );

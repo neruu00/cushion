@@ -9,6 +9,7 @@ import { ExternalLink, History, Pencil } from "lucide-react";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
+import { formatDate } from "@/lib/datetime";
 import { PageShell } from "@/components/PageShell";
 import { Markdown } from "@/components/Markdown";
 import { getAccessibleLibrary, getSessionEmail } from "@/lib/authz";
@@ -53,7 +54,7 @@ export default async function DocumentPage({ params }: PageProps<"/libraries/[li
         </p>
         <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
           <span>
-            {doc.updated_at.slice(0, 10)}
+            {formatDate(doc.updated_at)}
             {doc.updated_by ? ` · ${doc.updated_by}` : ""}
           </span>
           <Link

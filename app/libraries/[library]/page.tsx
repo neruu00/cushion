@@ -8,6 +8,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
+import { formatDate } from "@/lib/datetime";
 import { PageHeader } from "@/components/PageHeader";
 import { PageShell } from "@/components/PageShell";
 import { ChangeCard, type ChangeEvent } from "@/components/ChangeCard";
@@ -185,7 +186,7 @@ export default async function LibraryPage({
                     ) : null}
                   </span>
                   <span className="shrink-0 text-xs text-muted-foreground">
-                    {doc.updated_at.slice(0, 10)}
+                    {formatDate(doc.updated_at)}
                   </span>
                 </Link>
               </li>
