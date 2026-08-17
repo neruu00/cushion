@@ -24,7 +24,7 @@ export function DiffView({ before, after }: DiffViewProps) {
   if (lines === null) {
     return (
       <p className="px-3 py-2 text-xs text-muted-foreground">
-        변경이 너무 커서 diff를 생략했다. 아래 전문을 본다.
+        변경이 너무 커서 diff를 생략했어요. 아래 전문을 봐주세요.
       </p>
     );
   }
