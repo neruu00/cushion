@@ -78,6 +78,9 @@ create table if not exists libraries (
   discord_webhook_url     text,
   -- 최신 이벤트 id 비정규화 (D-012). 갱신은 lib/mirror.ts recordChange 한 곳뿐이다.
   latest_event_id         bigint not null default 0,
+  -- 마지막으로 실제 발송한 시각. 알림 디바운스 창의 기준점이고, 조건부 UPDATE의 CAS 키다.
+  -- null = 아직 한 번도 안 보냄 → 다음 변경이 즉시 나간다.
+  last_notified_at        timestamptz,
   created_at              timestamptz not null default now(),
 
   constraint libraries_slug_format check (slug ~ '^[a-z0-9][a-z0-9-]{0,62}$')
@@ -149,10 +152,16 @@ create table if not exists sync_events (
   changed_paths  text[] not null default '{}',
   deleted_paths  text[] not null default '{}',
   summary        text,                             -- 구조적 요약 (SPEC §8). LLM 아님
+  -- 이 이벤트가 알림에 실려 나간 시각. null = 아직 안 보냄 (디바운스 대기 중).
+  -- 델타 피드(doc_changes_since)는 이 값을 보지 않는다 — 커서는 token_cursors가 따로 센다.
+  notified_at    timestamptz,
   created_at     timestamptz not null default now()
 );
 
 create index if not exists sync_events_library_id_idx on sync_events (library_id, id desc);
+
+-- notified_at을 쓰는 부분 인덱스는 여기 두면 안 된다 — 이미 있는 DB에서는 위 create table이
+-- 통째로 건너뛰어져 그 컬럼이 아직 없다. 아래 [수렴] 절의 add column 뒤에 있다.
 
 -- ─────────────────────────────────────────────────────────────
 -- access_tokens — 에이전트용. 사람 단위이고 서가에 속하지 않는다
@@ -249,7 +258,22 @@ $$;
 alter table libraries add column if not exists discord_webhook_url text;
 alter table libraries add column if not exists latest_event_id bigint not null default 0;
 alter table libraries add column if not exists github_repos text[] not null default '{}';
+alter table libraries add column if not exists last_notified_at timestamptz;
 alter table documents add column if not exists updated_by text;
+alter table sync_events add column if not exists notified_at timestamptz;
+
+-- 발송 대기분만 훑는 부분 인덱스. 보낸 이벤트는 계속 쌓이지만 이 인덱스는 안 커진다.
+-- 컬럼을 참조하므로 반드시 위 add column 뒤다.
+create index if not exists sync_events_pending_idx
+  on sync_events (library_id, id) where notified_at is null;
+
+-- 이미 있던 이벤트는 발송된 것으로 친다. 안 그러면 배포 후 첫 쓰기가 과거 전부를
+-- 한 통에 묶어 쏜다. '1시간 이전'으로 제한하는 건 이 파일을 다시 돌려도 그 사이
+-- 대기 중인 알림을 삼키지 않게 하려는 것이다.
+update sync_events
+   set notified_at = created_at
+ where notified_at is null
+   and created_at < now() - interval '1 hour';
 
 alter table documents drop constraint if exists documents_updated_by_lower;
 alter table documents add constraint documents_updated_by_lower

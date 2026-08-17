@@ -21,10 +21,12 @@ export interface Library {
   discord_webhook_url: string | null;
   /** 레포별 최신 이벤트 (D-012 비정규화). [stale] 판단이 추가 쿼리 없이 된다 */
   latest_event_id: number;
+  /** 알림 디바운스 창의 기준점. 쓰기 경로가 이 값 하나로 발송 여부를 정한다 */
+  last_notified_at: string | null;
 }
 
 const LIBRARY_COLUMNS =
-  "id, slug, name, github_repos, mattermost_webhook_url, discord_webhook_url, latest_event_id";
+  "id, slug, name, github_repos, mattermost_webhook_url, discord_webhook_url, latest_event_id, last_notified_at";
 
 // ─── 정체성 ──────────────────────────────────────────────────────────
 

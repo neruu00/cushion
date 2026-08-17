@@ -3,24 +3,9 @@
  * @description 레포 등록 직후 화면에 뿌리는 붙여넣기용 설정 파일 (T-202).
  *              별도 설치 가이드 문서를 만들지 않기 위해 존재한다.
  */
-
-/**
- * 앱의 공개 base URL.
- *
- * NextAuth는 `NEXTAUTH_URL` 없이도 요청 호스트로 잘 돈다. 그래서 배포할 때 이 값을
- * 빠뜨려도 로그인은 멀쩡하고 **여기서 만드는 스니펫만 조용히 `localhost`가 된다** —
- * 화면은 정상으로 보이는데 팀원에게 나눠 준 연결 명령이 아무 데서도 안 되는 식이다.
- * 그래서 Vercel이 늘 넣어 주는 배포 도메인을 두 번째 후보로 둔다.
- */
-function baseUrl(): string {
-  const explicit = process.env.NEXTAUTH_URL;
-  if (explicit) return explicit.replace(/\/+$/, "");
-
-  const vercel = process.env.VERCEL_PROJECT_PRODUCTION_URL;
-  if (vercel) return `https://${vercel}`;
-
-  return "http://localhost:3000";
-}
+// `@/` 별칭이 아니라 확장자까지 쓴 상대 경로다. 이 파일은 `node --test`가 직접 실행하는
+// 순수 모듈이고, plain Node는 tsconfig의 paths를 모른다 (D-008).
+import { baseUrl } from "./url.ts";
 
 /**
  * 발급 직후 1회만 보여주는 연결 명령. **여기엔 토큰을 직접 넣는다** —
