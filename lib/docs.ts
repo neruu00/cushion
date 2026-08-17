@@ -19,7 +19,7 @@ export const DOCS_PAGES: DocsPage[] = [
   { href: "/docs", title: "개요", summary: "무엇을, 왜" },
   { href: "/docs/install", title: "설치", summary: "연결하는 세 단계" },
   { href: "/docs/usage", title: "사용법", summary: "doc_* 툴과 읽기·쓰기" },
-  { href: "/docs/skills", title: "스킬", summary: "슬래시 명령 5종" },
+  { href: "/docs/skills", title: "스킬", summary: "에이전트 슬래시 명령" },
 ];
 
 /**

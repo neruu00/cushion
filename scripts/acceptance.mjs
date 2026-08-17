@@ -277,7 +277,17 @@ try {
 
   // 스킬이 실제 툴·출력과 맞는지. 문서가 거짓말하면 에이전트가 그대로 따라 한다.
   const mcpSource = readFileSync("lib/mcp.ts", "utf8");
-  const SKILLS = ["cushion", "cushion-capture", "cushion-list", "cushion-new", "cushion-use"];
+  // 스킬을 추가하면 여기도 추가한다. readdir로 훑지 않는 이유: 그러면 파일이 하나도
+  // 배포되지 않아도 "전부 담긴다"가 통과한다 — 기대치를 손으로 적어야 검사가 된다.
+  const SKILLS = [
+    "cushion",
+    "cushion-capture",
+    "cushion-compact",
+    "cushion-divide",
+    "cushion-list",
+    "cushion-new",
+    "cushion-use",
+  ];
   for (const skill of SKILLS) {
     const body = readFileSync(`.claude/skills/${skill}/SKILL.md`, "utf8");
     check(
