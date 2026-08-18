@@ -2,11 +2,12 @@
  * @file lib/auth.ts
  * @description NextAuth v5 Google. 세션에는 lowercase 이메일만 담는다.
  *
- * DB 어댑터를 붙이지 않는다 — 유저 테이블이 없기 때문이다(D-003).
- * 정체성은 여기가, 접근 허용 여부는 `library_members` 행 존재가 결정한다.
+ * users 테이블에 로그인 기록을 남긴다. 접근 허용 여부는 `library_members` 행 존재가 결정한다.
  */
 import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
+
+import { supabase } from "@/lib/supabase";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: [
@@ -25,6 +26,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       delete token.name;
       delete token.picture;
       return token;
+    },
+  },
+  events: {
+    // Why: 로그인만 한 사용자도 관리자 화면에 나오게 하려면 users 행이 있어야 한다.
+    // signIn 이벤트는 인증 성공 뒤에 호출되므로 여기서 upsert하면 된다.
+    async signIn({ user }) {
+      const email = user.email?.toLowerCase();
+      if (!email) return;
+      const { error } = await supabase
+        .from("users")
+        .upsert({ email }, { onConflict: "email", ignoreDuplicates: true });
+      if (error) console.error("auth: users upsert", error);
     },
   },
 });

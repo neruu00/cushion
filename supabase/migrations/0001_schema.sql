@@ -9,7 +9,7 @@
 -- ⚠️ [정리] 절은 컬럼을 **지운다**. 돌리기 전에 /admin > 전체 내보내기로 문서를 받아 둘 것.
 --
 -- 설계 근거는 Cushion의 SPEC §5, PLAN의 D-003·D-011·D-012·D-013. 요약:
---  - 유저 테이블 없음. 정체성은 NextAuth가, 접근 허용은 library_members 행 존재가 결정
+--  - users 테이블은 로그인 기록만 남긴다. 접근 허용은 library_members 행 존재가 결정
 --  - documents는 캐시가 아니라 **원본**이다. git history가 하던 일을 document_versions가 한다
 --  - 동시 편집은 content_sha 낙관적 잠금으로 막는다. 병합하지 않는다
 
@@ -102,6 +102,20 @@ create table if not exists library_members (
 );
 
 create index if not exists library_members_email_idx on library_members (email);
+
+-- ─────────────────────────────────────────────────────────────
+-- users — 로그인한 적 있는 모든 사용자
+-- NextAuth signIn 콜백에서 upsert된다. library_members·access_tokens와 무관하게
+-- "로그인만 한 사람"도 관리자 화면에 나오게 하려고 도입했다.
+-- ─────────────────────────────────────────────────────────────
+create table if not exists users (
+  email       text primary key,
+  created_at  timestamptz not null default now(),
+
+  constraint users_email_lower check (email = lower(email))
+);
+
+alter table users enable row level security;
 
 -- ─────────────────────────────────────────────────────────────
 -- documents — 문서 **원본** (D-011). 되돌릴 git이 없다.

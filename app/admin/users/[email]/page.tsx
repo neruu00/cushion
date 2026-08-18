@@ -1,9 +1,9 @@
 /**
- * @file app/admin/participants/[email]/page.tsx
- * @description 참가자 한 명 상세 (D-020). admin 전용.
+ * @file app/admin/users/[email]/page.tsx
+ * @description 사용자 한 명 상세 (D-020). admin 전용.
  *
- * "참가자"는 어딘가의 멤버이거나 토큰을 발급한 이메일이다 — 유저 테이블이 없으므로(D-003)
- * 이 둘을 합쳐 보여준다. 둘 다 없으면 그런 참가자는 없는 것이라 404다.
+ * users 테이블에 있는 이메일이면 멤버나 토큰이 없어도 보여준다.
+ * users에도 없으면 404다.
  */
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -38,16 +38,17 @@ interface TokenRow {
 
 const LOG_LIMIT = 50;
 
-export default async function ParticipantPage({
+export default async function UserDetailPage({
   params,
-}: PageProps<"/admin/participants/[email]">) {
+}: PageProps<"/admin/users/[email]">) {
   // admin이 아니면 404. 403은 "그런 화면이 있다"를 알려준다.
   if (!(await isAdmin())) notFound();
 
   // 이메일은 조회 양쪽에서 lowercase다 (SPEC §6) — URL로 들어온 값도 예외가 아니다
   const email = decodeURIComponent((await params).email).toLowerCase();
 
-  const [membershipsRes, tokensRes, logs] = await Promise.all([
+  const [userRes, membershipsRes, tokensRes, logs] = await Promise.all([
+    supabase.from("users").select("email").eq("email", email).maybeSingle(),
     supabase
       .from("library_members")
       .select("created_at, libraries(slug, name)")
@@ -61,14 +62,15 @@ export default async function ParticipantPage({
     getRequestLogs({ actor: email, limit: LOG_LIMIT }),
   ]);
 
-  if (membershipsRes.error) console.error("ParticipantPage members", membershipsRes.error);
-  if (tokensRes.error) console.error("ParticipantPage tokens", tokensRes.error);
+  if (userRes.error) console.error("UserDetailPage user", userRes.error);
+  if (membershipsRes.error) console.error("UserDetailPage members", membershipsRes.error);
+  if (tokensRes.error) console.error("UserDetailPage tokens", tokensRes.error);
 
   const memberships = (membershipsRes.data as MembershipRow[] | null) ?? [];
   const tokens = (tokensRes.data as TokenRow[] | null) ?? [];
 
-  // 멤버도 아니고 토큰도 없으면 그런 참가자는 없다
-  if (memberships.length === 0 && tokens.length === 0) notFound();
+  // users 테이블에도 없고 멤버도 아니고 토큰도 없으면 그런 사용자는 없다
+  if (!userRes.data && memberships.length === 0 && tokens.length === 0) notFound();
 
   return (
     <PageShell className="space-y-8">
