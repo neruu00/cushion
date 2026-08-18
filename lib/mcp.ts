@@ -248,25 +248,26 @@ export function staleLine(context: McpContext): string | null {
 
 // ─── 툴 ──────────────────────────────────────────────────────────────
 
-const outlineArgs = z.object({
+export const outlineArgs = z.object({
   library: z.string().optional(),
   depth: z.enum(["libraries", "documents"]).optional(),
 });
 // 형태 검증은 createLibrarySchema가 한다 — 여기서 또 규칙을 쓰면 두 곳이 어긋난다.
-const createArgs = z.object({
+export const createArgs = z.object({
   slug: z.string(),
   name: z.string(),
   // 스키마가 문자열을 나누므로 배열이 오면 합쳐서 넘긴다 — 검증 규칙은 한 곳뿐이다
   github_repos: z.array(z.string()).optional(),
 });
-const getArgs = z.object({
+export const getArgs = z.object({
   library: z.string(),
   path: z.string(),
   heading: z.string().optional(),
   if_none_match: z.string().optional(),
 });
-const searchArgs = z.object({ query: z.string().min(1), library: z.string().optional() });
-const changesArgs = z.object({ library: z.string().optional(), since: z.number().int().optional() });
+export const searchArgs = z.object({ query: z.string().min(1), library: z.string().optional() });
+export const changesArgs = z.object({ library: z.string().optional(), since: z.number().int().optional() });
+
 
 /** 접근 불가와 존재하지 않음을 구분하지 않는다 — 구분하면 레포의 존재가 새어 나간다. */
 function librariesFor(context: McpContext, slug?: string): Library[] {

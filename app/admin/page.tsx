@@ -7,6 +7,9 @@
  * 멤버 관리는 여기 없다 — D-013 이후 각 라이브러리 화면에서 멤버가 직접 한다.
  * 전체 내보내기 링크만 admin 고유 기능이라 남는다 (유일한 백업, D-011).
  *
+ * 사용자 목록은 users 테이블(로그인 기록)을 기반으로 library_members·access_tokens 정보를
+ * 덧붙여 보여준다. 로그인만 한 사용자도 빠지지 않는다.
+ *
  * 사용량은 usage_hourly의 **요청 수** 합산이다 (토큰 환산 아님). 키가 UTC 날짜라
  * 표시도 UTC다 — lib/datetime.ts로 현지화하면 "오늘"의 경계가 데이터와 어긋난다.
  */
@@ -42,7 +45,7 @@ interface LibraryRow {
   library_members: { count: number }[];
 }
 
-interface Person {
+interface UserRow {
   email: string;
   /** 소속 라이브러리 수 */
   libraries: number;
@@ -50,6 +53,8 @@ interface Person {
   tokens: number;
   /** 토큰의 마지막 사용 시각. null = 토큰이 없거나 쓴 적 없음 */
   lastUsedAt: string | null;
+  /** users 테이블 가입 시각 */
+  createdAt: string | null;
 }
 
 const USAGE_DAYS = 14;
@@ -60,13 +65,14 @@ export default async function AdminPage() {
   // admin이 아니면 404. 403은 "그런 화면이 있다"를 알려준다.
   if (!(await isAdmin())) notFound();
 
-  const [librariesRes, membersRes, tokensRes, usageRes, logs] = await Promise.all([
+  const [librariesRes, usersRes, membersRes, tokensRes, usageRes, logs] = await Promise.all([
     supabase
       .from("libraries")
       .select(
         "id, slug, name, github_repos, mattermost_webhook_url, discord_webhook_url, created_at, documents(count), library_members(count)",
       )
       .order("slug"),
+    supabase.from("users").select("email, created_at").order("created_at", { ascending: false }),
     supabase.from("library_members").select("email"),
     supabase.from("access_tokens").select("email, last_used_at, revoked_at"),
     supabase
@@ -76,23 +82,26 @@ export default async function AdminPage() {
     getRequestLogs({ limit: RECENT_LOGS }),
   ]);
 
-  for (const res of [librariesRes, membersRes, tokensRes, usageRes]) {
+  for (const res of [librariesRes, usersRes, membersRes, tokensRes, usageRes]) {
     if (res.error) console.error("AdminPage", res.error);
   }
 
   const libraries: LibraryRow[] = librariesRes.data ?? [];
 
-  // 참가자 = 어딘가의 멤버이거나 토큰을 발급한 이메일. 유저 테이블이 없으므로(D-003)
-  // 이 둘의 합집합이 "가입한 사람"의 전부다.
-  const people = new Map<string, Person>();
-  const person = (email: string): Person => {
+  // 사용자 = users 테이블(로그인 기록)을 기반으로 멤버·토큰 정보를 덧붙인다.
+  // users 행이 없는데 멤버나 토큰만 있는 경우(마이그레이션 이전 데이터)도 합친다.
+  const people = new Map<string, UserRow>();
+  const person = (email: string): UserRow => {
     let entry = people.get(email);
     if (!entry) {
-      entry = { email, libraries: 0, tokens: 0, lastUsedAt: null };
+      entry = { email, libraries: 0, tokens: 0, lastUsedAt: null, createdAt: null };
       people.set(email, entry);
     }
     return entry;
   };
+  for (const row of usersRes.data ?? []) {
+    person(row.email).createdAt = row.created_at;
+  }
   for (const row of membersRes.data ?? []) person(row.email).libraries += 1;
   for (const row of tokensRes.data ?? []) {
     const entry = person(row.email);
@@ -101,8 +110,8 @@ export default async function AdminPage() {
       entry.lastUsedAt = row.last_used_at;
     }
   }
-  const participants = [...people.values()].sort((a, b) =>
-    (b.lastUsedAt ?? "") > (a.lastUsedAt ?? "") ? 1 : -1,
+  const users = [...people.values()].sort((a, b) =>
+    (b.lastUsedAt ?? b.createdAt ?? "") > (a.lastUsedAt ?? a.createdAt ?? "") ? 1 : -1,
   );
 
   // 요청 수: 일별 합산 + 툴별 합산. 규모가 작아 JS에서 접는다 (미해결 5번과 같은 판단)
@@ -139,7 +148,7 @@ export default async function AdminPage() {
         {[
           ["라이브러리", libraries.length],
           ["문서", documentCount],
-          ["참가자", participants.length],
+          ["사용자", users.length],
           [`${USAGE_DAYS}일 요청`, totalCalls],
         ].map(([label, value]) => (
           <div key={label} className="rounded-lg border p-4">
@@ -263,15 +272,15 @@ export default async function AdminPage() {
         )}
       </section>
 
-      {/* 참가자 */}
+      {/* 사용자 */}
       <section className="space-y-3 rounded-lg border p-5">
         <div className="space-y-1">
-          <h2 className="text-sm font-medium">참가자</h2>
+          <h2 className="text-sm font-medium">사용자</h2>
           <p className="text-xs text-muted-foreground">
-            어딘가의 멤버이거나 토큰을 발급한 이메일이에요. 유저 테이블이 따로 없어요 (D-003).
+            로그인한 적 있는 모든 사용자에요. 멤버·토큰 정보는 각 라이브러리에서 확인해요.
           </p>
         </div>
-        {participants.length === 0 ? (
+        {users.length === 0 ? (
           <p className="text-sm text-muted-foreground">아직 아무도 없어요.</p>
         ) : (
           <Table>
@@ -284,11 +293,11 @@ export default async function AdminPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {participants.map((entry) => (
+              {users.map((entry) => (
                 <TableRow key={entry.email}>
                   <TableCell className="font-mono text-xs">
                     <Link
-                      href={`/admin/participants/${encodeURIComponent(entry.email)}`}
+                      href={`/admin/users/${encodeURIComponent(entry.email)}`}
                       className="hover:underline"
                     >
                       {entry.email}

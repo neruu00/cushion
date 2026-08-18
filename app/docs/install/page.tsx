@@ -11,12 +11,55 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import type { ConnectGroup } from "@/components/ConnectTabs";
+import { ConnectTabs } from "@/components/ConnectTabs";
 import { DocsPager } from "@/components/DocsPager";
 import { DocsTransition } from "@/components/DocsTransition";
 import { OnboardingSteps } from "@/components/OnboardingSteps";
-import { connectCommand, skillsUrl } from "@/lib/snippets";
+import { antigravityConfig, codexConfig, codexEnvExport, connectCommand, skillsUrl } from "@/lib/snippets";
 
 export const metadata: Metadata = { title: "설치" };
+
+const PLACEHOLDER_TOKEN = "cshn_pat_…";
+
+// 실제 토큰이 채워진 버전은 /settings/tokens 발급 직후에만 나온다(SecretPayload는 1회 노출).
+// 여기 목록은 actions/token.ts가 발급 시 만드는 것과 같은 모양이다 — 한쪽만 고치는 날이
+// 오지 않게, 클라이언트·항목 구성을 그쪽과 맞춰 둔다.
+const CONNECT_GROUPS: ConnectGroup[] = [
+  {
+    key: "claude",
+    label: "Claude Code",
+    items: [{ label: "셸에서 한 번 실행", content: connectCommand(PLACEHOLDER_TOKEN) }],
+  },
+  {
+    key: "antigravity",
+    label: "Antigravity",
+    items: [
+      {
+        // 개인 연결은 항상 저장소 밖(전역) 경로만 준다 — 프로젝트 스코프
+        // (.agents/mcp_config.json)는 저장소 안에 토큰이 그대로 박힌다. headers가
+        // 환경변수 치환을 지원하는지 확인이 안 돼 .mcp.json처럼 시크릿을 뺄 수도 없어서,
+        // 커밋 위험을 원천 차단하려면 여기서 그 경로를 아예 안 주는 게 맞다.
+        label: "~/.gemini/config/mcp_config.json 에 추가 — url이 아니라 serverUrl 키예요",
+        content: antigravityConfig(PLACEHOLDER_TOKEN),
+      },
+    ],
+  },
+  {
+    key: "codex",
+    label: "Codex CLI",
+    items: [
+      {
+        label: "먼저 셸 프로필(.zshrc 등)에 추가",
+        content: codexEnvExport(PLACEHOLDER_TOKEN),
+      },
+      {
+        label: "~/.codex/config.toml에 추가 — 토큰은 직접 안 넣고 환경변수 이름만 가리켜요",
+        content: codexConfig(),
+      },
+    ],
+  },
+];
 
 export default function DocsInstallPage() {
   return (
@@ -35,21 +78,25 @@ export default function DocsInstallPage() {
             <Link href="/settings/tokens" className="underline underline-offset-4">
               /settings/tokens
             </Link>
-            에서 발급하면 아래 ①의 명령이 <strong className="text-foreground">토큰이 채워진 채로</strong>{" "}
-            나와요. 토큰은 그때 한 번만 보여요 — 서버에는 sha256 해시만 저장돼서 다시 꺼낼 수
+            에서 발급하면 아래 ①의 스니펫들이 <strong className="text-foreground">토큰이 채워진 채로</strong>{" "}
+            클라이언트별로 나와요(Claude Code·Antigravity·Codex CLI — 쓰는 것만 고르면 돼요).
+            토큰은 그때 한 번만 보여요 — 서버에는 sha256 해시만 저장돼서 다시 꺼낼 수
             없고, 잃어버리면 재발급해야 해요(재발급하면 이전 토큰은 즉시 무효가 돼요).
           </p>
         </section>
 
         <section className="space-y-4">
           <h2 className="text-lg font-medium">연결하는 세 단계</h2>
+          <p className="text-sm text-muted-foreground">
+            MCP는 표준 프로토콜이에요 — Cushion 서버는 URL과 <code>Authorization: Bearer</code>{" "}
+            헤더만 있으면 되는 평범한 Streamable HTTP 서버라{" "}
+            <strong className="text-foreground">클라이언트를 가리지 않아요.</strong> ①에서 쓰는
+            클라이언트를 고르세요 — ②(스킬)도 같은 탭 구성이고, ③은 클라이언트와 무관하게
+            완전히 같아요.
+          </p>
           <OnboardingSteps
             skillsUrl={skillsUrl()}
-            connectSlot={
-              <pre className="overflow-x-auto rounded-lg border bg-muted/40 p-3 font-mono text-xs leading-relaxed">
-                {connectCommand("cshn_pat_…")}
-              </pre>
-            }
+            connectSlot={<ConnectTabs groups={CONNECT_GROUPS} />}
           />
         </section>
 

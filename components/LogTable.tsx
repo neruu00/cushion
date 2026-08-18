@@ -1,8 +1,8 @@
 /**
  * @file components/LogTable.tsx
- * @description 요청 로그 표. /admin(최근 몇 건) · /admin/logs(전체) · 참가자 상세가 공유한다.
+ * @description 요청 로그 표. /admin(최근 몇 건) · /admin/logs(전체) · 사용자 상세가 공유한다.
  *
- * 서버 컴포넌트다 — 행이 많아도 클라이언트 번들 0. actor는 참가자 상세로 링크한다.
+ * 서버 컴포넌트다 — 행이 많아도 클라이언트 번들 0. actor는 사용자 상세로 링크한다.
  */
 import Link from "next/link";
 
@@ -20,7 +20,7 @@ import { cn } from "@/lib/utils";
 
 interface LogTableProps {
   logs: RequestLogRow[];
-  /** 참가자 상세에서는 전 행이 같은 사람이라 뺀다 */
+  /** 사용자 상세에서는 전 행이 같은 사람이라 뺀다 */
   showActor?: boolean;
   /** 상세 페이지에서는 에러를 자르지 않고 줄바꿈으로 다 보여준다 */
   fullError?: boolean;
@@ -57,7 +57,7 @@ export function LogTable({ logs, showActor = true, fullError = false }: LogTable
               <TableCell className="max-w-40 truncate font-mono text-xs">
                 {log.actor ? (
                   <Link
-                    href={`/admin/participants/${encodeURIComponent(log.actor)}`}
+                    href={`/admin/users/${encodeURIComponent(log.actor)}`}
                     className="hover:underline"
                   >
                     {log.actor}

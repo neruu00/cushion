@@ -24,6 +24,45 @@ export function connectCommand(token: string): string {
   return `claude mcp add --transport http --scope user cushion ${baseUrl()}/api/mcp --header "Authorization: Bearer ${token}"\n`;
 }
 
+/**
+ * Antigravity(`.agents/mcp_config.json` 또는 `~/.gemini/config/mcp_config.json`)는
+ * `url`이 아니라 `serverUrl`을 쓴다 — Claude·Cursor류와 키 이름이 다르다.
+ * 공식 문서: https://antigravity.google/docs/mcp
+ *
+ * 토큰을 그대로 박는다 — `headers`가 `${VAR}` 환경변수 치환을 지원하는지 문서로
+ * 확인이 안 돼서 `.mcp.json`처럼 시크릿을 뺄 수 없다. 그래서 이 함수의 결과는
+ * **저장소 밖(전역, `~/.gemini/config/mcp_config.json`) 경로에만** 써야 한다 — 저장소 안
+ * 경로(`.agents/mcp_config.json`)에 쓰면 토큰이 그대로 커밋될 위험이 있다.
+ */
+export function antigravityConfig(token: string): string {
+  return `${JSON.stringify(
+    {
+      mcpServers: {
+        cushion: {
+          serverUrl: `${baseUrl()}/api/mcp`,
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      },
+    },
+    null,
+    2,
+  )}\n`;
+}
+
+/**
+ * Codex CLI(`~/.codex/config.toml`)는 `bearer_token_env_var`로 **환경변수 이름**만 받는다
+ * (토큰 리터럴을 직접 받는 필드는 공식 문서가 권장하지 않는다) — 그래서 export 줄과
+ * toml 블록을 별도 파일로 나눈다. `.mcp.json`과 같은 변수 이름(`CUSHION_TOKEN`)을 써서
+ * 하나만 기억하면 되게 한다. 공식 문서: https://learn.chatgpt.com/docs/extend/mcp
+ */
+export function codexEnvExport(token: string): string {
+  return `export CUSHION_TOKEN="${token}"\n`;
+}
+
+export function codexConfig(): string {
+  return `[mcp_servers.cushion]\nurl = "${baseUrl()}/api/mcp"\nbearer_token_env_var = "CUSHION_TOKEN"\n`;
+}
+
 /** `.mcp.json`은 커밋되므로 토큰을 박지 않는다. 환경변수 확장을 쓴다. (SPEC §7) */
 function mcpJson(): string {
   return `${JSON.stringify(
