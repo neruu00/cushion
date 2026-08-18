@@ -252,6 +252,29 @@ as $$
 $$;
 
 -- ─────────────────────────────────────────────────────────────
+-- request_logs — MCP 요청 로그. /admin 모니터링이 읽는다 (D-020)
+--
+-- usage_hourly(집계)로는 "무엇이 실패하나"를 답할 수 없어 요청 단위로 남긴다.
+-- 에러를 따로 수집하지 않는다 — status 4xx/5xx 필터가 그 자리다.
+-- library는 FK가 아니라 요청이 보낸 slug 그대로다 — 오타로 인한 404도 그대로 보여야 한다.
+-- ponytail: 보존 무제한. 행이 무거워지면 보존 기간·정리 배치를 붙인다 (D-020 재검토 조건)
+-- ─────────────────────────────────────────────────────────────
+create table if not exists request_logs (
+  id           bigserial primary key,
+  method       text,                   -- JSON-RPC 메서드. 인증 실패·파싱 실패면 null
+  tool         text,                   -- tools/call일 때 툴 이름
+  library      text,                   -- 요청이 보낸 slug 그대로. 검증 전 값이다
+  actor        text,                   -- 토큰의 이메일. 인증 실패면 null
+  status       smallint not null,      -- HTTP 의미의 상태 (200·202·400·401·404·409·500)
+  error        text,                   -- 실패 메시지. 성공이면 null
+  duration_ms  integer not null default 0,
+  created_at   timestamptz not null default now()
+);
+
+-- 조회 경로는 "상태(범위)로 걸러 최신순" 하나뿐이다
+create index if not exists request_logs_status_idx on request_logs (status, id desc);
+
+-- ─────────────────────────────────────────────────────────────
 -- 이미 만들어진 DB 수렴
 -- 위 create table은 테이블이 있으면 통째로 건너뛴다 — 나중에 생긴 컬럼은 여기서 채운다.
 -- ─────────────────────────────────────────────────────────────
@@ -320,3 +343,4 @@ alter table sync_events        enable row level security;
 alter table access_tokens      enable row level security;
 alter table token_cursors      enable row level security;
 alter table usage_hourly       enable row level security;
+alter table request_logs       enable row level security;
