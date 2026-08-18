@@ -9,7 +9,7 @@ import { z } from "zod";
 
 import type { SecretState } from "@/lib/action.type";
 import { getSessionEmail } from "@/lib/authz";
-import { connectCommand } from "@/lib/snippets";
+import { antigravityConfig, codexConfig, codexEnvExport, connectCommand } from "@/lib/snippets";
 import { supabase } from "@/lib/supabase";
 import { generateToken } from "@/lib/token";
 
@@ -46,10 +46,34 @@ export async function createAccessToken(
     success: true,
     data: {
       secret: token.plaintext,
-      hint: "이 값은 다시 볼 수 없어요. 대개는 아래 명령만 복사하면 돼요",
+      hint: "이 값은 다시 볼 수 없어요. 대개는 아래에서 쓰는 클라이언트 탭만 복사하면 돼요",
       // 붙여넣기 한 번으로 끝나게 한다 — 레포 클론도 환경변수도 없이.
       files: [
-        { name: "Claude Code에 연결 — 이 한 줄", content: connectCommand(token.plaintext) },
+        {
+          group: "Claude Code",
+          name: "셸에서 한 번 실행",
+          content: connectCommand(token.plaintext),
+        },
+        {
+          group: "Antigravity",
+          // 개인 연결은 항상 저장소 밖(전역) 경로만 준다 — Claude(~/.claude.json)·
+          // Codex(~/.codex/config.toml)와 같은 원칙. 프로젝트 스코프(.agents/mcp_config.json)는
+          // 저장소 안에 토큰이 그대로 박혀서, 커밋 위험을 원천 차단하려면 여기서 안 준다.
+          // headers가 환경변수 치환(${VAR})을 지원하는지 공식 문서로 확인 못 해서
+          // .mcp.json처럼 시크릿 없는 버전을 만들 수도 없다 — 그래서 아예 뺐다.
+          name: "~/.gemini/config/mcp_config.json 에 추가",
+          content: antigravityConfig(token.plaintext),
+        },
+        {
+          group: "Codex CLI",
+          name: "셸 프로필(.zshrc 등)에 먼저 — config.toml엔 토큰을 직접 안 넣는다",
+          content: codexEnvExport(token.plaintext),
+        },
+        {
+          group: "Codex CLI",
+          name: "~/.codex/config.toml에 추가",
+          content: codexConfig(),
+        },
       ],
     },
   };

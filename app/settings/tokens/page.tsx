@@ -86,15 +86,16 @@ export default async function TokensPage() {
             connectSlot={
               <div className="space-y-2">
                 <p className="text-sm text-muted-foreground">
-                  발급하면 토큰이 포함된 명령이 같이 나와요. 아무 디렉터리에서 한 번 실행하면 끝
-                  — 레포를 클론할 필요도, 환경변수를 설정할 필요도 없어요. 토큰은{" "}
-                  <code>~/.claude.json</code> 에 평문으로 남아요(환경변수를 dotfile에 두는 것과
-                  같은 수준이에요). 유출되면 재발급하세요 — 그 즉시 이전 토큰은 무효가 돼요.
+                  발급하면 Claude Code · Antigravity · Codex CLI로 붙는 스니펫이 클라이언트별로
+                  같이 나와요. 쓰는 것만 골라 붙여 넣으면 끝 — 레포를 클론할 필요도, 서버에
+                  환경변수를 설정할 필요도 없어요. 어느 쪽이든 토큰은 내 컴퓨터의 개인 설정
+                  파일에 평문으로 남아요(환경변수를 dotfile에 두는 것과 같은 수준이에요). 유출되면
+                  재발급하세요 — 그 즉시 이전 토큰은 무효가 돼요.
                 </p>
-                <ActionForm action={createAccessToken} submitLabel="발급">
+                <ActionForm action={createAccessToken} submitLabel="발급" filesLayout="tabs">
                   <Label className="grid gap-1.5">
                     <span>이름</span>
-                    <Input name="name" placeholder="노트북 Claude Code" />
+                    <Input name="name" placeholder="노트북" />
                   </Label>
                 </ActionForm>
               </div>

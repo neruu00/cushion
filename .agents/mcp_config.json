@@ -1,7 +1,0 @@
-{
-  "mcpServers": {
-    "cushion": {
-      "serverUrl": "http://localhost:3000/api/mcp"
-    }
-  }
-}

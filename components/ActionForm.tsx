@@ -13,6 +13,7 @@ import { useActionState } from "react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { ConnectTabs, type ConnectGroup } from "@/components/ConnectTabs";
 import { CopyBlock } from "@/components/CopyBlock";
 import type { SecretState } from "@/lib/action.type";
 
@@ -21,9 +22,37 @@ interface ActionFormProps {
   submitLabel: string;
   children?: React.ReactNode;
   className?: string;
+  /**
+   * "tabs" = files를 group별로 묶어 탭으로 보여준다. 항목이 **이 중 하나만 고르면 되는**
+   * 관계일 때다(연결 스니펫 — 쓰는 클라이언트 하나만 고른다).
+   * 기본 "list"는 그냥 나열한다. 여러 파일을 **순서대로 다 쓰는** 관계일 때다
+   * (`setupFiles()`의 `.mcp.json` + `AGENTS.md`).
+   */
+  filesLayout?: "list" | "tabs";
 }
 
-export function ActionForm({ action, submitLabel, children, className }: ActionFormProps) {
+/** 순서를 유지하며 group으로 묶는다. group이 없으면 파일명 자체를 그룹으로 쓴다. */
+function groupFiles(files: { name: string; content: string; group?: string }[]): ConnectGroup[] {
+  const groups: ConnectGroup[] = [];
+  for (const file of files) {
+    const key = file.group ?? file.name;
+    let group = groups.find((g) => g.key === key);
+    if (!group) {
+      group = { key, label: key, items: [] };
+      groups.push(group);
+    }
+    group.items.push({ label: file.name, content: file.content });
+  }
+  return groups;
+}
+
+export function ActionForm({
+  action,
+  submitLabel,
+  children,
+  className,
+  filesLayout = "list",
+}: ActionFormProps) {
   const [state, formAction, pending] = useActionState(action, null);
 
   return (
@@ -58,9 +87,13 @@ export function ActionForm({ action, submitLabel, children, className }: ActionF
           ) : (
             <p className="text-sm text-muted-foreground">{state.data.hint}</p>
           )}
-          {state.data.files?.map((file) => (
-            <CopyBlock key={file.name} value={file.content} label={file.name} />
-          ))}
+          {state.data.files && filesLayout === "tabs" ? (
+            <ConnectTabs groups={groupFiles(state.data.files)} />
+          ) : (
+            state.data.files?.map((file) => (
+              <CopyBlock key={file.name} value={file.content} label={file.name} />
+            ))
+          )}
         </div>
       )}
     </div>

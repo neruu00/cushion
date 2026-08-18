@@ -5,7 +5,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { connectCommand } from "./snippets.ts";
+import { antigravityConfig, codexConfig, codexEnvExport, connectCommand } from "./snippets.ts";
 
 test("연결 명령은 한 줄이다", () => {
   // 백슬래시 줄바꿈은 PowerShell·cmd에서 깨진다. 여러 줄로 만드는 순간
@@ -36,4 +36,18 @@ test("NEXTAUTH_URL이 없으면 Vercel 도메인으로 떨어진다", () => {
 
   delete process.env.VERCEL_PROJECT_PRODUCTION_URL;
   assert.ok(connectCommand("t").includes(" http://localhost:3000/api/mcp "));
+});
+
+test("Antigravity 설정은 url이 아니라 serverUrl 키를 쓴다", () => {
+  const config = JSON.parse(antigravityConfig("cshn_pat_abc"));
+  assert.equal(config.mcpServers.cushion.url, undefined);
+  assert.ok(config.mcpServers.cushion.serverUrl.endsWith("/api/mcp"));
+  assert.equal(config.mcpServers.cushion.headers.Authorization, "Bearer cshn_pat_abc");
+});
+
+test("Codex 설정은 토큰을 파일에 박지 않고 환경변수 이름만 가리킨다", () => {
+  const config = codexConfig();
+  assert.ok(config.includes('bearer_token_env_var = "CUSHION_TOKEN"'));
+  assert.ok(!config.includes("cshn_pat_"));
+  assert.ok(codexEnvExport("cshn_pat_abc").includes('export CUSHION_TOKEN="cshn_pat_abc"'));
 });

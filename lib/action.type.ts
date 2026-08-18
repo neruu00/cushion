@@ -15,7 +15,8 @@ export interface SecretPayload {
   /** 1회 노출할 비밀값. 보여줄 게 없으면 생략한다 (설정 파일만 주는 경우) */
   secret?: string;
   hint: string;
-  files?: { name: string; content: string }[];
+  /** group을 주면 `ActionForm filesLayout="tabs"`가 그 단위로 탭을 묶는다 (클라이언트별 연결 스니펫) */
+  files?: { name: string; content: string; group?: string }[];
 }
 
 /** `useActionState` 초기값이 null이라 union에 포함한다. */

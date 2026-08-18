@@ -33,6 +33,11 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 
+# 에이전트 로컬 설정. mcp_config.json에는 평문 토큰이 들어간다 — .env*와 같은 등급이다.
+# skills/는 `/api/skills`가 배포하는 사본이라 레포에 두면 원본이 둘이 된다 (D-017).
+.agents/mcp_config.json
+.agents/skills/
+
 # vercel
 .vercel
 
