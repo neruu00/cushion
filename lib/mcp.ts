@@ -137,7 +137,18 @@ export const TOOLS = [
 export interface ToolResult {
   text: string;
   isError?: boolean;
+  /** isError일 때 HTTP 의미의 상태. request_logs의 필터 축이다 (D-020). 없으면 400으로 기록된다 */
+  status?: number;
 }
+
+/** lib/document.ts·lib/library.ts의 실패 code → HTTP 의미의 상태 */
+const ERROR_STATUS: Record<string, number> = {
+  invalid: 400,
+  not_found: 404,
+  duplicate: 409,
+  conflict: 409,
+  failed: 500,
+};
 
 interface LibraryState {
   latest: number;
@@ -315,12 +326,12 @@ export async function callTool(
     case "library_create":
       return libraryCreate(context, rawArgs);
     default:
-      return { text: `그런 툴이 없다: ${name}`, isError: true };
+      return { text: `그런 툴이 없다: ${name}`, isError: true, status: 404 };
   }
 }
 
 function badArgs(issue: string): ToolResult {
-  return { text: `인자가 잘못됐다: ${issue}`, isError: true };
+  return { text: `인자가 잘못됐다: ${issue}`, isError: true, status: 400 };
 }
 
 async function docOutline(context: McpContext, rawArgs: unknown): Promise<ToolResult> {
@@ -332,7 +343,7 @@ async function docOutline(context: McpContext, rawArgs: unknown): Promise<ToolRe
     // "오타 난 slug"와 "레포가 하나도 없음"을 구분한다. 뭉뚱그리면 오타 하나에
     // 에이전트가 library_create를 불러 중복 레포를 만든다.
     return args.data.library
-      ? { text: `그런 라이브러리가 없다: ${args.data.library}`, isError: true }
+      ? { text: `그런 라이브러리가 없다: ${args.data.library}`, isError: true, status: 404 }
       : { text: "접근 가능한 라이브러리가 없다. library_create로 만들 수 있다." };
   }
 
@@ -385,10 +396,11 @@ async function docGet(context: McpContext, rawArgs: unknown): Promise<ToolResult
   if (!args.success) return badArgs(args.error.issues[0].message);
 
   const [library] = librariesFor(context, args.data.library);
-  if (!library) return { text: `그런 라이브러리가 없다: ${args.data.library}`, isError: true };
+  if (!library)
+    return { text: `그런 라이브러리가 없다: ${args.data.library}`, isError: true, status: 404 };
 
   const [doc] = await documentsOf([library], args.data.path);
-  if (!doc) return { text: `그런 문서가 없다: ${args.data.path}`, isError: true };
+  if (!doc) return { text: `그런 문서가 없다: ${args.data.path}`, isError: true, status: 404 };
 
   // 해시가 같으면 본문 대신 5토큰. doc_get 재호출의 대부분이 여기서 끝난다.
   if (args.data.if_none_match && args.data.if_none_match === doc.content_sha) {
@@ -396,7 +408,8 @@ async function docGet(context: McpContext, rawArgs: unknown): Promise<ToolResult
   }
 
   const body = args.data.heading ? findSection(doc.content, args.data.heading) : doc.content;
-  if (body === null) return { text: `그런 섹션이 없다: ${args.data.heading}`, isError: true };
+  if (body === null)
+    return { text: `그런 섹션이 없다: ${args.data.heading}`, isError: true, status: 404 };
 
   return { text: `${library.slug}/${doc.path} sha:${doc.content_sha}\n\n${body}` };
 }
@@ -456,7 +469,8 @@ async function libraryCreate(context: McpContext, rawArgs: unknown): Promise<Too
     ...args.data,
     github_repos: args.data.github_repos?.join(" "),
   });
-  if (!result.ok) return { text: result.message, isError: true };
+  if (!result.ok)
+    return { text: result.message, isError: true, status: ERROR_STATUS[result.code] };
 
   return {
     text: `만들었다 ${result.slug} — 멤버: ${context.identity.email}. doc_put(library:"${result.slug}", …)으로 문서를 넣는다`,
@@ -546,7 +560,7 @@ async function docPut(context: McpContext, rawArgs: unknown): Promise<ToolResult
 
   if (!result.ok) {
     const current = result.currentSha ? ` 현재 sha:${result.currentSha}` : "";
-    return { text: `${result.message}${current}`, isError: true };
+    return { text: `${result.message}${current}`, isError: true, status: ERROR_STATUS[result.code] };
   }
   // DB뿐 아니라 이번 요청의 컨텍스트도 밀어 준다 — 안 그러면 방금 쓴 응답에 [stale]이 붙는다
   markSeen(context, result.libraryId, result.eventId);
@@ -568,7 +582,7 @@ async function docDelete(context: McpContext, rawArgs: unknown): Promise<ToolRes
 
   if (!result.ok) {
     const current = result.currentSha ? ` 현재 sha:${result.currentSha}` : "";
-    return { text: `${result.message}${current}`, isError: true };
+    return { text: `${result.message}${current}`, isError: true, status: ERROR_STATUS[result.code] };
   }
   markSeen(context, result.libraryId, result.eventId);
   return { text: `지웠다 ${args.data.library}/${args.data.path}` };
