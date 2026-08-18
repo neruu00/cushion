@@ -5,6 +5,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { ArchitectureDiagram } from "@/components/DocsDiagrams";
 import { DocsPager } from "@/components/DocsPager";
 import { DocsTransition } from "@/components/DocsTransition";
 
@@ -48,17 +49,19 @@ export default function DocsOverviewPage() {
 
         <section className="space-y-3">
           <h2 className="text-lg font-medium">어떻게 동작하나</h2>
-          <pre className="overflow-x-auto rounded-lg border bg-muted/40 p-4 font-mono text-xs leading-relaxed">
-{`                        Cushion
-                    ─────────────
-사람     ─웹 편집→   documents          (원본)   ─MCP→  에이전트
-에이전트 ─doc_put→   document_versions  (이력)   ─→     웹 화면
-                    sync_events                 ─→     Mattermost`}
-          </pre>
+          <div className="rounded-lg border bg-muted/20 p-4">
+            <ArchitectureDiagram />
+          </div>
           <p className="text-sm text-muted-foreground">
             <strong className="text-foreground">문서의 원본이 여기 있어요.</strong> git 레포의{" "}
             <code>.md</code>를 비추는 미러가 아니에요. 남의 레포 문서를 고치려면 클론이 필요했는데,
             읽으려고 클론을 피하는 도구가 쓰려면 클론을 요구하는 셈이라 방향을 뒤집었어요.
+          </p>
+          <p className="text-sm text-muted-foreground">
+            어느 입구로 쓰든(웹 편집·<code>doc_put</code>) 같은 경로를 지나 이력과 변경 요약이
+            남아요. 그리고 <strong className="text-foreground">같은 요약 하나</strong>가 팀 채널
+            알림과 에이전트의 <code>[stale]</code> 델타에 두 번 쓰여요 — 두 기능이 아니라
+            한 문자열이에요.
           </p>
           <p className="text-sm text-muted-foreground">
             그래서 git이 공짜로 주던 것을 대신할 장치가 있어요 — 덮어쓰기 전에 이전 본문을 남기는{" "}
