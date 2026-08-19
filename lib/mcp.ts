@@ -13,7 +13,7 @@
  */
 import { z } from "zod";
 
-import { getAccessibleLibraries, type Library, type TokenIdentity } from "@/lib/authz";
+import { getMemberLibraries, type Library, type TokenIdentity } from "@/lib/authz";
 import { deleteDocument, putDocument } from "@/lib/document";
 import { deleteDocumentSchema, putDocumentSchema } from "@/lib/document.schema";
 import { createLibraryFor } from "@/lib/library";
@@ -165,7 +165,8 @@ export interface McpContext {
 // ─── 컨텍스트 ────────────────────────────────────────────────────────
 
 export async function buildContext(identity: TokenIdentity): Promise<McpContext> {
-  const repos = await getAccessibleLibraries(identity.email);
+  // admin 토큰이어도 예외 없다 — MCP는 /admin·내보내기가 아니다 (SPEC §6).
+  const repos = await getMemberLibraries(identity.email);
   const state = new Map<string, LibraryState>();
   if (repos.length === 0) return { identity, repos, state };
 

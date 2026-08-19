@@ -11,7 +11,7 @@ import { PageShell } from "@/components/PageShell";
 import { removeDocument } from "@/actions/document";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { DocumentForm } from "@/components/DocumentForm";
-import { getAccessibleLibrary, getSessionEmail } from "@/lib/authz";
+import { getMemberLibrary, getSessionEmail } from "@/lib/authz";
 import { supabase } from "@/lib/supabase";
 
 export default async function EditDocumentPage({ params }: PageProps<"/libraries/[library]/edit/[...path]">) {
@@ -24,7 +24,7 @@ export default async function EditDocumentPage({ params }: PageProps<"/libraries
   }
 
   // 멤버가 아니면 404. 읽기와 쓰기의 문턱이 같다 — 볼 수 있으면 고칠 수 있다.
-  const library = await getAccessibleLibrary(email, slug);
+  const library = await getMemberLibrary(email, slug);
   if (!library) notFound();
 
   const { data: doc, error } = await supabase
