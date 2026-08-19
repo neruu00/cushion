@@ -68,7 +68,7 @@ export default function DocsInstallPage() {
         <header className="space-y-3">
           <h1 className="text-2xl font-semibold">설치</h1>
           <p className="text-muted-foreground">
-            레포를 클론할 필요도, 환경변수를 설정할 필요도 없어요. ①만 해도 읽고 써요.
+            토큰 하나만 있으면 붙어요. ①만 해도 읽고 써요.
           </p>
         </header>
 

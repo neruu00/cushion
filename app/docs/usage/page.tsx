@@ -71,7 +71,7 @@ doc_get(…, if_none_match:"<직전 sha>")        # 안 바뀌었으면 unchange
           <p className="text-sm text-muted-foreground">
             <code>base_sha</code>는 읽을 때 받은 sha예요. 그 사이 누가 고쳤으면{" "}
             <strong className="text-foreground">거부하고 현재 sha를 알려줘요.</strong> 자동으로
-            합치지 않아요 — 브랜치가 없으니 합칠 근거가 없거든요. 다시 읽고 다시 쓰는 게 맞아요.
+            합치지 않아요 — 다시 읽고 다시 쓰는 게 맞아요.
           </p>
           <p className="text-sm text-muted-foreground">
             <code>heading</code>을 주면 그 섹션만 갈아끼워요. 문서 전체를 되돌려 보내지 않아도 되니
@@ -96,7 +96,7 @@ doc_get(…, if_none_match:"<직전 sha>")        # 안 바뀌었으면 unchange
         <section className="space-y-3">
           <h2 className="text-lg font-medium">이력과 되돌리기</h2>
           <p className="text-sm text-muted-foreground">
-            원본이 여기 있고 되돌릴 git이 없어서, 본문을 덮기 전에 이전 것을 반드시 남겨요.{" "}
+            본문을 덮기 전에 이전 것을 반드시 남겨요.{" "}
             <strong className="text-foreground">삭제할 때도 남겨요</strong> — 삭제야말로 되돌릴 수
             있어야 하니까요.
           </p>
