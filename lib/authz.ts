@@ -141,7 +141,9 @@ export async function getMemberLibraryIds(email: string): Promise<string[]> {
 
 /**
  * 이 이메일이 볼 수 있는 레포 전체. admin은 멤버 테이블과 무관하게 전부 본다.
- * `/admin`·`/api/export`·MCP처럼 "전체 조망"이 실제로 필요한 곳에만 쓴다 (SPEC §6).
+ * `/admin`·`/api/export`처럼 "전체 조망"이 admin 고유 권한으로 실제로 필요한 곳에만 쓴다
+ * (SPEC §6: admin은 이 둘에서만 특별하다). **MCP·일반 페이지에는 쓰지 않는다** —
+ * 그 두 곳 말고는 admin도 멤버십을 따라야 한다. `getMemberLibraries`를 대신 쓴다.
  */
 export async function getAccessibleLibraries(email: string | null): Promise<Library[]> {
   if (!email) return [];
@@ -184,12 +186,14 @@ export async function getMemberLibraries(email: string | null): Promise<Library[
 }
 
 /**
- * slug로 레포를 찾되 접근 권한이 없으면 null.
+ * slug로 레포를 찾되 **멤버가 아니면** null. admin도 예외 없다 (SPEC §6) —
+ * `getAccessibleLibraries`(복수)와 이름이 비슷해서 헷갈리기 쉬운데, 그쪽만 admin 전체조회고
+ * 이쪽은 항상 멤버십을 따른다. MCP(`doc_get`/`doc_put`/`doc_delete`)와 `/libraries/[library]`
+ * 아래 모든 페이지가 이 함수 하나로 권한을 판단한다.
  *
  * 호출부는 null을 403이 아니라 **404**로 처리한다 — 403은 "그 레포가 존재한다"를 알려준다.
- * (SPEC §6)
  */
-export async function getAccessibleLibrary(
+export async function getMemberLibrary(
   email: string | null,
   slug: string,
 ): Promise<Library | null> {
@@ -202,11 +206,10 @@ export async function getAccessibleLibrary(
     .maybeSingle();
 
   if (error) {
-    console.error("getAccessibleLibrary", error.code, error.message);
+    console.error("getMemberLibrary", error.code, error.message);
     return null;
   }
   if (!repo) return null;
-  if (isAdminEmail(email)) return repo;
 
   const { count, error: memberError } = await supabase
     .from("library_members")
@@ -215,7 +218,7 @@ export async function getAccessibleLibrary(
     .eq("email", email.toLowerCase());
 
   if (memberError) {
-    console.error("getAccessibleLibrary:member", memberError.code, memberError.message);
+    console.error("getMemberLibrary:member", memberError.code, memberError.message);
     return null;
   }
   return count ? repo : null;

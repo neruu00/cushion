@@ -14,7 +14,7 @@ import { PageShell } from "@/components/PageShell";
 import { ChangeCard, type ChangeEvent } from "@/components/ChangeCard";
 import { LibrarySettingsDialog } from "@/components/LibrarySettingsDialog";
 import { MembersDialog } from "@/components/MembersDialog";
-import { getAccessibleLibrary, getSessionEmail, isAdmin } from "@/lib/authz";
+import { getMemberLibrary, getSessionEmail, isAdmin } from "@/lib/authz";
 import { UsageChart } from "@/components/UsageChart";
 import { estimateSavings } from "@/lib/savings";
 import { parseRange } from "@/lib/usage";
@@ -40,7 +40,7 @@ export default async function LibraryPage({
   if (!email) redirect(`/api/auth/signin?callbackUrl=${encodeURIComponent(`/libraries/${slug}`)}`);
 
   // 권한이 없으면 404다. 403은 "그 레포가 존재한다"를 알려준다 (SPEC §6).
-  const library = await getAccessibleLibrary(email, slug);
+  const library = await getMemberLibrary(email, slug);
   if (!library) notFound();
 
   // 멤버 관리·설정 변경은 소유자만 (D-021). admin은 여기서도 예외다.

@@ -12,7 +12,7 @@ import { notFound, redirect } from "next/navigation";
 import { formatDate } from "@/lib/datetime";
 import { PageShell } from "@/components/PageShell";
 import { Markdown } from "@/components/Markdown";
-import { getAccessibleLibrary, getSessionEmail } from "@/lib/authz";
+import { getMemberLibrary, getSessionEmail } from "@/lib/authz";
 import { supabase } from "@/lib/supabase";
 
 export default async function DocumentPage({ params }: PageProps<"/libraries/[library]/[...path]">) {
@@ -24,7 +24,7 @@ export default async function DocumentPage({ params }: PageProps<"/libraries/[li
     redirect(`/api/auth/signin?callbackUrl=${encodeURIComponent(`/libraries/${slug}/${docPath}`)}`);
   }
 
-  const library = await getAccessibleLibrary(email, slug);
+  const library = await getMemberLibrary(email, slug);
   if (!library) notFound();
 
   const { data: doc, error } = await supabase

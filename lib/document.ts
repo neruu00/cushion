@@ -12,7 +12,7 @@
  * 갱신). 읽고-비교하고-쓰는 사이에 남이 끼어들면 앱 비교는 통과하고도 편집이 유실된다 —
  * 조건이 DB에 있으면 그 창이 없다.
  */
-import { getAccessibleLibrary } from "@/lib/authz";
+import { getMemberLibrary } from "@/lib/authz";
 import { advanceCursor, recordChange, recordVersion } from "@/lib/mirror";
 import { replaceSection } from "@/lib/markdown";
 import { supabase } from "@/lib/supabase";
@@ -40,7 +40,7 @@ interface Existing {
 
 /** 권한 없음과 없음을 구분하지 않는다 — 구분하면 레포의 존재가 새어 나간다. (SPEC §6) */
 async function resolve(email: string, slug: string, path: string) {
-  const repo = await getAccessibleLibrary(email, slug);
+  const repo = await getMemberLibrary(email, slug);
   if (!repo) return { library: null, existing: null as Existing | null };
 
   const { data, error } = await supabase

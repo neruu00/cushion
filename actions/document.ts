@@ -10,7 +10,7 @@
 import { revalidatePath } from "next/cache";
 
 import type { SaveResult } from "@/lib/action.type";
-import { getAccessibleLibrary, getSessionEmail, isAdmin } from "@/lib/authz";
+import { getMemberLibrary, getSessionEmail, isAdmin } from "@/lib/authz";
 import { deleteDocument, putDocument } from "@/lib/document";
 import { deleteDocumentSchema, putDocumentSchema, restoreSchema } from "@/lib/document.schema";
 import { supabase } from "@/lib/supabase";
@@ -88,7 +88,7 @@ export async function restoreVersion(formData: FormData): Promise<void> {
   const parsed = restoreSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return;
 
-  const repo = await getAccessibleLibrary(email, parsed.data.library);
+  const repo = await getMemberLibrary(email, parsed.data.library);
   if (!repo) return;
   if (repo.owner_email !== email && !(await isAdmin())) return;
 

@@ -8,7 +8,7 @@ import { notFound, redirect } from "next/navigation";
 import { PageHeader } from "@/components/PageHeader";
 import { PageShell } from "@/components/PageShell";
 import { DocumentForm } from "@/components/DocumentForm";
-import { getAccessibleLibrary, getSessionEmail } from "@/lib/authz";
+import { getMemberLibrary, getSessionEmail } from "@/lib/authz";
 
 export default async function NewDocumentPage({ params }: PageProps<"/libraries/[library]/new">) {
   const { library: slug } = await params;
@@ -16,7 +16,7 @@ export default async function NewDocumentPage({ params }: PageProps<"/libraries/
   const email = await getSessionEmail();
   if (!email) redirect(`/api/auth/signin?callbackUrl=${encodeURIComponent(`/libraries/${slug}/new`)}`);
 
-  const library = await getAccessibleLibrary(email, slug);
+  const library = await getMemberLibrary(email, slug);
   if (!library) notFound();
 
   return (

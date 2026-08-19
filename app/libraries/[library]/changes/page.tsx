@@ -15,7 +15,7 @@ import { notFound, redirect } from "next/navigation";
 import { ChangeCard, type ChangeEvent } from "@/components/ChangeCard";
 import { PageHeader } from "@/components/PageHeader";
 import { PageShell } from "@/components/PageShell";
-import { getAccessibleLibrary, getSessionEmail } from "@/lib/authz";
+import { getMemberLibrary, getSessionEmail } from "@/lib/authz";
 import { supabase } from "@/lib/supabase";
 
 const LIMIT = 100;
@@ -29,7 +29,7 @@ export default async function ChangesPage({ params }: PageProps<"/libraries/[lib
   }
 
   // 권한이 없으면 404다. 403은 "그 라이브러리가 존재한다"를 알려준다 (SPEC §6).
-  const library = await getAccessibleLibrary(email, slug);
+  const library = await getMemberLibrary(email, slug);
   if (!library) notFound();
 
   const { data, error } = await supabase

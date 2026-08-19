@@ -25,7 +25,7 @@ import { restoreVersion } from "@/actions/document";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { DiffView } from "@/components/DiffView";
 import { VersionCard, type VersionSummary } from "@/components/VersionCard";
-import { getAccessibleLibrary, getSessionEmail, isAdmin } from "@/lib/authz";
+import { getMemberLibrary, getSessionEmail, isAdmin } from "@/lib/authz";
 import { supabase } from "@/lib/supabase";
 
 /** 한 쪽에 실을 버전 수. 본문을 안 읽으므로 넉넉해도 가볍다 */
@@ -44,7 +44,7 @@ export default async function HistoryPage({
     redirect(`/api/auth/signin?callbackUrl=${encodeURIComponent(`/libraries/${slug}/history/${docPath}`)}`);
   }
 
-  const library = await getAccessibleLibrary(email, slug);
+  const library = await getMemberLibrary(email, slug);
   if (!library) notFound();
 
   // 되돌리기는 소유자만 (D-021) — 목록·상세를 보는 건 멤버 전원, 그대로다.
