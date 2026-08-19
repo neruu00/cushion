@@ -30,9 +30,9 @@ test("NEXTAUTH_URL이 없으면 Vercel 도메인으로 떨어진다", () => {
   // 배포할 때 NEXTAUTH_URL을 빠뜨려도 로그인은 멀쩡히 돌아서 눈치채기 어렵다.
   // 그때 연결 명령이 localhost를 뱉으면 팀원 아무도 못 붙는다.
   delete process.env.NEXTAUTH_URL;
-  process.env.VERCEL_PROJECT_PRODUCTION_URL = "cushion-chi.vercel.app";
+  process.env.VERCEL_PROJECT_PRODUCTION_URL = "cushion-archive.vercel.app";
 
-  assert.ok(connectCommand("t").includes(" https://cushion-chi.vercel.app/api/mcp "));
+  assert.ok(connectCommand("t").includes(" https://cushion-archive.vercel.app/api/mcp "));
 
   delete process.env.VERCEL_PROJECT_PRODUCTION_URL;
   assert.ok(connectCommand("t").includes(" http://localhost:3000/api/mcp "));

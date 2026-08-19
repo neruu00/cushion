@@ -10,10 +10,9 @@
 import { revalidatePath } from "next/cache";
 
 import type { SaveResult } from "@/lib/action.type";
-import { getSessionEmail } from "@/lib/authz";
+import { getAccessibleLibrary, getSessionEmail, isAdmin } from "@/lib/authz";
 import { deleteDocument, putDocument } from "@/lib/document";
 import { deleteDocumentSchema, putDocumentSchema, restoreSchema } from "@/lib/document.schema";
-import { getAccessibleLibrary } from "@/lib/authz";
 import { supabase } from "@/lib/supabase";
 
 /**
@@ -78,6 +77,9 @@ export async function removeDocument(formData: FormData): Promise<void> {
  * 이력의 한 버전으로 되돌린다. **덮어쓰기가 아니라 새 저장이다** —
  * 되돌리기 자체도 이력에 한 줄 남아야 "언제 무엇으로 되돌렸나"를 나중에 알 수 있다.
  * 지워진 문서도 되돌릴 수 있다(이력이 문서가 아니라 경로에 매달려 있어서).
+ *
+ * 되돌리기는 그 라이브러리의 **소유자**만 한다 (D-021) — 일반 편집(`saveDocument`)은
+ * 여전히 멤버 전원이 하지만, 남의 편집을 지우는 되돌리기는 더 무거운 권한으로 둔다.
  */
 export async function restoreVersion(formData: FormData): Promise<void> {
   const email = await getSessionEmail();
@@ -88,6 +90,7 @@ export async function restoreVersion(formData: FormData): Promise<void> {
 
   const repo = await getAccessibleLibrary(email, parsed.data.library);
   if (!repo) return;
+  if (repo.owner_email !== email && !(await isAdmin())) return;
 
   // 버전이 정말 이 레포·이 경로의 것인지 확인한다. id만 믿으면 남의 이력을 끌어올 수 있다.
   const { data: version, error } = await supabase
