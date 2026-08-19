@@ -53,21 +53,19 @@ export default function DocsOverviewPage() {
             <ArchitectureDiagram />
           </div>
           <p className="text-sm text-muted-foreground">
-            <strong className="text-foreground">문서의 원본이 여기 있어요.</strong> git 레포의{" "}
-            <code>.md</code>를 비추는 미러가 아니에요. 남의 레포 문서를 고치려면 클론이 필요했는데,
-            읽으려고 클론을 피하는 도구가 쓰려면 클론을 요구하는 셈이라 방향을 뒤집었어요.
+            <strong className="text-foreground">문서의 원본이 여기 있어요.</strong> 웹 편집 화면에서도,
+            에이전트의 <code>doc_put</code>으로도 같은 문서를 만들고 고쳐요 — 어느 입구로 쓰든 같은
+            경로를 지나 이력과 변경 요약이 남아요.
           </p>
           <p className="text-sm text-muted-foreground">
-            어느 입구로 쓰든(웹 편집·<code>doc_put</code>) 같은 경로를 지나 이력과 변경 요약이
-            남아요. 그리고 <strong className="text-foreground">같은 요약 하나</strong>가 팀 채널
-            알림과 에이전트의 <code>[stale]</code> 델타에 두 번 쓰여요 — 두 기능이 아니라
-            한 문자열이에요.
+            <strong className="text-foreground">같은 요약 하나</strong>가 팀 채널 알림과 에이전트의{" "}
+            <code>[stale]</code> 델타에 두 번 쓰여요 — 두 기능이 아니라 한 문자열이에요.
           </p>
           <p className="text-sm text-muted-foreground">
-            그래서 git이 공짜로 주던 것을 대신할 장치가 있어요 — 덮어쓰기 전에 이전 본문을 남기는{" "}
-            <strong className="text-foreground">이력</strong>, 읽을 때 받은 sha를 쓸 때 되돌려 받아
-            어긋나면 거부하는 <strong className="text-foreground">동시 편집 보호</strong>, 그리고
-            유일한 백업인 <strong className="text-foreground">내보내기</strong>.{" "}
+            덮어쓰기 전에 이전 본문을 남기는 <strong className="text-foreground">이력</strong>, 읽을
+            때 받은 sha를 쓸 때 되돌려 받아 어긋나면 거부하는{" "}
+            <strong className="text-foreground">동시 편집 보호</strong>, 그리고 유일한 백업인{" "}
+            <strong className="text-foreground">내보내기</strong>가 있어요.{" "}
             <Link href="/docs/usage" className="underline underline-offset-4">
               사용법
             </Link>
