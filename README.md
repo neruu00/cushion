@@ -128,8 +128,8 @@ Next.js **16** App Router · Tailwind v4 + shadcn/ui · Supabase(Postgres) · Ne
 
 | 문서 | 어디에 | 담는 것 |
 |---|---|---|
-| `SPEC.md` | [Cushion](https://cushion-chi.vercel.app/libraries/cushion/SPEC.md) | 무엇을·왜. 데이터 모델, MCP 툴 명세, 검증 항목 |
-| `PLAN.md` | [Cushion](https://cushion-chi.vercel.app/libraries/cushion/PLAN.md) | 현재 상태, 다음 작업, **결정 로그** |
+| `SPEC.md` | [Cushion](https://cushion-archive.vercel.app/libraries/cushion/SPEC.md) | 무엇을·왜. 데이터 모델, MCP 툴 명세, 검증 항목 |
+| `PLAN.md` | [Cushion](https://cushion-archive.vercel.app/libraries/cushion/PLAN.md) | 현재 상태, 다음 작업, **결정 로그** |
 | [`AGENTS.md`](AGENTS.md) | 레포 | 코드를 읽어선 알기 어려운 규칙과 함정 |
 | [`supabase/migrations/`](supabase/migrations) | 레포 | DB 스키마의 원본 |
 

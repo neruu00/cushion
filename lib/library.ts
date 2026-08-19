@@ -26,9 +26,10 @@ export async function createLibraryFor(
     return { ok: false, code: "invalid", message: parsed.error.issues[0].message };
   }
 
+  // 만든 사람이 소유자다 (D-021) — 멤버 관리·설정·이력 되돌리기를 할 수 있는 단 한 사람.
   const { data: repo, error } = await supabase
     .from("libraries")
-    .insert(parsed.data)
+    .insert({ ...parsed.data, owner_email: email.toLowerCase() })
     .select("id, slug")
     .single();
 

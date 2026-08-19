@@ -81,9 +81,13 @@ create table if not exists libraries (
   -- 마지막으로 실제 발송한 시각. 알림 디바운스 창의 기준점이고, 조건부 UPDATE의 CAS 키다.
   -- null = 아직 한 번도 안 보냄 → 다음 변경이 즉시 나간다.
   last_notified_at        timestamptz,
+  -- 멤버 관리·설정 변경·이력 되돌리기를 할 수 있는 단 한 사람 (D-021). 만든 사람으로 시작한다.
+  -- null = 소유자 없음(마지막 멤버가 나가는 등) — 그때는 admin만 손댈 수 있다.
+  owner_email             text,
   created_at              timestamptz not null default now(),
 
-  constraint libraries_slug_format check (slug ~ '^[a-z0-9][a-z0-9-]{0,62}$')
+  constraint libraries_slug_format check (slug ~ '^[a-z0-9][a-z0-9-]{0,62}$'),
+  constraint libraries_owner_email_lower check (owner_email is null or owner_email = lower(owner_email))
 );
 
 -- ─────────────────────────────────────────────────────────────
@@ -296,6 +300,23 @@ alter table libraries add column if not exists discord_webhook_url text;
 alter table libraries add column if not exists latest_event_id bigint not null default 0;
 alter table libraries add column if not exists github_repos text[] not null default '{}';
 alter table libraries add column if not exists last_notified_at timestamptz;
+alter table libraries add column if not exists owner_email text;
+alter table libraries drop constraint if exists libraries_owner_email_lower;
+alter table libraries add constraint libraries_owner_email_lower
+  check (owner_email is null or owner_email = lower(owner_email));
+
+-- 소유자 백필 (D-021). "만든 사람"을 저장해 두지 않았으니 최선의 근사치로 그 레포에서
+-- 가장 먼저 합류한 멤버를 쓴다 — D-013의 "만든 사람이 첫 멤버가 된다"와 같은 가정이다.
+-- 멤버가 하나도 없는 레포는 owner_email이 null로 남고, admin만 손댈 수 있다.
+update libraries l
+   set owner_email = (
+     select m.email from library_members m
+      where m.library_id = l.id
+      order by m.created_at
+      limit 1
+   )
+ where l.owner_email is null;
+
 alter table documents add column if not exists updated_by text;
 alter table sync_events add column if not exists notified_at timestamptz;
 

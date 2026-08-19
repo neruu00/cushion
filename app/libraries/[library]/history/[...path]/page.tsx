@@ -25,7 +25,7 @@ import { restoreVersion } from "@/actions/document";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { DiffView } from "@/components/DiffView";
 import { VersionCard, type VersionSummary } from "@/components/VersionCard";
-import { getAccessibleLibrary, getSessionEmail } from "@/lib/authz";
+import { getAccessibleLibrary, getSessionEmail, isAdmin } from "@/lib/authz";
 import { supabase } from "@/lib/supabase";
 
 /** 한 쪽에 실을 버전 수. 본문을 안 읽으므로 넉넉해도 가볍다 */
@@ -47,6 +47,9 @@ export default async function HistoryPage({
   const library = await getAccessibleLibrary(email, slug);
   if (!library) notFound();
 
+  // 되돌리기는 소유자만 (D-021) — 목록·상세를 보는 건 멤버 전원, 그대로다.
+  const isOwner = library.owner_email === email || (await isAdmin());
+
   const basePath = `/libraries/${library.slug}/history/${docPath}`;
 
   const selected = versionId(query.v);
@@ -58,6 +61,7 @@ export default async function HistoryPage({
       docPath={docPath}
       basePath={basePath}
       versionId={selected}
+      isOwner={isOwner}
     />
   ) : (
     <VersionList
@@ -174,7 +178,14 @@ async function VersionList({ libraryId, slug, docPath, basePath, before }: ViewP
 }
 
 /** 상세 — 이 버전 하나와 비교 대상 하나만 읽는다 */
-async function VersionDetail({ libraryId, slug, docPath, basePath, versionId }: ViewProps & { versionId: number }) {
+async function VersionDetail({
+  libraryId,
+  slug,
+  docPath,
+  basePath,
+  versionId,
+  isOwner,
+}: ViewProps & { versionId: number; isOwner: boolean }) {
   // library_id·path까지 걸어야 남의 이력을 id만으로 끌어올 수 없다 (restoreVersion과 같은 방어)
   const { data: version, error } = await supabase
     .from("document_versions")
@@ -226,32 +237,34 @@ async function VersionDetail({ libraryId, slug, docPath, basePath, versionId }: 
           </>
         }
         action={
-          <ConfirmDialog
-            trigger="이 버전으로 되돌리기"
-            title="이 버전으로 되돌릴까요?"
-            confirmLabel="되돌리기"
-            description={
-              <>
-                <span className="block font-mono text-xs">
-                  {formatDateTime(version.created_at)} · {version.author}
-                </span>
-                {version.note ? (
-                  <span className="mt-1 block">&ldquo;{version.note}&rdquo;</span>
-                ) : null}
-                <span className="mt-2 block">
-                  되돌려도 지워지지 않아요 — 지금 내용을 이력에 남기고 그 위에 새로 써요.
-                </span>
-              </>
-            }
-            triggerSize="sm"
-            formId={`restore-${version.id}`}
-          >
-            <form id={`restore-${version.id}`} action={restoreVersion}>
-              <input type="hidden" name="library" value={slug} />
-              <input type="hidden" name="path" value={docPath} />
-              <input type="hidden" name="version_id" value={version.id} />
-            </form>
-          </ConfirmDialog>
+          isOwner ? (
+            <ConfirmDialog
+              trigger="이 버전으로 되돌리기"
+              title="이 버전으로 되돌릴까요?"
+              confirmLabel="되돌리기"
+              description={
+                <>
+                  <span className="block font-mono text-xs">
+                    {formatDateTime(version.created_at)} · {version.author}
+                  </span>
+                  {version.note ? (
+                    <span className="mt-1 block">&ldquo;{version.note}&rdquo;</span>
+                  ) : null}
+                  <span className="mt-2 block">
+                    되돌려도 지워지지 않아요 — 지금 내용을 이력에 남기고 그 위에 새로 써요.
+                  </span>
+                </>
+              }
+              triggerSize="sm"
+              formId={`restore-${version.id}`}
+            >
+              <form id={`restore-${version.id}`} action={restoreVersion}>
+                <input type="hidden" name="library" value={slug} />
+                <input type="hidden" name="path" value={docPath} />
+                <input type="hidden" name="version_id" value={version.id} />
+              </form>
+            </ConfirmDialog>
+          ) : undefined
         }
       />
 

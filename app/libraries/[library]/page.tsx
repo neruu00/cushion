@@ -14,7 +14,7 @@ import { PageShell } from "@/components/PageShell";
 import { ChangeCard, type ChangeEvent } from "@/components/ChangeCard";
 import { LibrarySettingsDialog } from "@/components/LibrarySettingsDialog";
 import { MembersDialog } from "@/components/MembersDialog";
-import { getAccessibleLibrary, getSessionEmail } from "@/lib/authz";
+import { getAccessibleLibrary, getSessionEmail, isAdmin } from "@/lib/authz";
 import { UsageChart } from "@/components/UsageChart";
 import { estimateSavings } from "@/lib/savings";
 import { parseRange } from "@/lib/usage";
@@ -42,6 +42,9 @@ export default async function LibraryPage({
   // 권한이 없으면 404다. 403은 "그 레포가 존재한다"를 알려준다 (SPEC §6).
   const library = await getAccessibleLibrary(email, slug);
   if (!library) notFound();
+
+  // 멤버 관리·설정 변경은 소유자만 (D-021). admin은 여기서도 예외다.
+  const isOwner = library.owner_email === email || (await isAdmin());
 
   const [docs, events, memberRows] = await Promise.all([
     supabase
@@ -115,15 +118,23 @@ export default async function LibraryPage({
         }
         action={
           <div className="flex shrink-0 items-center gap-2">
-            {/* 이 화면을 보는 것과 멤버를 관리하는 것의 권한 문턱이 같다 (D-013) */}
-            <MembersDialog libraryId={library.id} members={members} currentEmail={email} />
-            <LibrarySettingsDialog
+            {/* 보는 것과 관리하는 것의 권한 문턱이 다르다 (D-021) — 목록은 멤버 전원,
+                초대·제거·설정은 소유자(또는 admin)만. 다이얼로그 안에서 갈린다 */}
+            <MembersDialog
               libraryId={library.id}
-              name={library.name}
-              githubRepos={library.github_repos}
-              mattermostWebhookUrl={library.mattermost_webhook_url}
-              discordWebhookUrl={library.discord_webhook_url}
+              members={members}
+              currentEmail={email}
+              isOwner={isOwner}
             />
+            {isOwner && (
+              <LibrarySettingsDialog
+                libraryId={library.id}
+                name={library.name}
+                githubRepos={library.github_repos}
+                mattermostWebhookUrl={library.mattermost_webhook_url}
+                discordWebhookUrl={library.discord_webhook_url}
+              />
+            )}
           </div>
         }
       />

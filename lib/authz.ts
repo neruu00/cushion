@@ -23,10 +23,12 @@ export interface Library {
   latest_event_id: number;
   /** 알림 디바운스 창의 기준점. 쓰기 경로가 이 값 하나로 발송 여부를 정한다 */
   last_notified_at: string | null;
+  /** 멤버 관리·설정·이력 되돌리기를 할 수 있는 단 한 사람 (D-021). null이면 admin만 */
+  owner_email: string | null;
 }
 
 const LIBRARY_COLUMNS =
-  "id, slug, name, github_repos, mattermost_webhook_url, discord_webhook_url, latest_event_id, last_notified_at";
+  "id, slug, name, github_repos, mattermost_webhook_url, discord_webhook_url, latest_event_id, last_notified_at, owner_email";
 
 // ─── 정체성 ──────────────────────────────────────────────────────────
 
@@ -61,7 +63,7 @@ export async function identityFromAccessToken(
     .maybeSingle();
 
   if (error) {
-    console.error("identityFromAccessToken", error);
+    console.error("identityFromAccessToken", error.code, error.message);
     return null;
   }
   if (!data) return null;
@@ -76,7 +78,9 @@ export async function identityFromAccessToken(
       .from("access_tokens")
       .update({ last_used_at: new Date().toISOString() })
       .eq("id", data.id);
-    if (touchError) console.error("identityFromAccessToken:last_used_at", touchError);
+    if (touchError) {
+      console.error("identityFromAccessToken:last_used_at", touchError.code, touchError.message);
+    }
   }
 
   return { id: data.id as string, email: data.email as string };
@@ -102,19 +106,23 @@ export async function isAdmin(): Promise<boolean> {
   return isAdminEmail(await getSessionEmail());
 }
 
-/** 이 이메일이 이 레포의 멤버인가. 셀프서브 멤버 관리의 권한 판정용 (D-013). */
-export async function isMember(email: string, libraryId: string): Promise<boolean> {
-  const { count, error } = await supabase
-    .from("library_members")
-    .select("email", { count: "exact", head: true })
-    .eq("library_id", libraryId)
-    .eq("email", email.toLowerCase());
+/**
+ * 이 이메일이 이 레포의 소유자인가. 멤버 관리·설정 변경·이력 되돌리기의 권한 판정용 (D-021).
+ * `library_id`만 있고 `Library` 행이 없는 호출부(폼 데이터 등)를 위한 조회 버전이다 —
+ * 이미 행을 들고 있다면 `library.owner_email === email`로 직접 비교하는 편이 싸다.
+ */
+export async function isLibraryOwner(email: string, libraryId: string): Promise<boolean> {
+  const { data, error } = await supabase
+    .from("libraries")
+    .select("owner_email")
+    .eq("id", libraryId)
+    .maybeSingle();
 
   if (error) {
-    console.error("isMember", error);
+    console.error("isLibraryOwner", error.code, error.message);
     return false; // 조회 실패는 권한 없음 (fail-closed)
   }
-  return Boolean(count);
+  return data?.owner_email === email.toLowerCase();
 }
 
 /** 이 이메일이 멤버로 등록된 레포 id 목록. admin 여부는 보지 않는다. */
@@ -125,13 +133,16 @@ export async function getMemberLibraryIds(email: string): Promise<string[]> {
     .eq("email", email.toLowerCase());
 
   if (error) {
-    console.error("getMemberLibraryIds", error);
+    console.error("getMemberLibraryIds", error.code, error.message);
     return [];
   }
   return (data ?? []).map((row: { library_id: string }) => row.library_id);
 }
 
-/** 이 이메일이 볼 수 있는 레포 전체. admin은 멤버 테이블과 무관하게 전부 본다. */
+/**
+ * 이 이메일이 볼 수 있는 레포 전체. admin은 멤버 테이블과 무관하게 전부 본다.
+ * `/admin`·`/api/export`·MCP처럼 "전체 조망"이 실제로 필요한 곳에만 쓴다 (SPEC §6).
+ */
 export async function getAccessibleLibraries(email: string | null): Promise<Library[]> {
   if (!email) return [];
 
@@ -141,7 +152,32 @@ export async function getAccessibleLibraries(email: string | null): Promise<Libr
     : await query.in("id", await getMemberLibraryIds(email));
 
   if (error) {
-    console.error("getAccessibleLibraries", error);
+    console.error("getAccessibleLibraries", error.code, error.message);
+    return [];
+  }
+  return data ?? [];
+}
+
+/**
+ * 이 이메일이 **멤버로 속한** 레포만. admin이어도 예외 없다 (SPEC §6: admin은 `/admin`·
+ * 내보내기에서만 특별하다). `/dashboard`처럼 "내가 가입한 것"이 화면의 정의인 곳에 쓴다 —
+ * `getAccessibleLibraries`를 여기 쓰면 admin이 로그인할 때마다 전 서비스의 레포가 자기
+ * 것처럼 보인다.
+ */
+export async function getMemberLibraries(email: string | null): Promise<Library[]> {
+  if (!email) return [];
+
+  const ids = await getMemberLibraryIds(email);
+  if (ids.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from("libraries")
+    .select(LIBRARY_COLUMNS)
+    .in("id", ids)
+    .order("slug");
+
+  if (error) {
+    console.error("getMemberLibraries", error.code, error.message);
     return [];
   }
   return data ?? [];
@@ -166,7 +202,7 @@ export async function getAccessibleLibrary(
     .maybeSingle();
 
   if (error) {
-    console.error("getAccessibleLibrary", error);
+    console.error("getAccessibleLibrary", error.code, error.message);
     return null;
   }
   if (!repo) return null;
@@ -179,7 +215,7 @@ export async function getAccessibleLibrary(
     .eq("email", email.toLowerCase());
 
   if (memberError) {
-    console.error("getAccessibleLibrary:member", memberError);
+    console.error("getAccessibleLibrary:member", memberError.code, memberError.message);
     return null;
   }
   return count ? repo : null;

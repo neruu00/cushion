@@ -12,13 +12,14 @@ import { PageHeader } from "@/components/PageHeader";
 import { PageShell } from "@/components/PageShell";
 import { NewLibraryDialog } from "@/components/NewLibraryDialog";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { getAccessibleLibraries, getSessionEmail } from "@/lib/authz";
+import { getMemberLibraries, getSessionEmail } from "@/lib/authz";
 
 export default async function DashboardPage() {
   const email = await getSessionEmail();
   if (!email) redirect("/api/auth/signin?callbackUrl=%2Fdashboard");
 
-  const repos = await getAccessibleLibraries(email);
+  // admin이어도 예외 없이 내가 속한 것만 — 전체 조망은 /admin의 몫이다 (SPEC §6).
+  const repos = await getMemberLibraries(email);
 
   return (
     <PageShell className="space-y-6">
