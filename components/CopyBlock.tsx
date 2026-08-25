@@ -40,15 +40,23 @@ export function CopyBlock({ value, label }: CopyBlockProps) {
   }
 
   return (
-    <div className="rounded-lg border bg-muted/40">
-      <div className="flex items-center justify-between gap-2 border-b px-3 py-1.5">
-        <span className="truncate font-mono text-xs text-muted-foreground">{label ?? ""}</span>
-        <Button type="button" variant="ghost" size="xs" onClick={copy}>
+    // min-w-0: 부모가 flex·grid일 때(다이얼로그 안이 그렇다) 기본값 min-width:auto가
+    // 안의 <pre>·label 내용 크기를 그대로 밀어붙여서, overflow-x-auto가 있어도 이 블록
+    // 자체가 넓어져 버린다. min-w-0을 안 주면 내부 스크롤이 아니라 다이얼로그가 넓어진다.
+    <div className="min-w-0 rounded-lg border bg-muted/40">
+      <div className="flex min-w-0 items-center justify-between gap-2 border-b px-3 py-1.5">
+        {/* 긴 안내문이 와도(예: 초대 링크 힌트) 잘리지 않고 줄바꿈된다 — truncate였다면
+            한 줄로 잘려 못 읽혔다. 실제로 넓어지는 원인은 아래 <pre>의 값이다 */}
+        <span className="min-w-0 font-mono text-xs text-muted-foreground">{label ?? ""}</span>
+        <Button type="button" variant="ghost" size="xs" className="shrink-0" onClick={copy}>
           {state === "copied" ? <Check /> : state === "failed" ? <TriangleAlert /> : <Copy />}
           {state === "copied" ? "복사됨" : state === "failed" ? "선택했어요 — Ctrl+C" : "복사"}
         </Button>
       </div>
-      <pre ref={preRef} className="overflow-x-auto px-3 py-2 font-mono text-xs leading-relaxed">
+      <pre
+        ref={preRef}
+        className="min-w-0 overflow-x-auto px-3 py-2 font-mono text-xs leading-relaxed"
+      >
         {value}
       </pre>
     </div>
