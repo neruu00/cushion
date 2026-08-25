@@ -59,7 +59,9 @@ export function MembersDialog({
       <DialogTrigger render={<Button variant="outline" size="sm" />}>
         <Users /> 멤버 {members.length}
       </DialogTrigger>
-      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
+      {/* overflow-x-hidden: 초대 링크처럼 긴 값이 CopyBlock의 min-w-0을 뚫고도 혹시
+          넘치면, 다이얼로그가 넓어지는 대신 잘리게 하는 마지막 방어선이다 */}
+      <DialogContent className="max-h-[85vh] overflow-x-hidden overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>멤버</DialogTitle>
           <DialogDescription>
