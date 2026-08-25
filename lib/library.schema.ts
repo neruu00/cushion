@@ -99,3 +99,14 @@ export const memberSchema = z.object({
     .pipe(z.email("이메일 형식이 아니에요.")),
 });
 
+/** 초대 링크 생성·무효화. 재발급(무효화 후 생성)이라 slug까지 같이 받아 revalidate에 쓴다. */
+export const inviteActionSchema = z.object({
+  library_id: z.uuid(),
+  library_slug: z.string(),
+});
+
+/** `/invite/[token]`에서 참여 버튼을 누를 때. 토큰 형태는 lib/token.ts의 접두사가 걸러 준다. */
+export const joinInviteSchema = z.object({
+  token: z.string().min(1),
+});
+

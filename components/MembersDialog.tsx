@@ -13,10 +13,13 @@
  * 초대·제거는 소유자만 한다 (D-021) — 목록을 보는 것과 문턱이 다르다. 자기 자신을
  * 빼는 나가기는 예외로 누구나 된다. 실제 판정은 서버 액션이 다시 한다 — 여기서
  * 버튼을 숨기는 건 UX고, 막는 건 액션이다.
+ *
+ * 초대 링크(D-022)는 이메일 하나씩 넣는 것과 다른 경로다 — 링크를 가진 사람은 로그인만
+ * 하면 참여한다. access token과 같은 취급이라 발급 순간에만 값을 보여준다.
  */
 import { Trash2, Users } from "lucide-react";
 
-import { addMember, removeMember } from "@/actions/library";
+import { addMember, createInviteLink, removeMember, revokeInviteLink } from "@/actions/library";
 import { ActionForm } from "@/components/ActionForm";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Button } from "@/components/ui/button";
@@ -33,14 +36,24 @@ import { Label } from "@/components/ui/label";
 
 interface MembersDialogProps {
   libraryId: string;
+  librarySlug: string;
   members: { email: string }[];
   /** 지금 보고 있는 사람. 자기 행에 "(나)"를 붙여 나가기임을 알린다 */
   currentEmail: string;
   /** 소유자거나 admin. 초대 폼과 남을 제거하는 버튼은 이때만 보인다 (D-021) */
   isOwner: boolean;
+  /** 지금 살아있는 초대 링크가 있는가. 값 자체는 안 보여준다 — access token과 같다 */
+  hasActiveInvite: boolean;
 }
 
-export function MembersDialog({ libraryId, members, currentEmail, isOwner }: MembersDialogProps) {
+export function MembersDialog({
+  libraryId,
+  librarySlug,
+  members,
+  currentEmail,
+  isOwner,
+  hasActiveInvite,
+}: MembersDialogProps) {
   return (
     <Dialog>
       <DialogTrigger render={<Button variant="outline" size="sm" />}>
@@ -106,6 +119,36 @@ export function MembersDialog({ libraryId, members, currentEmail, isOwner }: Mem
               <Input name="email" type="email" placeholder="teammate@example.com" required />
             </Label>
           </ActionForm>
+        )}
+
+        {isOwner && (
+          <div className="space-y-2 border-t pt-4">
+            <div>
+              <h3 className="text-sm font-medium">초대 링크</h3>
+              <p className="text-xs text-muted-foreground">
+                이메일을 몰라도 돼요 — 링크를 가진 사람은 로그인만 하면 참여해요. 라이브러리당
+                링크는 한 번에 하나만 살아있어요.
+              </p>
+            </div>
+
+            {hasActiveInvite && (
+              <div className="flex items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm">
+                <span className="text-muted-foreground">활성 링크가 있어요</span>
+                <form action={revokeInviteLink}>
+                  <input type="hidden" name="library_id" value={libraryId} />
+                  <input type="hidden" name="library_slug" value={librarySlug} />
+                  <Button type="submit" variant="destructive" size="xs">
+                    무효화
+                  </Button>
+                </form>
+              </div>
+            )}
+
+            <ActionForm action={createInviteLink} submitLabel={hasActiveInvite ? "재생성" : "생성"}>
+              <input type="hidden" name="library_id" value={libraryId} />
+              <input type="hidden" name="library_slug" value={librarySlug} />
+            </ActionForm>
+          </div>
         )}
       </DialogContent>
     </Dialog>

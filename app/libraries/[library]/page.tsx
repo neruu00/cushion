@@ -46,7 +46,7 @@ export default async function LibraryPage({
   // 멤버 관리·설정 변경은 소유자만 (D-021). admin은 여기서도 예외다.
   const isOwner = library.owner_email === email || (await isAdmin());
 
-  const [docs, events, memberRows] = await Promise.all([
+  const [docs, events, memberRows, inviteRows] = await Promise.all([
     supabase
       .from("documents")
       // ponytail: 절약 추정 때문에 본문까지 읽는다. 레포 하나에 문서 수십 개면 충분하고,
@@ -66,8 +66,18 @@ export default async function LibraryPage({
       .select("email")
       .eq("library_id", library.id)
       .order("email"),
+    // 초대 다이얼로그는 소유자만 본다 — 아니면 쿼리 자체가 낭비다 (D-022).
+    isOwner
+      ? supabase
+          .from("library_invites")
+          .select("id")
+          .eq("library_id", library.id)
+          .is("revoked_at", null)
+          .limit(1)
+      : Promise.resolve({ data: null, error: null }),
   ]);
   const members: { email: string }[] = memberRows.data ?? [];
+  const hasActiveInvite = (inviteRows.data?.length ?? 0) > 0;
 
   if (docs.error) console.error("LibraryPage: documents", docs.error);
   if (events.error) console.error("LibraryPage: events", events.error);
@@ -122,9 +132,11 @@ export default async function LibraryPage({
                 초대·제거·설정은 소유자(또는 admin)만. 다이얼로그 안에서 갈린다 */}
             <MembersDialog
               libraryId={library.id}
+              librarySlug={library.slug}
               members={members}
               currentEmail={email}
               isOwner={isOwner}
+              hasActiveInvite={hasActiveInvite}
             />
             {isOwner && (
               <LibrarySettingsDialog

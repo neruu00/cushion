@@ -50,3 +50,8 @@ export function historyUrl(base: string, slug: string, path: string): string {
 export function changesUrl(base: string, slug: string): string {
   return `${libraryUrl(base, slug)}/changes`;
 }
+
+/** 초대 링크. 토큰 자체가 비밀이라 경로에 그대로 실어도 된다(access token과 같은 취급). */
+export function inviteUrl(base: string, token: string): string {
+  return `${base}/invite/${encodeURIComponent(token)}`;
+}
