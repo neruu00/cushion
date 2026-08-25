@@ -10,13 +10,21 @@
  * 순서를 지킨다: 권한 확인 → Zod 검증 → 로직 → 재검증
  */
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 
 import type { SecretState } from "@/lib/action.type";
-import { getSessionEmail, isAdmin, isLibraryOwner } from "@/lib/authz";
+import { getSessionEmail, isAdmin, isLibraryOwner, libraryFromInviteToken } from "@/lib/authz";
 import { createLibraryFor } from "@/lib/library";
-import { librarySettingsSchema, memberSchema } from "@/lib/library.schema";
+import {
+  inviteActionSchema,
+  joinInviteSchema,
+  librarySettingsSchema,
+  memberSchema,
+} from "@/lib/library.schema";
 import { setupFiles } from "@/lib/snippets";
 import { supabase } from "@/lib/supabase";
+import { generateToken } from "@/lib/token";
+import { baseUrl, inviteUrl } from "@/lib/url";
 
 export async function createLibrary(
   _prev: SecretState,
@@ -141,4 +149,104 @@ export async function removeMember(formData: FormData): Promise<void> {
   if (error) console.error("removeMember", error);
   revalidatePath("/admin");
   revalidatePath("/dashboard");
+}
+
+/**
+ * 초대 링크 생성. 재발급과 같은 모양이다(access token 재발급, SPEC §6) — 새 값을 만들고
+ * 기존 살아있는 링크를 무효화한다. 라이브러리당 살아있는 링크가 항상 최대 하나인 이유가 그것
+ * — "누가 아직 안 들어왔는지" 추적할 필요 없이 링크 하나만 신경 쓰면 된다.
+ *
+ * PAT처럼 **평문은 여기서만** 노출한다. DB엔 해시만 남아서, 다이얼로그를 닫으면 다시 못
+ * 본다 — 잃어버리면 재발급이 맞다(공유용 링크라고 예외를 두지 않는다).
+ */
+export async function createInviteLink(
+  _prev: SecretState,
+  formData: FormData,
+): Promise<SecretState> {
+  const email = await getSessionEmail();
+  if (!email) return { success: false, error: "로그인이 필요해요." };
+
+  const parsed = inviteActionSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return { success: false, error: "잘못된 요청이에요." };
+
+  if (!(await canManageLibrary(email, parsed.data.library_id))) {
+    return { success: false, error: "이 라이브러리의 소유자만 초대 링크를 만들 수 있어요." };
+  }
+
+  const { error: revokeError } = await supabase
+    .from("library_invites")
+    .update({ revoked_at: new Date().toISOString() })
+    .eq("library_id", parsed.data.library_id)
+    .is("revoked_at", null);
+  if (revokeError) console.error("createInviteLink:revoke", revokeError.code, revokeError.message);
+
+  const token = generateToken("invite");
+  const { error } = await supabase.from("library_invites").insert({
+    library_id: parsed.data.library_id,
+    token_hash: token.hash,
+    created_by: email,
+  });
+
+  if (error) {
+    console.error("createInviteLink", error.code, error.message);
+    return { success: false, error: "만들지 못했어요. 잠시 후 다시 시도해 주세요." };
+  }
+
+  revalidatePath(`/libraries/${parsed.data.library_slug}`);
+  return {
+    success: true,
+    data: {
+      secret: inviteUrl(baseUrl(), token.plaintext),
+      hint: "이 링크는 다시 볼 수 없어요. 링크를 가진 사람은 로그인만 하면 참여할 수 있어요 — 필요한 사람에게만 보내세요.",
+    },
+  };
+}
+
+/** 무효화는 삭제가 아니라 `revoked_at` 기록이다(access token 폐기와 같은 이유). */
+export async function revokeInviteLink(formData: FormData): Promise<void> {
+  const email = await getSessionEmail();
+  if (!email) return;
+
+  const parsed = inviteActionSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return;
+
+  if (!(await canManageLibrary(email, parsed.data.library_id))) return;
+
+  const { error } = await supabase
+    .from("library_invites")
+    .update({ revoked_at: new Date().toISOString() })
+    .eq("library_id", parsed.data.library_id)
+    .is("revoked_at", null);
+
+  if (error) console.error("revokeInviteLink", error.code, error.message);
+  revalidatePath(`/libraries/${parsed.data.library_slug}`);
+}
+
+/**
+ * `/invite/[token]`의 참여 버튼. 폼이 준 library_id를 믿지 않고 토큰에서 다시 찾는다 —
+ * 그래야 무효화된 링크로는 아무리 폼을 조작해도 못 들어온다.
+ *
+ * 이미 멤버면 그냥 통과시킨다(23505 unique violation) — 링크를 두 번 눌러도 에러가 아니라
+ * 라이브러리로 보내는 게 맞다.
+ */
+export async function joinLibrary(formData: FormData): Promise<void> {
+  const email = await getSessionEmail();
+  if (!email) return;
+
+  const parsed = joinInviteSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return;
+
+  const library = await libraryFromInviteToken(parsed.data.token);
+  if (!library) return;
+
+  const { error } = await supabase
+    .from("library_members")
+    .insert({ library_id: library.id, email });
+  if (error && error.code !== "23505") {
+    console.error("joinLibrary", error.code, error.message);
+    return;
+  }
+
+  revalidatePath("/dashboard");
+  redirect(`/libraries/${library.slug}`);
 }

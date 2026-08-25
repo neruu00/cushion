@@ -9,7 +9,7 @@
  */
 import { auth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
-import { hashFromAuthHeader } from "@/lib/token";
+import { hashFromAuthHeader, sha256, TOKEN_PREFIX } from "@/lib/token";
 
 export interface Library {
   id: string;
@@ -222,4 +222,29 @@ export async function getMemberLibrary(
     return null;
   }
   return count ? repo : null;
+}
+
+/**
+ * 초대 링크 토큰 → 그 라이브러리. 무효화됐거나 형태가 안 맞으면 null (D-022).
+ * `identityFromAccessToken`과 같은 모양이다 — 접두사로 먼저 거르고, 해시로 조회한다.
+ * 멤버십은 안 본다 — 초대 토큰 자체가 "아직 멤버가 아닌 사람"을 위한 것이다.
+ */
+export async function libraryFromInviteToken(token: string): Promise<Library | null> {
+  if (!token.startsWith(TOKEN_PREFIX.invite)) return null;
+  const hash = sha256(token);
+
+  const { data, error } = await supabase
+    .from("library_invites")
+    .select(`libraries!inner(${LIBRARY_COLUMNS})`)
+    .eq("token_hash", hash)
+    .is("revoked_at", null)
+    .maybeSingle();
+
+  if (error) {
+    console.error("libraryFromInviteToken", error.code, error.message);
+    return null;
+  }
+  if (!data) return null;
+  // supabase-js가 단일 관계는 객체로, `!inner`도 마찬가지로 준다 — 배열이 아니다.
+  return data.libraries as unknown as Library;
 }

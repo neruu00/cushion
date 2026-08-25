@@ -108,6 +108,29 @@ create table if not exists library_members (
 create index if not exists library_members_email_idx on library_members (email);
 
 -- ─────────────────────────────────────────────────────────────
+-- library_invites — 소유자가 만드는 초대 링크 (D-022).
+-- access_tokens와 같은 원칙으로 sha256 해시만 저장하고 발급 순간 1회만 노출한다 —
+-- 다시 보여줘야 하는 값이 아니라, PAT처럼 "잃어버리면 재발급"이 맞다. 재발급 = 새 값 +
+-- 기존 revoked_at 설정이라 라이브러리당 살아있는 링크는 항상 최대 하나다(app 로직에서 보장).
+-- ─────────────────────────────────────────────────────────────
+create table if not exists library_invites (
+  id           uuid primary key default gen_random_uuid(),
+  library_id   uuid not null references libraries(id) on delete cascade,
+  token_hash   text not null unique,             -- sha256(cshn_inv_...). 평문 저장 금지
+  created_by   text not null,                    -- lowercase
+  created_at   timestamptz not null default now(),
+  revoked_at   timestamptz,
+
+  constraint library_invites_created_by_lower check (created_by = lower(created_by))
+);
+
+-- 유효 초대만 훑는 경로. 폐기된 링크는 인덱스에서 빠진다 (access_tokens_active_idx와 같은 모양)
+create index if not exists library_invites_active_idx
+  on library_invites (token_hash) where revoked_at is null;
+
+create index if not exists library_invites_library_idx on library_invites (library_id);
+
+-- ─────────────────────────────────────────────────────────────
 -- users — 로그인한 적 있는 모든 사용자
 -- NextAuth signIn 콜백에서 upsert된다. library_members·access_tokens와 무관하게
 -- "로그인만 한 사람"도 관리자 화면에 나오게 하려고 도입했다.
@@ -379,3 +402,4 @@ alter table access_tokens      enable row level security;
 alter table token_cursors      enable row level security;
 alter table usage_hourly       enable row level security;
 alter table request_logs       enable row level security;
+alter table library_invites    enable row level security;
