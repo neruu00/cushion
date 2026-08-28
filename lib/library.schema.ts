@@ -81,12 +81,22 @@ export const createLibrarySchema = z.object({
  *
  * slug는 여기 없다. 바꾸는 순간 팀원의 URL과 에이전트가 쓰던 `library` 인자가 죽는다.
  */
+/**
+ * 체크박스는 **꺼져 있으면 formData에 아예 안 실린다.** 그래서 "없음 = false"로 접는다 —
+ * `z.boolean()`을 그대로 쓰면 끌 때마다 검증이 터진다. 켜면 브라우저가 "on"을 보낸다.
+ */
+const checkbox = z
+  .string()
+  .optional()
+  .transform((v) => v !== undefined);
+
 export const librarySettingsSchema = z.object({
   library_id: z.uuid(),
   name: z.string().trim().min(1, "이름을 입력하세요.").max(100),
   github_repos: githubRepos,
   mattermost_webhook_url: webhookUrl,
   discord_webhook_url: webhookUrl,
+  is_public: checkbox,
 });
 
 export const memberSchema = z.object({

@@ -32,6 +32,8 @@ interface LibrarySettingsDialogProps {
   githubRepos: string[];
   mattermostWebhookUrl: string | null;
   discordWebhookUrl: string | null;
+  /** 켜면 링크를 아는 누구나 로그인 없이 문서를 읽는다 (D-023) */
+  isPublic: boolean;
 }
 
 export function LibrarySettingsDialog({
@@ -40,6 +42,7 @@ export function LibrarySettingsDialog({
   githubRepos,
   mattermostWebhookUrl,
   discordWebhookUrl,
+  isPublic,
 }: LibrarySettingsDialogProps) {
   return (
     <Dialog>
@@ -86,6 +89,29 @@ export function LibrarySettingsDialog({
             placeholder="https://discord.com/api/webhooks/…"
             defaultValue={discordWebhookUrl ?? ""}
           />
+
+          {/* 체크박스라 Field(라벨+입력 한 쌍)에 안 맞는다 — 라벨이 옆에 붙어야 한다.
+              defaultChecked도 defaultValue와 같은 이유로 key 리마운트가 필요하다 */}
+          <label
+            key={`pub:${isPublic}`}
+            className="flex items-start gap-2 rounded-lg border p-3 text-sm"
+          >
+            <input
+              type="checkbox"
+              name="is_public"
+              defaultChecked={isPublic}
+              className="mt-0.5 size-4 shrink-0 accent-foreground"
+            />
+            <span className="grid gap-1">
+              <span className="font-medium">링크가 있으면 누구나 읽기</span>
+              <span className="text-xs font-normal text-muted-foreground">
+                켜면 <strong className="text-foreground">로그인 없이도</strong> 이 라이브러리의
+                문서를 읽을 수 있어요. 쓰기·이력·멤버 목록은 그대로 멤버만이에요. 검색엔진에는
+                올라가지 않지만, <strong className="text-foreground">링크를 받은 사람은 전부</strong>{" "}
+                볼 수 있으니 비공개 내용이 있으면 켜지 마세요.
+              </span>
+            </span>
+          </label>
         </ActionForm>
       </DialogContent>
     </Dialog>
