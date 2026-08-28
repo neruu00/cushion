@@ -32,7 +32,7 @@ interface LibrarySettingsDialogProps {
   githubRepos: string[];
   mattermostWebhookUrl: string | null;
   discordWebhookUrl: string | null;
-  /** 켜면 링크를 아는 누구나 로그인 없이 문서를 읽는다 (D-023) */
+  /** 켜면 링크를 아는 누구나 로그인 없이 문서를 읽는다 (D-024) */
   isPublic: boolean;
 }
 

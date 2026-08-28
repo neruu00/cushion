@@ -84,7 +84,7 @@ create table if not exists libraries (
   -- 멤버 관리·설정 변경·이력 되돌리기를 할 수 있는 단 한 사람 (D-021). 만든 사람으로 시작한다.
   -- null = 소유자 없음(마지막 멤버가 나가는 등) — 그때는 admin만 손댈 수 있다.
   owner_email             text,
-  -- true면 **로그인 없이** 문서 목록·본문을 읽을 수 있다 (D-023). 소유자만 켤 수 있고,
+  -- true면 **로그인 없이** 문서 목록·본문을 읽을 수 있다 (D-024). 소유자만 켤 수 있고,
   -- 켜도 쓰기는 여전히 멤버만이다 — 읽기 문턱만 내리는 값이지 쓰기와는 무관하다.
   -- 기본 false: 켜는 건 의식적인 행동이어야 한다(fail-closed).
   is_public               boolean not null default false,
@@ -112,7 +112,7 @@ create table if not exists library_members (
 create index if not exists library_members_email_idx on library_members (email);
 
 -- ─────────────────────────────────────────────────────────────
--- library_invites — 소유자가 만드는 초대 링크 (D-022).
+-- library_invites — 소유자가 만드는 초대 링크 (D-023).
 -- access_tokens와 같은 원칙으로 sha256 해시만 저장하고 발급 순간 1회만 노출한다 —
 -- 다시 보여줘야 하는 값이 아니라, PAT처럼 "잃어버리면 재발급"이 맞다. 재발급 = 새 값 +
 -- 기존 revoked_at 설정이라 라이브러리당 살아있는 링크는 항상 최대 하나다(app 로직에서 보장).
