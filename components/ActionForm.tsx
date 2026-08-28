@@ -29,6 +29,11 @@ interface ActionFormProps {
    * (`setupFiles()`의 `.mcp.json` + `AGENTS.md`).
    */
   filesLayout?: "list" | "tabs";
+  /**
+   * 발급된 값을 감추고 복사 버튼만 보여준다. 좁은 다이얼로그 안에서 줄바꿈 없는 긴 한 줄
+   * (초대 링크)을 그대로 그리면 상자가 다이얼로그를 뚫고 나간다.
+   */
+  hideSecret?: boolean;
 }
 
 /** 순서를 유지하며 group으로 묶는다. group이 없으면 파일명 자체를 그룹으로 쓴다. */
@@ -52,6 +57,7 @@ export function ActionForm({
   children,
   className,
   filesLayout = "list",
+  hideSecret = false,
 }: ActionFormProps) {
   const [state, formAction, pending] = useActionState(action, null);
 
@@ -82,7 +88,11 @@ export function ActionForm({
                   서버에는 해시만 저장돼요. 이 화면을 벗어나면 다시 볼 수 없고, 재발급만 할 수 있어요.
                 </AlertDescription>
               </Alert>
-              <CopyBlock value={state.data.secret} label={state.data.hint} />
+              <CopyBlock
+                value={state.data.secret}
+                label={state.data.hint}
+                hideValue={hideSecret}
+              />
             </>
           ) : (
             <p className="text-sm text-muted-foreground">{state.data.hint}</p>
