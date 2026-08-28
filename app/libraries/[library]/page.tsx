@@ -5,6 +5,7 @@
  * 타임라인은 `sync_events.summary`를 그대로 보여준다 — 알림·에이전트 델타와 같은 문자열이다.
  * 두 번 만들면 두 번 드리프트한다 (SPEC §8).
  */
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
@@ -14,7 +15,7 @@ import { PageShell } from "@/components/PageShell";
 import { ChangeCard, type ChangeEvent } from "@/components/ChangeCard";
 import { LibrarySettingsDialog } from "@/components/LibrarySettingsDialog";
 import { MembersDialog } from "@/components/MembersDialog";
-import { getMemberLibrary, getSessionEmail, isAdmin } from "@/lib/authz";
+import { getReadableLibrary, getSessionEmail, isAdmin } from "@/lib/authz";
 import { UsageChart } from "@/components/UsageChart";
 import { estimateSavings } from "@/lib/savings";
 import { parseRange } from "@/lib/usage";
@@ -28,6 +29,9 @@ interface DocRow {
   content: string;
 }
 
+/** 링크를 아는 사람만 보는 것이지 검색으로 찾는 것이 아니다 (D-023). */
+export const metadata: Metadata = { robots: { index: false, follow: false } };
+
 export default async function LibraryPage({
   params,
   searchParams,
@@ -37,14 +41,18 @@ export default async function LibraryPage({
   const range = parseRange((await searchParams).range);
 
   const email = await getSessionEmail();
-  if (!email) redirect(`/api/auth/signin?callbackUrl=${encodeURIComponent(`/libraries/${slug}`)}`);
-
-  // 권한이 없으면 404다. 403은 "그 레포가 존재한다"를 알려준다 (SPEC §6).
-  const library = await getMemberLibrary(email, slug);
-  if (!library) notFound();
+  // 공개 라이브러리는 비로그인도 문서 목록·본문까지 본다 (D-023).
+  const view = await getReadableLibrary(email, slug);
+  if (!view) {
+    // 비로그인이면 로그인부터 — 로그인하면 보이는 라이브러리일 수 있다.
+    // 로그인했는데도 못 보면 404다. 403은 "그 라이브러리가 존재한다"를 알려준다 (SPEC §6).
+    if (!email) redirect(`/api/auth/signin?callbackUrl=${encodeURIComponent(`/libraries/${slug}`)}`);
+    notFound();
+  }
+  const { library, isMember } = view;
 
   // 멤버 관리·설정 변경은 소유자만 (D-021). admin은 여기서도 예외다.
-  const isOwner = library.owner_email === email || (await isAdmin());
+  const isOwner = isMember && (library.owner_email === email || (await isAdmin()));
 
   const [docs, events, memberRows, inviteRows] = await Promise.all([
     supabase
@@ -54,18 +62,19 @@ export default async function LibraryPage({
       .select("path, title, updated_at, content")
       .eq("library_id", library.id)
       .order("path"),
-    supabase
-      .from("sync_events")
-      .select("id, summary, author, created_at, changed_paths, deleted_paths")
-      .eq("library_id", library.id)
-      .order("id", { ascending: false })
-      // 최신 1건만 보여준다. 2건을 읽는 건 "더보기"를 걸지 말지 알기 위해서다.
-      .limit(2),
-    supabase
-      .from("library_members")
-      .select("email")
-      .eq("library_id", library.id)
-      .order("email"),
+    // 변경 타임라인·멤버 목록은 편집자 이메일과 팀 명단이라 멤버에게만 (D-023).
+    isMember
+      ? supabase
+          .from("sync_events")
+          .select("id, summary, author, created_at, changed_paths, deleted_paths")
+          .eq("library_id", library.id)
+          .order("id", { ascending: false })
+          // 최신 1건만 보여준다. 2건을 읽는 건 "더보기"를 걸지 말지 알기 위해서다.
+          .limit(2)
+      : Promise.resolve({ data: null, error: null }),
+    isMember
+      ? supabase.from("library_members").select("email").eq("library_id", library.id).order("email")
+      : Promise.resolve({ data: null, error: null }),
     // 초대 다이얼로그는 소유자만 본다 — 아니면 쿼리 자체가 낭비다 (D-022).
     isOwner
       ? supabase
@@ -116,28 +125,36 @@ export default async function LibraryPage({
                 ))}
               </>
             ) : null}
-            {" · "}
-            {/* 붙어 있으면 어디에 붙었는지 보여준다 — 없을 때만 알리면 확인할 방법이 없다 */}
-            {[
-              library.mattermost_webhook_url ? "Mattermost" : null,
-              library.discord_webhook_url ? "Discord" : null,
-            ]
-              .filter(Boolean)
-              .join(" · ") || "알림 채널 없음"}
+            {/* 알림 채널은 내부 설정이라 멤버에게만 (D-023) */}
+            {isMember ? (
+              <>
+                {" · "}
+                {/* 붙어 있으면 어디에 붙었는지 보여준다 — 없을 때만 알리면 확인할 방법이 없다 */}
+                {[
+                  library.mattermost_webhook_url ? "Mattermost" : null,
+                  library.discord_webhook_url ? "Discord" : null,
+                ]
+                  .filter(Boolean)
+                  .join(" · ") || "알림 채널 없음"}
+              </>
+            ) : null}
           </>
         }
         action={
           <div className="flex shrink-0 items-center gap-2">
             {/* 보는 것과 관리하는 것의 권한 문턱이 다르다 (D-021) — 목록은 멤버 전원,
-                초대·제거·설정은 소유자(또는 admin)만. 다이얼로그 안에서 갈린다 */}
-            <MembersDialog
-              libraryId={library.id}
-              librarySlug={library.slug}
-              members={members}
-              currentEmail={email}
-              isOwner={isOwner}
-              hasActiveInvite={hasActiveInvite}
-            />
+                초대·제거·설정은 소유자(또는 admin)만. 다이얼로그 안에서 갈린다.
+                비멤버(공개 열람자)에게는 멤버 목록 자체가 안 보인다 (D-023) */}
+            {isMember && email && (
+              <MembersDialog
+                libraryId={library.id}
+                librarySlug={library.slug}
+                members={members}
+                currentEmail={email}
+                isOwner={isOwner}
+                hasActiveInvite={hasActiveInvite}
+              />
+            )}
             {isOwner && (
               <LibrarySettingsDialog
                 libraryId={library.id}
@@ -145,6 +162,7 @@ export default async function LibraryPage({
                 githubRepos={library.github_repos}
                 mattermostWebhookUrl={library.mattermost_webhook_url}
                 discordWebhookUrl={library.discord_webhook_url}
+                isPublic={library.is_public}
               />
             )}
           </div>
@@ -152,45 +170,56 @@ export default async function LibraryPage({
       />
 
       {/* 위에서부터 최근 변경 → 문서 → 토큰 사용량. 무슨 일이 있었나 → 무엇이 있나 →
-          얼마나 썼나 순이다. 멤버는 헤더의 다이얼로그로 옮겼다. */}
-      <section className="space-y-2">
-        <div className="flex items-center justify-between gap-4">
-          <h2 className="text-sm font-medium">최근 변경</h2>
-          {timeline.length > 0 ? (
-            <Link
-              href={`/libraries/${library.slug}/changes`}
-              className="text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
-            >
-              더보기
-            </Link>
-          ) : null}
-        </div>
-        {timeline.length === 0 ? (
-          <p className="text-sm text-muted-foreground">아직 변경 기록이 없어요.</p>
-        ) : (
-          <ul className="divide-y rounded-lg border">
-            {/* 최신 하나만. 나머지는 더보기로 간다 */}
-            <li>
-              <ChangeCard event={timeline[0]} librarySlug={library.slug} />
-            </li>
-          </ul>
-        )}
-      </section>
+          얼마나 썼나 순이다. 멤버는 헤더의 다이얼로그로 옮겼다.
+          공개 열람자에게는 문서 목록만 남는다 — 나머지는 편집자 이메일·내부 지표다 (D-023). */}
+      {isMember && (
+        <section className="space-y-2">
+          <div className="flex items-center justify-between gap-4">
+            <h2 className="text-sm font-medium">최근 변경</h2>
+            {timeline.length > 0 ? (
+              <Link
+                href={`/libraries/${library.slug}/changes`}
+                className="text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
+              >
+                더보기
+              </Link>
+            ) : null}
+          </div>
+          {timeline.length === 0 ? (
+            <p className="text-sm text-muted-foreground">아직 변경 기록이 없어요.</p>
+          ) : (
+            <ul className="divide-y rounded-lg border">
+              {/* 최신 하나만. 나머지는 더보기로 간다 */}
+              <li>
+                <ChangeCard event={timeline[0]} librarySlug={library.slug} />
+              </li>
+            </ul>
+          )}
+        </section>
+      )}
 
       <section className="space-y-2">
         <div className="flex items-center justify-between gap-4">
           <h2 className="text-sm font-medium">문서</h2>
-          <Link
-            href={`/libraries/${library.slug}/new`}
-            className="text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
-          >
-            새 문서
-          </Link>
+          {isMember && (
+            <Link
+              href={`/libraries/${library.slug}/new`}
+              className="text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
+            >
+              새 문서
+            </Link>
+          )}
         </div>
         {documents.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            아직 문서가 없어요. 위의 &quot;새 문서&quot;로 만들거나, 에이전트가{" "}
-            <code>doc_put</code>으로 만들 수 있어요.
+            {isMember ? (
+              <>
+                아직 문서가 없어요. 위의 &quot;새 문서&quot;로 만들거나, 에이전트가{" "}
+                <code>doc_put</code>으로 만들 수 있어요.
+              </>
+            ) : (
+              "아직 문서가 없어요."
+            )}
           </p>
         ) : (
           <ul className="divide-y rounded-lg border">
@@ -219,15 +248,17 @@ export default async function LibraryPage({
       </section>
 
       {/* 이 도구가 존재하는 이유를 그 라이브러리의 숫자로 보여준다. 실측(그래프)과
-          추정(절약)을 한 카드에 두되 역할을 나눈다 — 자세한 건 UsageChart 주석에. */}
-      <UsageChart
-        summary={usage}
-        range={range}
-        savings={savings}
-        documentCount={documents.length}
-        basePath={`/libraries/${library.slug}`}
-      />
-
+          추정(절약)을 한 카드에 두되 역할을 나눈다 — 자세한 건 UsageChart 주석에.
+          공개 열람자에게는 안 보인다 — 내부 운영 지표다 (D-023). */}
+      {isMember && (
+        <UsageChart
+          summary={usage}
+          range={range}
+          savings={savings}
+          documentCount={documents.length}
+          basePath={`/libraries/${library.slug}`}
+        />
+      )}
     </PageShell>
   );
 }

@@ -84,6 +84,10 @@ create table if not exists libraries (
   -- 멤버 관리·설정 변경·이력 되돌리기를 할 수 있는 단 한 사람 (D-021). 만든 사람으로 시작한다.
   -- null = 소유자 없음(마지막 멤버가 나가는 등) — 그때는 admin만 손댈 수 있다.
   owner_email             text,
+  -- true면 **로그인 없이** 문서 목록·본문을 읽을 수 있다 (D-023). 소유자만 켤 수 있고,
+  -- 켜도 쓰기는 여전히 멤버만이다 — 읽기 문턱만 내리는 값이지 쓰기와는 무관하다.
+  -- 기본 false: 켜는 건 의식적인 행동이어야 한다(fail-closed).
+  is_public               boolean not null default false,
   created_at              timestamptz not null default now(),
 
   constraint libraries_slug_format check (slug ~ '^[a-z0-9][a-z0-9-]{0,62}$'),
@@ -324,6 +328,7 @@ alter table libraries add column if not exists latest_event_id bigint not null d
 alter table libraries add column if not exists github_repos text[] not null default '{}';
 alter table libraries add column if not exists last_notified_at timestamptz;
 alter table libraries add column if not exists owner_email text;
+alter table libraries add column if not exists is_public boolean not null default false;
 alter table libraries drop constraint if exists libraries_owner_email_lower;
 alter table libraries add constraint libraries_owner_email_lower
   check (owner_email is null or owner_email = lower(owner_email));

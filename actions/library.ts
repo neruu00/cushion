@@ -117,9 +117,10 @@ export async function updateLibrary(_prev: SecretState, formData: FormData): Pro
   return {
     success: true,
     data: {
+      // 공개 여부는 결과 문구에서 확인할 수 있어야 한다 — 실수로 켠 걸 알아채는 지점이다
       hint: `저장됐다 — GitHub ${settings.github_repos.length}개 · 알림 ${
         connected.length > 0 ? connected.join(" · ") : "없음"
-      }`,
+      } · ${settings.is_public ? "링크 있으면 누구나 읽기 켜짐" : "멤버만 읽기"}`,
     },
   };
 }

@@ -25,10 +25,12 @@ export interface Library {
   last_notified_at: string | null;
   /** 멤버 관리·설정·이력 되돌리기를 할 수 있는 단 한 사람 (D-021). null이면 admin만 */
   owner_email: string | null;
+  /** 로그인 없이 문서를 **읽을** 수 있는가 (D-023). 쓰기는 이 값과 무관하게 멤버만이다 */
+  is_public: boolean;
 }
 
 const LIBRARY_COLUMNS =
-  "id, slug, name, github_repos, mattermost_webhook_url, discord_webhook_url, latest_event_id, last_notified_at, owner_email";
+  "id, slug, name, github_repos, mattermost_webhook_url, discord_webhook_url, latest_event_id, last_notified_at, owner_email, is_public";
 
 // ─── 정체성 ──────────────────────────────────────────────────────────
 
@@ -222,6 +224,60 @@ export async function getMemberLibrary(
     return null;
   }
   return count ? repo : null;
+}
+
+/**
+ * **읽기 전용** 조회 결과. 공개 라이브러리는 비로그인도 여기까지는 통과한다 (D-023).
+ *
+ * `isMember`가 이 타입의 존재 이유다 — 화면이 "볼 수 있다"와 "손댈 수 있다"를 갈라야
+ * 하는데, 라이브러리 행만으로는 그걸 알 수 없다. 편집·이력·멤버 목록처럼 멤버 전용인
+ * 것들은 전부 이 값으로 가린다.
+ */
+export interface LibraryView {
+  library: Library;
+  isMember: boolean;
+}
+
+/**
+ * 문서를 **읽기 위한** 조회. 멤버이거나, 라이브러리가 공개면 통과한다 (D-023).
+ *
+ * ⚠️ **쓰기 경로에 절대 쓰지 않는다.** 쓰기는 `getMemberLibrary`만 지난다
+ * (`lib/document.ts`의 `resolve`, `actions/document.ts`) — 그게 익명 쓰기를 막는
+ * 유일한 선이라, 이 함수를 거기 끼우는 순간 공개 라이브러리가 누구나 고칠 수 있게 된다.
+ *
+ * 비로그인이고 비공개면 null이다. 호출부는 그때 로그인으로 보내거나 404를 낸다 —
+ * 어느 쪽이든 라이브러리의 존재를 알려주지 않는다.
+ */
+export async function getReadableLibrary(
+  email: string | null,
+  slug: string,
+): Promise<LibraryView | null> {
+  const { data: repo, error } = await supabase
+    .from("libraries")
+    .select(LIBRARY_COLUMNS)
+    .eq("slug", slug)
+    .maybeSingle();
+
+  if (error) {
+    console.error("getReadableLibrary", error.code, error.message);
+    return null;
+  }
+  if (!repo) return null;
+
+  if (!email) return repo.is_public ? { library: repo, isMember: false } : null;
+
+  const { count, error: memberError } = await supabase
+    .from("library_members")
+    .select("email", { count: "exact", head: true })
+    .eq("library_id", repo.id)
+    .eq("email", email.toLowerCase());
+
+  if (memberError) {
+    console.error("getReadableLibrary:member", memberError.code, memberError.message);
+    return null; // 조회 실패는 권한 없음 (fail-closed)
+  }
+  if (count) return { library: repo, isMember: true };
+  return repo.is_public ? { library: repo, isMember: false } : null;
 }
 
 /**
