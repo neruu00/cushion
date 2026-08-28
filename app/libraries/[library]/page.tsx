@@ -15,7 +15,7 @@ import { PageShell } from "@/components/PageShell";
 import { ChangeCard, type ChangeEvent } from "@/components/ChangeCard";
 import { LibrarySettingsDialog } from "@/components/LibrarySettingsDialog";
 import { MembersDialog } from "@/components/MembersDialog";
-import { getReadableLibrary, getSessionEmail, isAdmin } from "@/lib/authz";
+import { getReadableLibrary, getSessionEmail, isAdmin, isPublic } from "@/lib/authz";
 import { UsageChart } from "@/components/UsageChart";
 import { estimateSavings } from "@/lib/savings";
 import { parseRange } from "@/lib/usage";
@@ -162,7 +162,7 @@ export default async function LibraryPage({
                 githubRepos={library.github_repos}
                 mattermostWebhookUrl={library.mattermost_webhook_url}
                 discordWebhookUrl={library.discord_webhook_url}
-                isPublic={library.is_public}
+                isPublic={isPublic(library)}
               />
             )}
           </div>

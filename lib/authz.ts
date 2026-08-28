@@ -25,12 +25,69 @@ export interface Library {
   last_notified_at: string | null;
   /** 멤버 관리·설정·이력 되돌리기를 할 수 있는 단 한 사람 (D-021). null이면 admin만 */
   owner_email: string | null;
-  /** 로그인 없이 문서를 **읽을** 수 있는가 (D-023). 쓰기는 이 값과 무관하게 멤버만이다 */
-  is_public: boolean;
+  /**
+   * 로그인 없이 문서를 **읽을** 수 있는가 (D-023). 쓰기는 이 값과 무관하게 멤버만이다.
+   * 마이그레이션 전 DB에서는 컬럼이 없어 `undefined`로 온다 — 아래 `isPublic()`으로만 읽는다.
+   */
+  is_public?: boolean;
 }
 
-const LIBRARY_COLUMNS =
-  "id, slug, name, github_repos, mattermost_webhook_url, discord_webhook_url, latest_event_id, last_notified_at, owner_email, is_public";
+/**
+ * 이 라이브러리가 공개인가. **컬럼을 직접 보지 않고 항상 이걸 지난다** —
+ * `is_public`은 나중에 생긴 컬럼이라 마이그레이션 전 DB에서는 `undefined`이고,
+ * 그때의 안전한 답은 "비공개"다(fail-closed).
+ */
+export function isPublic(library: Library): boolean {
+  return library.is_public === true;
+}
+
+/**
+ * `select`에 넣는 컬럼 목록.
+ *
+ * ⚠️ **새 컬럼을 여기 그냥 추가하면 마이그레이션 전까지 모든 라이브러리 조회가 42703으로
+ * 죽는다** — 이 목록을 `getMemberLibrary`·`getAccessibleLibraries`·MCP까지 전부 공유하기
+ * 때문에, 컬럼 하나가 앱 전체를 세운다(실제로 `is_public`에서 겪었다). 그래서 나중에
+ * 생긴 컬럼은 아래 `OPTIONAL_COLUMNS`에 넣고, 조회가 42703으로 실패하면 그 컬럼들을
+ * 빼고 한 번 더 시도한다. 마이그레이션이 돌면 첫 시도가 그냥 성공한다.
+ */
+const BASE_COLUMNS =
+  "id, slug, name, github_repos, mattermost_webhook_url, discord_webhook_url, latest_event_id, last_notified_at, owner_email";
+const OPTIONAL_COLUMNS = ["is_public"];
+const LIBRARY_COLUMNS = [BASE_COLUMNS, ...OPTIONAL_COLUMNS].join(", ");
+
+/** PostgREST: 그런 컬럼이 없다 = 마이그레이션을 아직 안 돌렸다 */
+const MISSING_COLUMN = "42703";
+
+let missingColumnNoticeShown = false;
+
+/**
+ * 라이브러리 조회를 한 번 돌리고, 새 컬럼이 없어서 실패하면 그것 없이 다시 돌린다.
+ * `build(columns)`는 컬럼 목록만 받아 쿼리를 만드는 함수다 — 두 번 만들 수 있어야 한다.
+ */
+async function selectLibraries<T>(
+  build: (columns: string) => PromiseLike<{ data: T; error: { code?: string; message?: string } | null }>,
+  label: string,
+): Promise<{ data: T | null; failed: boolean }> {
+  const first = await build(LIBRARY_COLUMNS);
+  if (!first.error) return { data: first.data, failed: false };
+
+  if (first.error.code === MISSING_COLUMN) {
+    if (!missingColumnNoticeShown) {
+      missingColumnNoticeShown = true;
+      console.warn(
+        `authz: supabase/migrations/0001_schema.sql 을 다시 돌려야 한다(${OPTIONAL_COLUMNS.join("·")} 없음). ` +
+          "그 전까지 공개 라이브러리 기능만 꺼진 채로 나머지는 정상 동작한다.",
+      );
+    }
+    const retry = await build(BASE_COLUMNS);
+    if (!retry.error) return { data: retry.data, failed: false };
+    console.error(label, retry.error.code, retry.error.message);
+    return { data: null, failed: true };
+  }
+
+  console.error(label, first.error.code, first.error.message);
+  return { data: null, failed: true };
+}
 
 // ─── 정체성 ──────────────────────────────────────────────────────────
 
@@ -150,15 +207,14 @@ export async function getMemberLibraryIds(email: string): Promise<string[]> {
 export async function getAccessibleLibraries(email: string | null): Promise<Library[]> {
   if (!email) return [];
 
-  const query = supabase.from("libraries").select(LIBRARY_COLUMNS).order("slug");
-  const { data, error } = isAdminEmail(email)
-    ? await query
-    : await query.in("id", await getMemberLibraryIds(email));
+  const admin = isAdminEmail(email);
+  const ids = admin ? null : await getMemberLibraryIds(email);
 
-  if (error) {
-    console.error("getAccessibleLibraries", error.code, error.message);
-    return [];
-  }
+  const { data } = await selectLibraries<Library[] | null>((columns) => {
+    const query = supabase.from("libraries").select(columns).order("slug");
+    return (ids ? query.in("id", ids) : query) as never;
+  }, "getAccessibleLibraries");
+
   return data ?? [];
 }
 
@@ -174,16 +230,11 @@ export async function getMemberLibraries(email: string | null): Promise<Library[
   const ids = await getMemberLibraryIds(email);
   if (ids.length === 0) return [];
 
-  const { data, error } = await supabase
-    .from("libraries")
-    .select(LIBRARY_COLUMNS)
-    .in("id", ids)
-    .order("slug");
+  const { data } = await selectLibraries<Library[] | null>(
+    (columns) => supabase.from("libraries").select(columns).in("id", ids).order("slug") as never,
+    "getMemberLibraries",
+  );
 
-  if (error) {
-    console.error("getMemberLibraries", error.code, error.message);
-    return [];
-  }
   return data ?? [];
 }
 
@@ -201,16 +252,10 @@ export async function getMemberLibrary(
 ): Promise<Library | null> {
   if (!email) return null;
 
-  const { data: repo, error } = await supabase
-    .from("libraries")
-    .select(LIBRARY_COLUMNS)
-    .eq("slug", slug)
-    .maybeSingle();
-
-  if (error) {
-    console.error("getMemberLibrary", error.code, error.message);
-    return null;
-  }
+  const { data: repo } = await selectLibraries<Library | null>(
+    (columns) => supabase.from("libraries").select(columns).eq("slug", slug).maybeSingle() as never,
+    "getMemberLibrary",
+  );
   if (!repo) return null;
 
   const { count, error: memberError } = await supabase
@@ -252,19 +297,13 @@ export async function getReadableLibrary(
   email: string | null,
   slug: string,
 ): Promise<LibraryView | null> {
-  const { data: repo, error } = await supabase
-    .from("libraries")
-    .select(LIBRARY_COLUMNS)
-    .eq("slug", slug)
-    .maybeSingle();
-
-  if (error) {
-    console.error("getReadableLibrary", error.code, error.message);
-    return null;
-  }
+  const { data: repo } = await selectLibraries<Library | null>(
+    (columns) => supabase.from("libraries").select(columns).eq("slug", slug).maybeSingle() as never,
+    "getReadableLibrary",
+  );
   if (!repo) return null;
 
-  if (!email) return repo.is_public ? { library: repo, isMember: false } : null;
+  if (!email) return isPublic(repo) ? { library: repo, isMember: false } : null;
 
   const { count, error: memberError } = await supabase
     .from("library_members")
@@ -277,7 +316,7 @@ export async function getReadableLibrary(
     return null; // 조회 실패는 권한 없음 (fail-closed)
   }
   if (count) return { library: repo, isMember: true };
-  return repo.is_public ? { library: repo, isMember: false } : null;
+  return isPublic(repo) ? { library: repo, isMember: false } : null;
 }
 
 /**
@@ -289,18 +328,17 @@ export async function libraryFromInviteToken(token: string): Promise<Library | n
   if (!token.startsWith(TOKEN_PREFIX.invite)) return null;
   const hash = sha256(token);
 
-  const { data, error } = await supabase
-    .from("library_invites")
-    .select(`libraries!inner(${LIBRARY_COLUMNS})`)
-    .eq("token_hash", hash)
-    .is("revoked_at", null)
-    .maybeSingle();
-
-  if (error) {
-    console.error("libraryFromInviteToken", error.code, error.message);
-    return null;
-  }
+  const { data } = await selectLibraries<{ libraries: unknown } | null>(
+    (columns) =>
+      supabase
+        .from("library_invites")
+        .select(`libraries!inner(${columns})`)
+        .eq("token_hash", hash)
+        .is("revoked_at", null)
+        .maybeSingle() as never,
+    "libraryFromInviteToken",
+  );
   if (!data) return null;
   // supabase-js가 단일 관계는 객체로, `!inner`도 마찬가지로 준다 — 배열이 아니다.
-  return data.libraries as unknown as Library;
+  return data.libraries as Library;
 }
