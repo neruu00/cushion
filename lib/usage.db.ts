@@ -53,20 +53,16 @@ function isMissingMigration(error: PostgrestErrorish): boolean {
  * 라이브러리에 귀속되지 않는 호출(library 인자 없는 doc_outline, library_create)에는
  * 부르지 않는다. 그만큼 과소집계되고, 그 사실을 /admin의 요청 수 설명이 밝힌다.
  *
+ * **세는 것은 호출 수뿐이다.** 토큰 양(in_chars·out_chars)은 걷어냈다 — 읽던 화면이
+ * 없어져서 아무도 안 보는 컬럼에 매 호출 쓰기만 하고 있었다.
+ *
  * 비용을 알고 쓴다: 호출당 쓰기 하나가 붙는다. `last_used_at`이 5분 스로틀로 지워 둔
  * 그 비용이 되살아나는 것이다. 무거워지면 여기에 배치·스로틀을 건다.
  */
-export async function recordUsage(input: {
-  libraryId: string;
-  tool: string;
-  inChars: number;
-  outChars: number;
-}): Promise<void> {
+export async function recordUsage(input: { libraryId: string; tool: string }): Promise<void> {
   const { error } = await supabase.rpc("record_usage", {
     p_library: input.libraryId,
     p_tool: input.tool,
-    p_in: input.inChars,
-    p_out: input.outChars,
   });
   if (error && !isMissingMigration(error)) console.error("recordUsage:", describe(error));
 }
