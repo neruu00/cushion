@@ -17,6 +17,7 @@ import { formatDate } from "@/lib/datetime";
 import { PageShell } from "@/components/PageShell";
 import { Markdown } from "@/components/Markdown";
 import { getReadableLibrary, getSessionEmail } from "@/lib/authz";
+import { baseNameOf, breadcrumbs, dirOf } from "@/lib/docpath";
 import { supabase } from "@/lib/supabase";
 
 /** 링크를 아는 사람만 보는 것이지 검색으로 찾는 것이 아니다 (D-024). */
@@ -61,8 +62,20 @@ export default async function DocumentPage({ params }: PageProps<"/libraries/[li
           <Link href={`/libraries/${library.slug}`} className="font-mono hover:text-foreground">
             {library.slug}
           </Link>
+          {/* 디렉터리는 라우트가 아니라 목록 화면의 아코디언 그룹이다 — 그 자리로 돌아간다 */}
+          {breadcrumbs(dirOf(doc.path)).map((crumb) => (
+            <span key={crumb.path}>
+              {" / "}
+              <Link
+                href={`/libraries/${library.slug}#dir-${encodeURIComponent(crumb.path)}`}
+                className="font-mono hover:text-foreground"
+              >
+                {crumb.name}
+              </Link>
+            </span>
+          ))}
           {" / "}
-          <span className="font-mono">{doc.path}</span>
+          <span className="font-mono">{baseNameOf(doc.path)}</span>
         </p>
         <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
           {/* 편집자 이메일은 멤버에게만 — 공개 문서에서 팀 명단이 새면 안 된다 (D-024) */}

@@ -9,10 +9,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
-import { formatDate } from "@/lib/datetime";
 import { PageHeader } from "@/components/PageHeader";
 import { PageShell } from "@/components/PageShell";
 import { ChangeCard, type ChangeEvent } from "@/components/ChangeCard";
+import { DocumentTree } from "@/components/DocumentTree";
 import { LibrarySettingsDialog } from "@/components/LibrarySettingsDialog";
 import { MembersDialog } from "@/components/MembersDialog";
 import { getReadableLibrary, getSessionEmail, isAdmin, isPublic } from "@/lib/authz";
@@ -209,28 +209,7 @@ export default async function LibraryPage({ params }: PageProps<"/libraries/[lib
             )}
           </p>
         ) : (
-          <ul className="divide-y rounded-lg border">
-            {documents.map((doc) => (
-              <li key={doc.path}>
-                <Link
-                  href={`/libraries/${library.slug}/${doc.path}`}
-                  className="flex items-center justify-between gap-4 px-3 py-2 hover:bg-muted/40"
-                >
-                  <span className="min-w-0">
-                    <span className="block truncate font-mono text-sm">{doc.path}</span>
-                    {doc.title ? (
-                      <span className="block truncate text-xs text-muted-foreground">
-                        {doc.title}
-                      </span>
-                    ) : null}
-                  </span>
-                  <span className="shrink-0 text-xs text-muted-foreground">
-                    {formatDate(doc.updated_at)}
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ul>
+          <DocumentTree librarySlug={library.slug} documents={documents} />
         )}
       </section>
     </PageShell>
