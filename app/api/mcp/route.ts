@@ -163,23 +163,14 @@ async function handle(request: NextRequest, log: LogDraft): Promise<Response> {
       const stale = staleLine(context);
       const text = stale ? `${result.text}\n\n${stale}` : result.text;
 
-      // 사용량 기록. 여기가 유일한 지점이다 — 툴 하나하나에 흩으면 새 툴을 추가할 때
-      // 빠뜨린다. 응답을 이미 문자열로 들고 있어 길이는 공짜다.
+      // 호출 수 기록. 여기가 유일한 지점이다 — 툴 하나하나에 흩으면 새 툴을 추가할 때
+      // 빠뜨린다.
       //
       // 라이브러리로 귀속되는 호출만 센다. library 인자가 없는 doc_outline은 접근 가능한
       // 전 라이브러리를 훑으므로 어느 하나에 달 수가 없고, 억지로 달면 그 라이브러리의
       // 숫자가 부풀어 오른다. 그만큼 과소집계된다는 건 화면이 밝힌다.
       const target = slug ? context.repos.find((repo) => repo.slug === slug) : undefined;
-      if (target) {
-        await recordUsage({
-          libraryId: target.id,
-          tool: name,
-          // 에이전트가 만들어 보낸 것 = 그쪽의 출력 토큰이었다
-          inChars: JSON.stringify(args ?? {}).length,
-          // 에이전트가 받아 싣는 것 = 그쪽의 입력 토큰이 된다
-          outChars: text.length,
-        });
-      }
+      if (target) await recordUsage({ libraryId: target.id, tool: name });
 
       return rpcResult(id, {
         content: [{ type: "text", text }],

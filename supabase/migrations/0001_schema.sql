@@ -84,7 +84,7 @@ create table if not exists libraries (
   -- 멤버 관리·설정 변경·이력 되돌리기를 할 수 있는 단 한 사람 (D-021). 만든 사람으로 시작한다.
   -- null = 소유자 없음(마지막 멤버가 나가는 등) — 그때는 admin만 손댈 수 있다.
   owner_email             text,
-  -- true면 **로그인 없이** 문서 목록·본문을 읽을 수 있다 (D-023). 소유자만 켤 수 있고,
+  -- true면 **로그인 없이** 문서 목록·본문을 읽을 수 있다 (D-024). 소유자만 켤 수 있고,
   -- 켜도 쓰기는 여전히 멤버만이다 — 읽기 문턱만 내리는 값이지 쓰기와는 무관하다.
   -- 기본 false: 켜는 건 의식적인 행동이어야 한다(fail-closed).
   is_public               boolean not null default false,
@@ -112,7 +112,7 @@ create table if not exists library_members (
 create index if not exists library_members_email_idx on library_members (email);
 
 -- ─────────────────────────────────────────────────────────────
--- library_invites — 소유자가 만드는 초대 링크 (D-022).
+-- library_invites — 소유자가 만드는 초대 링크 (D-023).
 -- access_tokens와 같은 원칙으로 sha256 해시만 저장하고 발급 순간 1회만 노출한다 —
 -- 다시 보여줘야 하는 값이 아니라, PAT처럼 "잃어버리면 재발급"이 맞다. 재발급 = 새 값 +
 -- 기존 revoked_at 설정이라 라이브러리당 살아있는 링크는 항상 최대 하나다(app 로직에서 보장).
@@ -242,15 +242,20 @@ create table if not exists token_cursors (
 );
 
 -- ─────────────────────────────────────────────────────────────
--- usage_hourly — MCP 툴 사용량 집계. 라이브러리 화면의 토큰 그래프가 이걸 읽는다
+-- usage_hourly — MCP 툴 **호출 수** 집계. /admin의 요청 수가 이걸 읽는다 (D-020)
 --
--- 문서 본문에서 계산하는 예측 절약에는 시간축이 없다. "오늘 얼마나 읽었나"는 실제 호출을
--- 기록해야만 안다. access_tokens.last_used_at은 5분 스로틀이라 횟수 집계에도 못 쓴다.
+-- "얼마나 불렀나"는 실제 호출을 기록해야만 안다. access_tokens.last_used_at은 5분
+-- 스로틀이라 횟수 집계에 못 쓴다.
 --
--- **시간 단위로 접어서 저장한다.** 호출별 원본을 쌓으면 "누가 언제 어느 문서를 읽었는지"가
--- 남는데 그건 이 시스템이 갖고 있지 않은 정보다. 화면에 필요한 건 (날짜 × 시각 × 라이브러리
--- × 툴) 집계로 다 나온다 — 오늘 화면은 시각을 축에 쓰고, 7일·30일은 시각을 날짜로 합친다.
--- 거친 쪽은 세밀한 쪽에서 만들 수 있지만 반대는 안 되므로 시간이 저장 단위다.
+-- **호출별 원본을 쌓지 않는다.** 그러면 "누가 언제 어느 문서를 읽었는지"가 남는데 그건 이
+-- 시스템이 갖고 있지 않은 정보다. (날짜 × 시각 × 라이브러리 × 툴) 집계로 화면에 필요한 건
+-- 다 나온다.
+--
+-- 토큰 양(in_chars·out_chars)은 걷어냈다. 그 값을 읽던 라이브러리 화면의 토큰 그래프가
+-- 없어져서, 아무도 읽지 않는 컬럼에 매 호출 쓰기만 하고 있었다. 아래 [정리] 절이 지운다.
+--
+-- `hour`는 남아 있지만 지금은 아무도 읽지 않는다 — /admin은 날짜로만 접는다. 시각축을
+-- 쓰는 화면이 다시 생기지 않으면 primary key와 함께 접을 수 있다.
 --
 -- 날짜·시각은 UTC다. 타임존을 박으면 남이 자기 인스턴스를 띄웠을 때 틀린다.
 -- ─────────────────────────────────────────────────────────────
@@ -258,13 +263,10 @@ create table if not exists usage_hourly (
   day        date not null default current_date,
   hour       smallint not null default 0,
   -- NOT NULL이다. 라이브러리에 귀속되지 않는 호출(library 인자 없는 doc_outline,
-  -- library_create)은 애초에 기록하지 않는다 — 소비자가 라이브러리 화면뿐이라 귀속 못 하는
-  -- 호출은 어느 차트에도 안 나온다. 그만큼 과소집계되고, 화면이 그 사실을 밝힌다.
+  -- library_create)은 애초에 기록하지 않는다. 그만큼 과소집계되고, 화면이 그 사실을 밝힌다.
   library_id uuid not null references libraries(id) on delete cascade,
   tool       text not null,
   calls      integer not null default 0,
-  in_chars   bigint not null default 0,             -- 에이전트가 보낸 것 (그쪽의 출력)
-  out_chars  bigint not null default 0,             -- 에이전트가 받은 것 (그쪽의 입력)
 
   constraint usage_hourly_hour_range check (hour between 0 and 23),
   primary key (day, hour, library_id, tool)
@@ -276,24 +278,26 @@ create index if not exists usage_hourly_library_day_idx on usage_hourly (library
 -- **supabase-js의 .upsert()로는 표현할 수 없다.** `calls = calls + 1`처럼 기존 값을 읽어
 -- 더해야 하는데, JS에서 select→update로 나누면 연달아 오는 툴 호출이 서로를 덮어 카운트가
 -- 유실된다. 단일 INSERT ... ON CONFLICT DO UPDATE는 한 문장이라 원자적이다.
+--
+-- 인자가 4개에서 2개로 줄었다. `create or replace`는 **시그니처가 다르면 교체가 아니라
+-- 오버로드 추가**라서, 구 버전을 명시적으로 지워야 한다. 안 지우면 in_chars를 쓰는 함수가
+-- 살아남아 지워진 컬럼을 참조하다 호출 시점에 터진다.
+drop function if exists record_usage(uuid, text, integer, integer);
+
 create or replace function record_usage(
   p_library uuid,
-  p_tool    text,
-  p_in      integer,
-  p_out     integer
+  p_tool    text
 ) returns void
 language sql
 as $$
-  insert into usage_hourly (day, hour, library_id, tool, calls, in_chars, out_chars)
+  insert into usage_hourly (day, hour, library_id, tool, calls)
   values (
     (now() at time zone 'utc')::date,
     extract(hour from now() at time zone 'utc')::smallint,
-    p_library, p_tool, 1, greatest(p_in, 0), greatest(p_out, 0)
+    p_library, p_tool, 1
   )
   on conflict (day, hour, library_id, tool) do update
-    set calls     = usage_hourly.calls + 1,
-        in_chars  = usage_hourly.in_chars + excluded.in_chars,
-        out_chars = usage_hourly.out_chars + excluded.out_chars;
+    set calls = usage_hourly.calls + 1;
 $$;
 
 -- ─────────────────────────────────────────────────────────────
@@ -390,6 +394,11 @@ alter table documents   drop column if exists commit_sha;        -- 가리킬 �
 alter table libraries   drop column if exists sync_token_hash;   -- 레포가 미는 경로가 없다
 alter table sync_events drop column if exists commit_sha;
 alter table sync_events drop column if exists message;           -- note와 summary에 이미 있다
+
+-- 토큰 양. 라이브러리 화면의 토큰 그래프를 걷어내면서 읽는 코드가 0건이 됐다.
+-- 위 record_usage가 이미 2인자 버전으로 바뀌었으므로 쓰는 쪽도 없다.
+alter table usage_hourly drop column if exists in_chars;
+alter table usage_hourly drop column if exists out_chars;
 
 -- ─────────────────────────────────────────────────────────────
 -- RLS

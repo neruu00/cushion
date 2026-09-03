@@ -157,7 +157,7 @@ try {
   );
 
   const memberDash = await page("/dashboard", memberCookie);
-  check("멤버 대시보드에 레포와 절약 추정이 보인다", memberDash.status === 200 && memberDash.html.includes(SLUG_A));
+  check("멤버 대시보드에 내 레포가 보인다", memberDash.status === 200 && memberDash.html.includes(SLUG_A));
 
   // 여정 전체를 싣는 페이지다. import 하나만 깨져도 500인데, 여기 말고는 아무도 안 연다.
   const tokensPage = await page("/settings/tokens", memberCookie);

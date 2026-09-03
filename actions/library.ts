@@ -42,7 +42,7 @@ export async function createLibrary(
   return {
     success: true,
     data: {
-      hint: `${result.slug} 만들었다. 문서는 /libraries/${result.slug} 에서, 붙이는 순서는 /settings/tokens 에서`,
+      hint: `${result.slug} 라이브러리를 만들었어요. 문서는 /libraries/${result.slug} 에서 관리하고, 에이전트를 붙이는 순서는 /settings/tokens 에서 확인하세요.`,
       files: setupFiles(result.slug),
     },
   };
@@ -90,7 +90,7 @@ export async function updateLibrary(_prev: SecretState, formData: FormData): Pro
 
   const { library_id, ...settings } = parsed.data;
   if (!(await canManageLibrary(email, library_id))) {
-    return { success: false, error: "이 라이브러리의 소유자만 바꿀 수 있어요." };
+    return { success: false, error: "이 라이브러리의 소유자만 설정을 바꿀 수 있어요." };
   }
 
   // slug를 되받아 재검증에 쓴다 — 폼이 준 값을 믿고 경로를 만들지 않는다.
@@ -118,9 +118,11 @@ export async function updateLibrary(_prev: SecretState, formData: FormData): Pro
     success: true,
     data: {
       // 공개 여부는 결과 문구에서 확인할 수 있어야 한다 — 실수로 켠 걸 알아채는 지점이다
-      hint: `저장됐다 — GitHub ${settings.github_repos.length}개 · 알림 ${
+      hint: `설정을 저장했어요. GitHub 레포 ${settings.github_repos.length}개, 알림 ${
         connected.length > 0 ? connected.join(" · ") : "없음"
-      } · ${settings.is_public ? "링크 있으면 누구나 읽기 켜짐" : "멤버만 읽기"}`,
+      }, 공개 범위는 ${
+        settings.is_public ? "링크를 아는 누구나 읽기" : "멤버만 읽기"
+      }예요.`,
     },
   };
 }
@@ -190,7 +192,7 @@ export async function createInviteLink(
 
   if (error) {
     console.error("createInviteLink", error.code, error.message);
-    return { success: false, error: "만들지 못했어요. 잠시 후 다시 시도해 주세요." };
+    return { success: false, error: "초대 링크를 만들지 못했어요. 잠시 후 다시 시도해 주세요." };
   }
 
   revalidatePath(`/libraries/${parsed.data.library_slug}`);
@@ -198,7 +200,7 @@ export async function createInviteLink(
     success: true,
     data: {
       secret: inviteUrl(baseUrl(), token.plaintext),
-      hint: "이 링크는 다시 볼 수 없어요. 링크를 가진 사람은 로그인만 하면 참여할 수 있어요 — 필요한 사람에게만 보내세요.",
+      hint: "이 링크는 다시 볼 수 없어요. 링크를 가진 사람은 로그인만 하면 참여할 수 있으니, 꼭 필요한 사람에게만 보내세요.",
     },
   };
 }

@@ -63,7 +63,7 @@ export function MermaidDiagram({ code }: MermaidDiagramProps) {
     return (
       <div className="not-prose space-y-2 rounded-lg border border-dashed p-3">
         <p className="text-xs text-muted-foreground">
-          다이어그램을 그리지 못했어요 — {state.message}
+          다이어그램을 그리지 못했어요: {state.message}
         </p>
         <pre className="overflow-x-auto text-xs">{code}</pre>
       </div>

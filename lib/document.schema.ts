@@ -16,7 +16,10 @@ export const documentPath = z
   .trim()
   .min(1)
   .max(400)
-  .refine((p) => !p.startsWith("/") && !p.split("/").includes(".."), "잘못된 경로예요.")
+  .refine(
+    (p) => !p.startsWith("/") && !p.split("/").includes(".."),
+    "경로는 / 로 시작할 수 없고 .. 를 포함할 수 없어요.",
+  )
   // 목차·섹션 조회가 전부 마크다운을 전제한다. 다른 걸 받으면 조용히 쓸모없어진다.
   .refine((p) => p.toLowerCase().endsWith(".md"), "경로는 .md 로 끝나야 해요.");
 

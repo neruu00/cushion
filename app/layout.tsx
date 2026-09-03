@@ -34,7 +34,8 @@ const pretendard = localFont({
 
 export const metadata: Metadata = {
   title: "Cushion",
-  description: "스펙 읽기 전용 미러. 에이전트에는 조각으로, 팀에는 변경 알림으로.",
+  description:
+    "프로젝트 문서를 한곳에 모아 두는 도서관이에요. 에이전트는 MCP로 필요한 조각만 읽고 쓰고, 팀에는 변경 알림이 전달돼요.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

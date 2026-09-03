@@ -28,7 +28,7 @@ interface ScopeOption {
 
 export function SkillInstall({ skillsUrl }: SkillInstallProps) {
   const sentence = (root: string) =>
-    `${skillsUrl} 를 받아서 files의 각 항목을 ${root}<path> 로 저장해줘. 이미 있으면 덮어써도 된다.`;
+    `${skillsUrl} 를 받아서 files의 각 항목을 ${root}<path> 경로에 저장해 줘. 이미 파일이 있으면 덮어써도 괜찮아.`;
 
   const scopes = (options: ScopeOption[]) => (
     <div className="space-y-4">
@@ -36,7 +36,10 @@ export function SkillInstall({ skillsUrl }: SkillInstallProps) {
         <div key={option.root} className="space-y-2">
           <h4 className="text-sm font-medium">{option.label}</h4>
           <p className="text-sm text-muted-foreground">{option.hint}</p>
-          <CopyBlock value={sentence(option.root)} label={`에이전트에게 그대로 — ${option.root}`} />
+          <CopyBlock
+            value={sentence(option.root)}
+            label={`에이전트에게 그대로 보내세요 (${option.root})`}
+          />
         </div>
       ))}
     </div>
@@ -57,8 +60,9 @@ export function SkillInstall({ skillsUrl }: SkillInstallProps) {
             label: "내 컴퓨터 전체",
             hint: (
               <>
-                <code>~/.claude/skills/</code> — 한 번 설치하면 <strong>모든 프로젝트</strong>에서
-                써요. 스킬 파일에는 프로젝트 정보가 없어서 보통 이쪽이 맞아요.
+                <code>~/.claude/skills/</code>에 두면 한 번만 설치해도{" "}
+                <strong>모든 프로젝트</strong>에서 쓸 수 있어요. 스킬 파일에는 프로젝트별 정보가
+                없어서 보통 이쪽이 맞아요.
               </>
             ),
           },
@@ -67,8 +71,9 @@ export function SkillInstall({ skillsUrl }: SkillInstallProps) {
             label: "이 프로젝트만",
             hint: (
               <>
-                <code>.claude/skills/</code> — 커밋하면 <strong>팀 전원</strong>이 자동으로 받아요.
-                대신 프로젝트마다 설치해야 하고, 갱신돼도 커밋된 사본은 그대로예요.
+                <code>.claude/skills/</code>에 두고 커밋하면 <strong>팀 전원</strong>이 자동으로
+                받아요. 대신 프로젝트마다 따로 설치해야 하고, 원본이 갱신돼도 커밋해 둔 사본은
+                그대로 남아요.
               </>
             ),
           },
@@ -82,7 +87,7 @@ export function SkillInstall({ skillsUrl }: SkillInstallProps) {
             label: "내 컴퓨터 전체",
             hint: (
               <>
-                <code>~/.gemini/config/skills/</code> — 모든 프로젝트에서 써요.
+                <code>~/.gemini/config/skills/</code>에 두면 모든 프로젝트에서 쓸 수 있어요.
               </>
             ),
           },
@@ -91,8 +96,8 @@ export function SkillInstall({ skillsUrl }: SkillInstallProps) {
             label: "이 프로젝트만",
             hint: (
               <>
-                <code>.agents/skills/</code>(프로젝트 루트) — 커밋하면 팀 전원이 받아요. 이 경로는
-                Codex CLI와 같아서, 두 클라이언트를 같이 쓰면 한 번만 설치하면 돼요.
+                프로젝트 루트의 <code>.agents/skills/</code>에 두고 커밋하면 팀 전원이 받아요.
+                이 경로는 Codex CLI와 같아서, 두 클라이언트를 함께 쓴다면 한 번만 설치해도 돼요.
               </>
             ),
           },
@@ -106,7 +111,7 @@ export function SkillInstall({ skillsUrl }: SkillInstallProps) {
             label: "내 컴퓨터 전체",
             hint: (
               <>
-                <code>~/.agents/skills/</code> — 모든 저장소에서 써요.
+                <code>~/.agents/skills/</code>에 두면 모든 저장소에서 쓸 수 있어요.
               </>
             ),
           },
@@ -115,8 +120,8 @@ export function SkillInstall({ skillsUrl }: SkillInstallProps) {
             label: "이 프로젝트만",
             hint: (
               <>
-                <code>.agents/skills/</code>(프로젝트 루트) — 커밋하면 팀 전원이 받아요. Antigravity
-                프로젝트 스코프와 경로가 같아요.
+                프로젝트 루트의 <code>.agents/skills/</code>에 두고 커밋하면 팀 전원이 받아요.
+                Antigravity의 프로젝트 스코프와 경로가 같아요.
               </>
             ),
           },

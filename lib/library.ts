@@ -37,8 +37,8 @@ export async function createLibraryFor(
     console.error("createLibraryFor", error);
     // 23505 = unique_violation. 그 외는 내부 사정이므로 사용자에게 말하지 않는다.
     return error?.code === "23505"
-      ? { ok: false, code: "duplicate", message: "이미 있는 slug입니다." }
-      : { ok: false, code: "failed", message: "레포 생성에 실패했습니다." };
+      ? { ok: false, code: "duplicate", message: "이미 있는 slug예요." }
+      : { ok: false, code: "failed", message: "라이브러리를 만들지 못했어요." };
   }
 
   // 만든 사람이 첫 멤버다. 실패하면 레포를 지워 보상한다 —
@@ -50,7 +50,7 @@ export async function createLibraryFor(
   if (memberError) {
     console.error("createLibraryFor: 첫 멤버 등록 실패, 보상 삭제", memberError);
     await supabase.from("libraries").delete().eq("id", repo.id);
-    return { ok: false, code: "failed", message: "레포 생성에 실패했습니다." };
+    return { ok: false, code: "failed", message: "라이브러리를 만들지 못했어요." };
   }
 
   return { ok: true, slug: repo.slug, id: repo.id };

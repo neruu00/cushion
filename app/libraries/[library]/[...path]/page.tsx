@@ -5,7 +5,7 @@
  * 원본이 여기 있으므로 편집 링크가 있다 (D-011). GitHub 링크는 문서가 아니라
  * "관련 코드 레포"를 가리킨다 — 문서는 더 이상 그 레포에 없다.
  *
- * 공개 라이브러리는 **비로그인도 본문을 읽는다** (D-023). 편집·이력 링크는 멤버에게만
+ * 공개 라이브러리는 **비로그인도 본문을 읽는다** (D-024). 편집·이력 링크는 멤버에게만
  * 보인다 — 비멤버가 눌러 봐야 그 라우트들이 다시 막는다(여기 숨기는 건 UX다).
  */
 import { ExternalLink, History, Pencil } from "lucide-react";
@@ -19,7 +19,7 @@ import { Markdown } from "@/components/Markdown";
 import { getReadableLibrary, getSessionEmail } from "@/lib/authz";
 import { supabase } from "@/lib/supabase";
 
-/** 링크를 아는 사람만 보는 것이지 검색으로 찾는 것이 아니다 (D-023). */
+/** 링크를 아는 사람만 보는 것이지 검색으로 찾는 것이 아니다 (D-024). */
 export const metadata: Metadata = { robots: { index: false, follow: false } };
 
 export default async function DocumentPage({ params }: PageProps<"/libraries/[library]/[...path]">) {
@@ -65,7 +65,7 @@ export default async function DocumentPage({ params }: PageProps<"/libraries/[li
           <span className="font-mono">{doc.path}</span>
         </p>
         <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-          {/* 편집자 이메일은 멤버에게만 — 공개 문서에서 팀 명단이 새면 안 된다 (D-023) */}
+          {/* 편집자 이메일은 멤버에게만 — 공개 문서에서 팀 명단이 새면 안 된다 (D-024) */}
           <span>
             {formatDate(doc.updated_at)}
             {isMember && doc.updated_by ? ` · ${doc.updated_by}` : ""}

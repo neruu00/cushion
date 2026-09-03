@@ -1,6 +1,6 @@
 /**
  * @file app/libraries/[library]/page.tsx
- * @description 문서 목록 + 최근 변경 타임라인 + 예측 절약 (T-501).
+ * @description 문서 목록 + 최근 변경 타임라인.
  *
  * 타임라인은 `sync_events.summary`를 그대로 보여준다 — 알림·에이전트 델타와 같은 문자열이다.
  * 두 번 만들면 두 번 드리프트한다 (SPEC §8).
@@ -16,32 +16,22 @@ import { ChangeCard, type ChangeEvent } from "@/components/ChangeCard";
 import { LibrarySettingsDialog } from "@/components/LibrarySettingsDialog";
 import { MembersDialog } from "@/components/MembersDialog";
 import { getReadableLibrary, getSessionEmail, isAdmin, isPublic } from "@/lib/authz";
-import { UsageChart } from "@/components/UsageChart";
-import { estimateSavings } from "@/lib/savings";
-import { parseRange } from "@/lib/usage";
-import { getUsage } from "@/lib/usage.db";
 import { supabase } from "@/lib/supabase";
 
 interface DocRow {
   path: string;
   title: string | null;
   updated_at: string;
-  content: string;
 }
 
-/** 링크를 아는 사람만 보는 것이지 검색으로 찾는 것이 아니다 (D-023). */
+/** 링크를 아는 사람만 보는 것이지 검색으로 찾는 것이 아니다 (D-024). */
 export const metadata: Metadata = { robots: { index: false, follow: false } };
 
-export default async function LibraryPage({
-  params,
-  searchParams,
-}: PageProps<"/libraries/[library]">) {
+export default async function LibraryPage({ params }: PageProps<"/libraries/[library]">) {
   const { library: slug } = await params;
-  // Next 16은 searchParams도 await다 (동기 접근 제거)
-  const range = parseRange((await searchParams).range);
 
   const email = await getSessionEmail();
-  // 공개 라이브러리는 비로그인도 문서 목록·본문까지 본다 (D-023).
+  // 공개 라이브러리는 비로그인도 문서 목록·본문까지 본다 (D-024).
   const view = await getReadableLibrary(email, slug);
   if (!view) {
     // 비로그인이면 로그인부터 — 로그인하면 보이는 라이브러리일 수 있다.
@@ -57,12 +47,11 @@ export default async function LibraryPage({
   const [docs, events, memberRows, inviteRows] = await Promise.all([
     supabase
       .from("documents")
-      // ponytail: 절약 추정 때문에 본문까지 읽는다. 레포 하나에 문서 수십 개면 충분하고,
-      // 무거워지면 documents에 문자수 컬럼을 비정규화한다.
-      .select("path, title, updated_at, content")
+      // 목록에 필요한 것만 읽는다. 본문은 문서 보기 화면이 그 문서 하나만 가져온다.
+      .select("path, title, updated_at")
       .eq("library_id", library.id)
       .order("path"),
-    // 변경 타임라인·멤버 목록은 편집자 이메일과 팀 명단이라 멤버에게만 (D-023).
+    // 변경 타임라인·멤버 목록은 편집자 이메일과 팀 명단이라 멤버에게만 (D-024).
     isMember
       ? supabase
           .from("sync_events")
@@ -75,7 +64,7 @@ export default async function LibraryPage({
     isMember
       ? supabase.from("library_members").select("email").eq("library_id", library.id).order("email")
       : Promise.resolve({ data: null, error: null }),
-    // 초대 다이얼로그는 소유자만 본다 — 아니면 쿼리 자체가 낭비다 (D-022).
+    // 초대 다이얼로그는 소유자만 본다 — 아니면 쿼리 자체가 낭비다 (D-023).
     isOwner
       ? supabase
           .from("library_invites")
@@ -93,8 +82,6 @@ export default async function LibraryPage({
 
   const documents: DocRow[] = docs.data ?? [];
   const timeline: ChangeEvent[] = events.data ?? [];
-  const savings = estimateSavings(documents);
-  const usage = await getUsage(library.id, range);
 
   return (
     <PageShell className="space-y-8">
@@ -125,7 +112,7 @@ export default async function LibraryPage({
                 ))}
               </>
             ) : null}
-            {/* 알림 채널은 내부 설정이라 멤버에게만 (D-023) */}
+            {/* 알림 채널은 내부 설정이라 멤버에게만 (D-024) */}
             {isMember ? (
               <>
                 {" · "}
@@ -144,7 +131,7 @@ export default async function LibraryPage({
           <div className="flex shrink-0 items-center gap-2">
             {/* 보는 것과 관리하는 것의 권한 문턱이 다르다 (D-021) — 목록은 멤버 전원,
                 초대·제거·설정은 소유자(또는 admin)만. 다이얼로그 안에서 갈린다.
-                비멤버(공개 열람자)에게는 멤버 목록 자체가 안 보인다 (D-023) */}
+                비멤버(공개 열람자)에게는 멤버 목록 자체가 안 보인다 (D-024) */}
             {isMember && email && (
               <MembersDialog
                 libraryId={library.id}
@@ -169,9 +156,9 @@ export default async function LibraryPage({
         }
       />
 
-      {/* 위에서부터 최근 변경 → 문서 → 토큰 사용량. 무슨 일이 있었나 → 무엇이 있나 →
-          얼마나 썼나 순이다. 멤버는 헤더의 다이얼로그로 옮겼다.
-          공개 열람자에게는 문서 목록만 남는다 — 나머지는 편집자 이메일·내부 지표다 (D-023). */}
+      {/* 위에서부터 최근 변경 → 문서. 무슨 일이 있었나 → 무엇이 있나 순이다.
+          멤버는 헤더의 다이얼로그로 옮겼다.
+          공개 열람자에게는 문서 목록만 남는다 — 나머지는 편집자 이메일이다 (D-024). */}
       {isMember && (
         <section className="space-y-2">
           <div className="flex items-center justify-between gap-4">
@@ -214,7 +201,7 @@ export default async function LibraryPage({
           <p className="text-sm text-muted-foreground">
             {isMember ? (
               <>
-                아직 문서가 없어요. 위의 &quot;새 문서&quot;로 만들거나, 에이전트가{" "}
+                아직 문서가 없어요. 위에 있는 &quot;새 문서&quot;로 직접 만들거나, 에이전트가{" "}
                 <code>doc_put</code>으로 만들 수 있어요.
               </>
             ) : (
@@ -246,19 +233,6 @@ export default async function LibraryPage({
           </ul>
         )}
       </section>
-
-      {/* 이 도구가 존재하는 이유를 그 라이브러리의 숫자로 보여준다. 실측(그래프)과
-          추정(절약)을 한 카드에 두되 역할을 나눈다 — 자세한 건 UsageChart 주석에.
-          공개 열람자에게는 안 보인다 — 내부 운영 지표다 (D-023). */}
-      {isMember && (
-        <UsageChart
-          summary={usage}
-          range={range}
-          savings={savings}
-          documentCount={documents.length}
-          basePath={`/libraries/${library.slug}`}
-        />
-      )}
     </PageShell>
   );
 }

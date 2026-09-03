@@ -23,26 +23,27 @@ interface OnboardingStepsProps {
 export function OnboardingSteps({ connectSlot, skillsUrl }: OnboardingStepsProps) {
   return (
     <ol className="space-y-6">
-      <Step n="1" title="연결하기" hint="셸에서 한 번. 이때부터 doc_* 툴이 보여요">
+      <Step n="1" title="연결하기" hint="셸에서 한 번만 실행하면 이때부터 doc_* 툴이 보여요">
         {connectSlot}
       </Step>
 
-      <Step n="2" title="스킬 설치하기" hint="선택이지만 권장 — 없어도 기본 동작은 해요">
+      <Step n="2" title="스킬 설치하기" hint="선택이지만 설치하기를 권해요. 없어도 기본 동작은 해요">
         <SkillInstall skillsUrl={skillsUrl} />
       </Step>
 
       <Step
         n="3"
         title="어느 라이브러리를 볼지 정하기"
-        hint="AGENTS.md에 한 줄. 다음 세션의 방아쇠예요"
+        hint="AGENTS.md에 한 줄을 적어 두면 다음 세션이 그 줄을 보고 시작해요"
       >
-        <CopyBlock value="/cushion-use" label="에이전트에게" />
+        <CopyBlock value="/cushion-use" label="에이전트에게 그대로 보내세요" />
         <p className="text-sm text-muted-foreground">
-          이 프로젝트가 볼 라이브러리를 <code>git remote</code>로 찾아 <code>AGENTS.md</code>에
-          적어 둬요. <strong>아직 라이브러리가 없으면</strong> 만들지 물어봐요.
+          에이전트가 이 프로젝트에 맞는 라이브러리를 <code>git remote</code>로 찾아{" "}
+          <code>AGENTS.md</code>에 적어 둬요. <strong>아직 라이브러리가 없으면</strong> 새로 만들지를
+          먼저 물어봐요.
           <br />
-          팀원이 이미 <code>AGENTS.md</code>를 커밋해 뒀다면 이 단계는 건너뛰어도 돼요 —
-          ①만 하면 바로 읽을 수 있어요.
+          팀원이 이미 <code>AGENTS.md</code>를 커밋해 뒀다면 이 단계는 건너뛰어도 돼요. 그때는
+          ①만 마쳐도 바로 문서를 읽을 수 있어요.
         </p>
       </Step>
     </ol>

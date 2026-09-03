@@ -1,6 +1,6 @@
 /**
  * @file app/invite/[token]/page.tsx
- * @description 초대 링크 진입점 (D-022). 소유자가 만든 링크 하나로 로그인만 하면 참여한다.
+ * @description 초대 링크 진입점 (D-023). 소유자가 만든 링크 하나로 로그인만 하면 참여한다.
  *
  * GET에서 바로 멤버로 만들지 않는다 — 조회는 부작용이 없어야 한다(링크 미리보기 크롤러,
  * 두 번 클릭 등). 참여는 이 페이지의 버튼이 누르는 별도 폼 제출(`joinLibrary`)이 한다.
@@ -46,7 +46,7 @@ export default async function InvitePage({ params }: PageProps<"/invite/[token]"
         title="라이브러리 초대"
         description={
           <>
-            <span className="font-mono">{library.slug}</span> — {library.name}
+            <span className="font-mono">{library.slug}</span> · {library.name}
           </>
         }
       />

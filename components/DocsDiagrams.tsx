@@ -5,7 +5,7 @@
  * mermaid를 쓰지 않는다 — mermaid의 값은 "임의의 다이어그램 텍스트를 그때그때 렌더"인데,
  * 여기 그림은 몇 장으로 고정이고 코드와 같이 커밋된다. 클라이언트 렌더는 보기 화면
  * 번들 0 원칙(SPEC §9)에 어긋나고, 빌드 타임 렌더(mermaid-cli)는 Puppeteer가 딸려온다.
- * 고정된 그림 몇 장에는 손 SVG가 가장 싸다 — UsageChart와 같은 판단이다.
+ * 고정된 그림 몇 장에는 손 SVG가 가장 싸다 — 라이브러리를 얹을 이유가 없다.
  *
  * 색은 shadcn 토큰만 쓴다. 데이터가 아니라 설명이라 강조는 amber(주의 한 줄)와
  * destructive(거부) 딱 두 곳이다.
@@ -129,7 +129,7 @@ export function ArchitectureDiagram() {
       viewBox="0 0 720 280"
       className="w-full"
       role="img"
-      aria-label="Cushion 구조. 사람의 웹 편집과 에이전트의 MCP 호출이 documents 원본으로 모이고, 변경은 이력과 변경 요약으로 남아 팀 채널 알림과 에이전트의 stale 델타에 같은 요약이 쓰인다"
+      aria-label="Cushion의 구조를 나타낸 그림이에요. 사람이 웹에서 편집한 내용과 에이전트가 MCP로 호출한 내용이 모두 documents 원본으로 모여요. 변경된 내용은 이력과 변경 요약으로 남고, 그 요약 하나가 팀 채널 알림과 에이전트의 stale 델타에 똑같이 쓰여요."
     >
       <ArrowDefs id="arch-arrow" />
 
@@ -179,14 +179,14 @@ export function ConflictDiagram() {
       viewBox="0 0 720 150"
       className="w-full"
       role="img"
-      aria-label="충돌 흐름. doc_get으로 sha a1을 받고, 그 사이 남이 저장해 sha가 b2가 되면, base_sha a1의 doc_put은 거부되며 현재 sha를 회신한다. 새 sha 위에 변경을 다시 얹어 저장한다"
+      aria-label="충돌이 일어나는 과정을 나타낸 그림이에요. doc_get으로 sha a1을 받은 뒤 그 사이에 다른 사람이 저장해서 sha가 b2로 바뀌면, base_sha가 a1인 doc_put은 거부되고 서버가 현재 sha를 회신해요. 그다음에는 새 sha 위에 변경을 다시 얹어서 저장해요."
     >
       <ArrowDefs id="cas-arrow" />
 
       <Node x={24} y={36} w={150} h={76} title="① doc_get" sub="sha:a1을 받음" mono />
       <Node x={204} y={36} w={150} h={76} title="② 남이 먼저 저장" sub="현재는 sha:b2" />
       <Node x={384} y={36} w={150} h={76} title="③ put(base_sha:a1)" sub="거부 + 현재 sha 회신" mono tone="danger" />
-      <Node x={564} y={36} w={132} h={76} title="④ b2 위에 다시" sub="저장 — 병합 없음" />
+      <Node x={564} y={36} w={132} h={76} title="④ b2 위에 다시" sub="저장 (병합 없음)" />
 
       <Arrow x1={174} y1={74} x2={202} y2={74} marker="cas-arrow" />
       <Arrow x1={354} y1={74} x2={382} y2={74} marker="cas-arrow" />
@@ -205,7 +205,7 @@ export function StaleDiagram() {
       viewBox="0 0 720 168"
       className="w-full"
       role="img"
-      aria-label="stale 흐름. 누가 문서를 고치면 변경 요약이 쌓이고, 에이전트의 다음 툴 응답 끝에 stale 한 줄이 붙는다. doc_changes_since를 부르면 경로·섹션·증감 요약이 오고 커서가 전진한다"
+      aria-label="stale 표시가 붙는 과정을 나타낸 그림이에요. 누군가 문서를 고치면 변경 요약이 쌓이고, 에이전트가 받는 다음 툴 응답 끝에 stale 한 줄이 붙어요. 그때 doc_changes_since를 부르면 경로와 섹션, 증감 요약이 오고 커서가 전진해요."
     >
       <ArrowDefs id="stale-arrow" />
 
@@ -233,7 +233,7 @@ export function StaleDiagram() {
           [stale] cushion: SPEC.md
         </text>
         <text x={360} y={134} textAnchor="middle" className="fill-muted-foreground text-[10px]">
-          밀렸을 때만 붙어요 — 아니면 없음
+          밀렸을 때만 붙고, 아니면 없어요
         </text>
       </g>
 

@@ -133,7 +133,8 @@ export default async function AdminPage() {
         title="관리"
         description={
           <>
-            서비스 전체를 한눈에 봐요. 멤버 관리는 각 라이브러리 화면에서 해요.{" "}
+            서비스 전체를 한눈에 볼 수 있는 화면이에요. 멤버 관리는 각 라이브러리 화면에서
+            해요.{" "}
             {/* git이 없으므로 이게 유일한 백업이다 (D-011).
                 라우트 핸들러가 파일을 내려주므로 <Link>의 클라이언트 이동으로는 다운로드가 안 된다. */}
             <a href="/api/export" className="underline underline-offset-4 hover:text-foreground">
@@ -163,8 +164,9 @@ export default async function AdminPage() {
         <div className="space-y-1">
           <h2 className="text-sm font-medium">요청 수</h2>
           <p className="text-xs text-muted-foreground">
-            최근 {USAGE_DAYS}일 MCP 툴 호출이에요. 날짜는 UTC 기준이고, <code>library</code> 없이
-            부른 <code>doc_outline</code>은 안 세요 — 전부는 아래 요청 로그에 있어요.
+            최근 {USAGE_DAYS}일 동안의 MCP 툴 호출 횟수예요. 날짜는 UTC를 기준으로 하고,{" "}
+            <code>library</code> 인자 없이 부른 <code>doc_outline</code>은 집계에서 빼요. 빠진 것을
+            포함한 전부는 아래 요청 로그에서 볼 수 있어요.
           </p>
         </div>
         <div className="space-y-1">
@@ -198,7 +200,8 @@ export default async function AdminPage() {
           <div className="space-y-1">
             <h2 className="text-sm font-medium">요청 로그</h2>
             <p className="text-xs text-muted-foreground">
-              최신 {RECENT_LOGS}건이에요. 상태 필터와 전체 목록은 전체 보기에 있어요.
+              가장 최근 {RECENT_LOGS}건이에요. 상태 필터와 전체 목록은 전체 보기에서 확인할 수
+              있어요.
             </p>
           </div>
           <Link
@@ -277,7 +280,8 @@ export default async function AdminPage() {
         <div className="space-y-1">
           <h2 className="text-sm font-medium">사용자</h2>
           <p className="text-xs text-muted-foreground">
-            로그인한 적 있는 모든 사용자에요. 멤버·토큰 정보는 각 라이브러리에서 확인해요.
+            한 번이라도 로그인한 적이 있는 사용자 전체예요. 멤버와 토큰 정보는 각 라이브러리
+            화면에서 확인할 수 있어요.
           </p>
         </div>
         {users.length === 0 ? (

@@ -1,9 +1,6 @@
 /**
  * @file app/dashboard/page.tsx
  * @description 내 레포 목록 + 레포 만들기 (D-013).
- *
- * 절약 추정은 여기 두지 않는다 — 레포에 들어가면 보인다. 목록 화면이 전 레포의
- * 문서 본문을 읽어야 하는 건 목록이 할 일이 아니다.
  */
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -25,7 +22,7 @@ export default async function DashboardPage() {
     <PageShell className="space-y-6">
       <PageHeader
         title="대시보드"
-        description="문서 원본은 Cushion에 있어요. 여기서 만들면 에이전트가 MCP로 읽고 써요."
+        description="문서의 원본은 Cushion에 보관돼요. 여기서 라이브러리를 만들면 에이전트가 MCP로 그 문서를 읽고 써요."
         // 비어 있으면 아래 빈 상태가 곧 CTA다 — 버튼이 두 군데면 눈이 갈린다
         action={repos.length > 0 ? <NewLibraryDialog /> : undefined}
       />
@@ -35,7 +32,7 @@ export default async function DashboardPage() {
           <p className="text-sm text-muted-foreground">
             아직 라이브러리가 없어요.
             <br />
-            새로 만들거나, 팀원에게 초대를 요청하세요 — 초대되면 여기에 바로 보여요.
+            직접 새로 만들거나 팀원에게 초대를 요청하세요. 초대를 받으면 이 목록에 바로 나타나요.
           </p>
           <NewLibraryDialog />
         </div>

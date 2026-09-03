@@ -23,26 +23,29 @@ export default function DocsOverviewPage() {
             에이전트는 MCP로 <strong className="text-foreground">필요한 조각만</strong> 읽고 써요.
           </p>
           <p className="text-muted-foreground">
-            목적은 하나예요 — 에이전트가 같은 문서를 세션마다 컨텍스트에 싣느라 태우는 토큰을 줄이는 것.
+            목적은 하나예요. 에이전트가 같은 문서를 세션마다 컨텍스트에 다시 싣느라 소모하는
+            토큰을 줄이는 것이에요.
           </p>
         </header>
 
         <section className="space-y-3">
           <h2 className="text-lg font-medium">왜 필요한가</h2>
           <p className="text-sm text-muted-foreground">
-            에이전트에게 스펙을 읽히는 가장 흔한 방법은 파일 전체를 컨텍스트에 넣는 거예요. 그런데
-            한 번의 작업에 실제로 필요한 건 대개 섹션 하나고, 다음 세션에는 같은 문서를 처음부터
-            다시 싣게 돼요. 문서가 자랄수록 이 비용은 작업 수에 비례해 늘어나요.
+            에이전트에게 스펙을 읽히는 가장 흔한 방법은 파일 전체를 컨텍스트에 넣는 것이에요.
+            그런데 한 번의 작업에 실제로 필요한 부분은 대개 섹션 하나뿐이고, 다음 세션에는 같은
+            문서를 처음부터 다시 싣게 돼요. 문서가 자랄수록 이 비용은 작업 수에 비례해서 늘어나요.
           </p>
           <p className="text-sm text-muted-foreground">
-            Cushion은 그 흐름을 <strong className="text-foreground">목차 한 번 + 섹션 하나씩</strong>
-            으로 바꿔요. 목차는 세션당 한 번이라 작업이 늘수록 격차가 벌어져요.
+            Cushion은 이 과정을 <strong className="text-foreground">목차 한 번 + 섹션 하나씩</strong>
+            으로 바꿔요. 목차는 세션당 한 번만 읽으면 되기 때문에, 작업이 늘어날수록 격차가
+            벌어져요.
           </p>
           <div className="rounded-lg border bg-muted/30 p-4 text-sm">
-            <strong>자기 자신의 문서로 잰 값</strong> — 전량 로드 대비 <strong>20% 미만, 5배 이상 절감</strong>.
+            <strong>Cushion 자신의 문서로 측정한 값</strong>이에요. 문서 전체를 불러올 때와
+            비교하면 <strong>20% 미만으로 줄어들고, 5배 이상 절감</strong>돼요.
             <p className="mt-1 text-xs text-muted-foreground">
-              측정 대상이 이 프로젝트의 문서라 문서가 자라면 값도 움직여요. 그래서 숫자를 박아 두지
-              않고 <code>pnpm acceptance</code>가 그때그때 다시 재요.
+              측정 대상이 이 프로젝트의 문서라서 문서가 자라면 값도 함께 움직여요. 그래서 숫자를
+              코드에 고정하지 않고 <code>pnpm acceptance</code>가 실행될 때마다 다시 측정해요.
             </p>
           </div>
         </section>
@@ -53,13 +56,14 @@ export default function DocsOverviewPage() {
             <ArchitectureDiagram />
           </div>
           <p className="text-sm text-muted-foreground">
-            <strong className="text-foreground">문서의 원본이 여기 있어요.</strong> 웹 편집 화면에서도,
-            에이전트의 <code>doc_put</code>으로도 같은 문서를 만들고 고쳐요 — 어느 입구로 쓰든 같은
-            경로를 지나 이력과 변경 요약이 남아요.
+            <strong className="text-foreground">문서의 원본이 여기에 있어요.</strong> 웹 편집
+            화면에서도, 에이전트의 <code>doc_put</code>으로도 같은 문서를 만들고 고쳐요. 어느 쪽으로
+            쓰든 같은 경로를 지나기 때문에 이력과 변경 요약이 똑같이 남아요.
           </p>
           <p className="text-sm text-muted-foreground">
             <strong className="text-foreground">같은 요약 하나</strong>가 팀 채널 알림과 에이전트의{" "}
-            <code>[stale]</code> 델타에 두 번 쓰여요 — 두 기능이 아니라 한 문자열이에요.
+            <code>[stale]</code> 델타에 모두 쓰여요. 기능이 둘인 것이 아니라, 문자열 하나를 두 곳에서
+            쓰는 것이에요.
           </p>
           <p className="text-sm text-muted-foreground">
             덮어쓰기 전에 이전 본문을 남기는 <strong className="text-foreground">이력</strong>, 읽을
@@ -80,21 +84,21 @@ export default function DocsOverviewPage() {
               <dt className="font-medium">한곳에</dt>
               <dd className="text-muted-foreground">
                 웹 편집 화면에서도, 에이전트의 <code>doc_put</code>으로도 같은 문서를 만들고 고쳐요.
-                모든 변경이 이력에 남고 되돌릴 수 있어요. 삭제도 남아요.
+                모든 변경이 이력에 남고 되돌릴 수 있어요. 삭제한 기록도 함께 남아요.
               </dd>
             </div>
             <div>
               <dt className="font-medium">조각만</dt>
               <dd className="text-muted-foreground">
-                목차를 먼저 보고 필요한 <code>##</code> 섹션만 가져가요. 안 바뀐 문서를 다시 물으면
-                본문 대신 <code>unchanged</code> 다섯 글자로 끝나요.
+                목차를 먼저 보고 필요한 <code>##</code> 섹션만 가져가요. 바뀌지 않은 문서를 다시
+                물으면 본문 대신 <code>unchanged</code> 한 단어로 끝나요.
               </dd>
             </div>
             <div>
               <dt className="font-medium">밀렸을 때만</dt>
               <dd className="text-muted-foreground">
-                폴링도 상시 연결도 없어요. 문서가 바뀌면 다음 툴 응답 끝에 <code>[stale]</code> 한 줄이
-                붙고, 팀 채널에는 무엇이 왜 바뀌었는지가 가요.
+                폴링도 상시 연결도 없어요. 문서가 바뀌면 다음 툴 응답 끝에 <code>[stale]</code> 한
+                줄이 붙고, 팀 채널에는 무엇이 왜 바뀌었는지가 알림으로 전달돼요.
               </dd>
             </div>
           </dl>
@@ -103,24 +107,25 @@ export default function DocsOverviewPage() {
         <section className="space-y-3">
           <h2 className="text-lg font-medium">들여오지 않는 것</h2>
           <p className="text-sm text-muted-foreground">
-            빠뜨린 게 아니라 기각한 것들이에요. 각각 결정 로그에 이유가 있어요.
+            빠뜨린 것이 아니라 의도적으로 기각한 것들이에요. 각각의 이유는 결정 로그에 적혀 있어요.
           </p>
           <ul className="space-y-2 text-sm text-muted-foreground">
             <li>
-              <strong className="text-foreground">LLM 변경 요약</strong> — 요약 모델은 본문만 보므로
-              “어느 코드가 영향받는지”가 추측이 돼요. 경로 + 섹션 + 증감의 구조적 요약으로 가요
+              <strong className="text-foreground">LLM 변경 요약</strong>: 요약 모델은 본문만 보기
+              때문에 “어느 코드가 영향받는지”가 추측이 돼요. 그래서 경로와 섹션, 증감을 조합한
+              구조적 요약을 써요
             </li>
             <li>
-              <strong className="text-foreground">자동 병합·충돌 해결 UI</strong> — 브랜치가 없어
-              병합할 근거가 없어요. <code>base_sha</code>로 거부만 해요
+              <strong className="text-foreground">자동 병합과 충돌 해결 UI</strong>: 브랜치가 없어서
+              병합할 근거가 없어요. <code>base_sha</code>가 어긋나면 거부하기만 해요
             </li>
             <li>
-              <strong className="text-foreground">임베딩·벡터 DB</strong> — 스펙 수십 개 규모에서는
-              부분 문자열 스코어링으로 충분해요
+              <strong className="text-foreground">임베딩과 벡터 DB</strong>: 스펙 수십 개
+              규모에서는 부분 문자열 스코어링만으로도 충분해요
             </li>
             <li>
-              <strong className="text-foreground">폴링·상시 연결 구독</strong> — 커서와 응답에 얹는{" "}
-              <code>[stale]</code> 한 줄로 대체해요
+              <strong className="text-foreground">폴링과 상시 연결 구독</strong>: 커서와 응답에
+              붙이는 <code>[stale]</code> 한 줄로 대신해요
             </li>
           </ul>
         </section>

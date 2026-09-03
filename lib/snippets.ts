@@ -102,9 +102,12 @@ export function setupFiles(slug: string): { name: string; content: string }[] {
     // 개인 연결은 /settings/tokens의 온보딩(붙여넣기 두 번)이면 끝난다. 이 파일까지 두면
     // 프로젝트 스코프가 user 스코프를 덮어 `CUSHION_TOKEN` 없이는 그 안에서만 401이 난다.
     {
-      name: ".mcp.json — 팀 전체에 배포할 때만. 개인은 /settings/tokens 온보딩으로 충분하다",
+      name: ".mcp.json (팀 전체에 배포할 때만 쓰세요. 개인은 /settings/tokens 온보딩으로 충분해요)",
       content: mcpJson(),
     },
-    { name: "AGENTS.md 에 덧붙일 것 — 이 한 줄이 방아쇠다", content: agentsSnippet(slug) },
+    {
+      name: "AGENTS.md 에 덧붙이세요 (에이전트가 Cushion을 찾게 만드는 유일한 줄이에요)",
+      content: agentsSnippet(slug),
+    },
   ];
 }
