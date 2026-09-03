@@ -1,9 +1,6 @@
 /**
  * @file app/dashboard/page.tsx
  * @description 내 레포 목록 + 레포 만들기 (D-013).
- *
- * 절약 추정은 여기 두지 않는다 — 레포에 들어가면 보인다. 목록 화면이 전 레포의
- * 문서 본문을 읽어야 하는 건 목록이 할 일이 아니다.
  */
 import Link from "next/link";
 import { redirect } from "next/navigation";
