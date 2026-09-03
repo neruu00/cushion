@@ -38,7 +38,7 @@ export async function createAccessToken(
 
   if (error) {
     console.error("createAccessToken", error);
-    return { success: false, error: "발급하지 못했어요. 잠시 후 다시 시도해 주세요." };
+    return { success: false, error: "토큰을 발급하지 못했어요. 잠시 후 다시 시도해 주세요." };
   }
 
   revalidatePath("/settings/tokens");
@@ -46,7 +46,7 @@ export async function createAccessToken(
     success: true,
     data: {
       secret: token.plaintext,
-      hint: "이 값은 다시 볼 수 없어요. 대개는 아래에서 쓰는 클라이언트 탭만 복사하면 돼요",
+      hint: "이 값은 다시 볼 수 없어요. 대개는 아래에서 실제로 쓰는 클라이언트 탭만 복사하면 돼요.",
       // 붙여넣기 한 번으로 끝나게 한다 — 레포 클론도 환경변수도 없이.
       files: [
         {
@@ -66,7 +66,7 @@ export async function createAccessToken(
         },
         {
           group: "Codex CLI",
-          name: "셸 프로필(.zshrc 등)에 먼저 — config.toml엔 토큰을 직접 안 넣는다",
+          name: "먼저 셸 프로필(.zshrc 등)에 추가 (config.toml에는 토큰을 직접 넣지 않아요)",
           content: codexEnvExport(token.plaintext),
         },
         {

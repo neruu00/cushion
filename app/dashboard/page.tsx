@@ -25,7 +25,7 @@ export default async function DashboardPage() {
     <PageShell className="space-y-6">
       <PageHeader
         title="대시보드"
-        description="문서 원본은 Cushion에 있어요. 여기서 만들면 에이전트가 MCP로 읽고 써요."
+        description="문서의 원본은 Cushion에 보관돼요. 여기서 라이브러리를 만들면 에이전트가 MCP로 그 문서를 읽고 써요."
         // 비어 있으면 아래 빈 상태가 곧 CTA다 — 버튼이 두 군데면 눈이 갈린다
         action={repos.length > 0 ? <NewLibraryDialog /> : undefined}
       />
@@ -35,7 +35,7 @@ export default async function DashboardPage() {
           <p className="text-sm text-muted-foreground">
             아직 라이브러리가 없어요.
             <br />
-            새로 만들거나, 팀원에게 초대를 요청하세요 — 초대되면 여기에 바로 보여요.
+            직접 새로 만들거나 팀원에게 초대를 요청하세요. 초대를 받으면 이 목록에 바로 나타나요.
           </p>
           <NewLibraryDialog />
         </div>

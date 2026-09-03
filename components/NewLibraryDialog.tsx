@@ -32,8 +32,8 @@ export function NewLibraryDialog() {
         <DialogHeader>
           <DialogTitle>새 라이브러리</DialogTitle>
           <DialogDescription>
-            slug는 소문자·숫자·하이픈만 쓸 수 있어요. 만든 사람이 첫 멤버가 되고, 팀원은
-            라이브러리 화면에서 초대해요. 웹훅은 나중에 채워도 돼요.
+            slug에는 소문자와 숫자, 하이픈만 쓸 수 있어요. 만든 사람이 첫 멤버가 되고, 다른
+            팀원을 추가하려면 라이브러리 화면에서 초대하면 돼요. 웹훅은 나중에 채워도 돼요.
           </DialogDescription>
         </DialogHeader>
 
@@ -45,7 +45,7 @@ export function NewLibraryDialog() {
             name="github_repos"
             label="이 라이브러리를 보는 GitHub 레포 (선택)"
             placeholder={"acme/web\nacme/api"}
-            hint="한 줄에 하나씩. 조직 전체는 acme/* 한 줄이면 돼요"
+            hint="한 줄에 하나씩 적어 주세요. 조직 전체를 지정하려면 acme/* 한 줄이면 돼요"
           />
           <Field
             name="mattermost_webhook_url"

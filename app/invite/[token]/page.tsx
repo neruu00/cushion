@@ -46,7 +46,7 @@ export default async function InvitePage({ params }: PageProps<"/invite/[token]"
         title="라이브러리 초대"
         description={
           <>
-            <span className="font-mono">{library.slug}</span> — {library.name}
+            <span className="font-mono">{library.slug}</span> · {library.name}
           </>
         }
       />

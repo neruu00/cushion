@@ -214,7 +214,7 @@ export default async function LibraryPage({
           <p className="text-sm text-muted-foreground">
             {isMember ? (
               <>
-                아직 문서가 없어요. 위의 &quot;새 문서&quot;로 만들거나, 에이전트가{" "}
+                아직 문서가 없어요. 위에 있는 &quot;새 문서&quot;로 직접 만들거나, 에이전트가{" "}
                 <code>doc_put</code>으로 만들 수 있어요.
               </>
             ) : (

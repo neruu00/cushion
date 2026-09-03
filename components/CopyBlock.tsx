@@ -65,7 +65,7 @@ export function CopyBlock({ value, label, hideValue = false }: CopyBlockProps) {
         <span className="min-w-0 font-mono text-xs text-muted-foreground">{label ?? ""}</span>
         <Button type="button" variant="ghost" size="xs" className="shrink-0" onClick={copy}>
           {state === "copied" ? <Check /> : state === "failed" ? <TriangleAlert /> : <Copy />}
-          {state === "copied" ? "복사됨" : state === "failed" ? "선택했어요 — Ctrl+C" : "복사"}
+          {state === "copied" ? "복사했어요" : state === "failed" ? "선택했어요: Ctrl+C" : "복사"}
         </Button>
       </div>
       {showValue && (

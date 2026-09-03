@@ -48,8 +48,8 @@ const githubRepos = z
   )
   .pipe(
     z
-      .array(z.string().regex(ONE_REPO, "GitHub은 org/repo 또는 org/* 형태로 입력하세요."))
-      .max(50, "GitHub 레포는 50개까지입니다."),
+      .array(z.string().regex(ONE_REPO, "GitHub 레포는 org/repo 또는 org/* 형태로 입력해 주세요."))
+      .max(50, "GitHub 레포는 50개까지 등록할 수 있어요."),
   );
 
 /** `org/*`가 있으면 그 조직 전체가 일치한다. 매칭 규칙은 이 함수 하나뿐이다. */
@@ -67,8 +67,8 @@ export const createLibrarySchema = z.object({
   slug: z
     .string()
     .trim()
-    .regex(/^[a-z0-9][a-z0-9-]{0,62}$/, "slug는 소문자·숫자·하이픈만 쓸 수 있습니다."),
-  name: z.string().trim().min(1, "이름을 입력하세요.").max(100),
+    .regex(/^[a-z0-9][a-z0-9-]{0,62}$/, "slug에는 소문자와 숫자, 하이픈만 쓸 수 있어요."),
+  name: z.string().trim().min(1, "이름을 입력해 주세요.").max(100),
   github_repos: githubRepos,
   // 둘 다 둘 수 있다. 페이로드 키가 달라서(text vs content) 한 칸으로 합치지 않는다.
   mattermost_webhook_url: webhookUrl,
@@ -92,7 +92,7 @@ const checkbox = z
 
 export const librarySettingsSchema = z.object({
   library_id: z.uuid(),
-  name: z.string().trim().min(1, "이름을 입력하세요.").max(100),
+  name: z.string().trim().min(1, "이름을 입력해 주세요.").max(100),
   github_repos: githubRepos,
   mattermost_webhook_url: webhookUrl,
   discord_webhook_url: webhookUrl,
@@ -106,7 +106,7 @@ export const memberSchema = z.object({
   email: z
     .string()
     .transform((v) => v.trim().toLowerCase())
-    .pipe(z.email("이메일 형식이 아니에요.")),
+    .pipe(z.email("이메일 형식에 맞지 않아요.")),
 });
 
 /** 초대 링크 생성·무효화. 재발급(무효화 후 생성)이라 slug까지 같이 받아 revalidate에 쓴다. */

@@ -22,7 +22,7 @@ export async function GET(request: NextRequest): Promise<Response> {
   if (!email) return new Response("unauthorized", { status: 401 });
 
   const repos = await getAccessibleLibraries(email);
-  if (repos.length === 0) return new Response("접근 가능한 문서가 없다.\n", { status: 200 });
+  if (repos.length === 0) return new Response("접근할 수 있는 문서가 없어요.\n", { status: 200 });
 
   const { data, error } = await supabase
     .from("documents")

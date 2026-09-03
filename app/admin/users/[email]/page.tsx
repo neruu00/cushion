@@ -81,7 +81,7 @@ export default async function UserDetailPage({
           </Link>
         }
         title={<span className="font-mono">{email}</span>}
-        description={`라이브러리 ${memberships.length}개 · 토큰 ${tokens.length}개 (폐기 포함)`}
+        description={`라이브러리 ${memberships.length}개에 속해 있고, 발급한 토큰은 폐기한 것까지 포함해 ${tokens.length}개예요.`}
       />
 
       <section className="space-y-3 rounded-lg border p-5">

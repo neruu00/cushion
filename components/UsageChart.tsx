@@ -71,8 +71,9 @@ export function UsageChart({
         <div className="space-y-1">
           <h2 className="text-sm font-medium">토큰 사용량</h2>
           <p className="text-xs text-muted-foreground">
-            에이전트가 MCP로 주고받은 양이에요. 저장은 문자수라 토큰은{" "}
-            <strong className="text-foreground">추정</strong>이고, 날짜·시각은 UTC 기준이에요.
+            에이전트가 MCP로 주고받은 토큰의 양이에요. 실제로 저장하는 값은 문자 수라서 토큰은{" "}
+            <strong className="text-foreground">추정치</strong>이고, 날짜와 시각은 UTC를 기준으로
+            표시해요.
           </p>
         </div>
 
@@ -99,7 +100,7 @@ export function UsageChart({
         <p className="rounded-lg border border-dashed px-4 py-10 text-center text-sm text-muted-foreground">
           이 기간에는 기록이 없어요.
           <br />
-          <span className="text-xs">에이전트가 MCP로 이 라이브러리를 읽으면 여기 쌓여요.</span>
+          <span className="text-xs">에이전트가 MCP로 이 라이브러리를 읽으면 여기에 기록이 쌓여요.</span>
         </p>
       ) : (
         <div className="space-y-1">
@@ -173,23 +174,24 @@ export function UsageChart({
       <div className="space-y-1 border-t pt-3 text-xs text-muted-foreground">
         {savings ? (
           <p>
-            이 라이브러리(문서 {documentCount}개)를 통째로 읽으면 한 번에 약{" "}
-            <strong className="text-foreground">{fmt(savings.controlTokens)} tok</strong>이에요.
-            목차 1회 + 작업당 섹션 1개면 약{" "}
+            이 라이브러리의 문서 {documentCount}개를 통째로 읽으면 한 번에 약{" "}
+            <strong className="text-foreground">{fmt(savings.controlTokens)} tok</strong>이 들어요.
+            목차를 한 번 읽고 작업마다 섹션을 하나씩 읽으면 약{" "}
             <strong className="text-foreground">
               {fmt(savings.outlineTokens + savings.perTaskTokens)} tok
-            </strong>{" "}
-            — 세션당 <strong className="text-foreground">{fmt(savings.savedTokens)} tok</strong>{" "}
-            아껴요 ({savings.ratio.toFixed(1)}배). 목차는 세션당 한 번이라 작업이 늘수록 더
-            벌어져요.
+            </strong>
+            으로 끝나서, 세션마다{" "}
+            <strong className="text-foreground">{fmt(savings.savedTokens)} tok</strong>을 아껴요.
+            비율로는 {savings.ratio.toFixed(1)}배예요. 목차는 세션당 한 번만 읽으면 되니까 작업이
+            늘어날수록 격차는 더 벌어져요.
           </p>
         ) : (
-          <p>문서를 넣으면 절약 추정이 여기 나와요.</p>
+          <p>문서를 넣으면 절약 추정치가 여기에 나와요.</p>
         )}
         <p>
           읽기 {fmt(readTokens)} tok · 쓰기 {fmt(writeTokens)} tok.{" "}
-          <code>library</code> 없이 부른 <code>doc_outline</code>은 어느 라이브러리에도 달 수
-          없어서 빠져 있어요.
+          <code>library</code> 인자 없이 부른 <code>doc_outline</code>은 어느 라이브러리의
+          기록인지 특정할 수 없어서 이 집계에서 빠져 있어요.
         </p>
       </div>
     </section>

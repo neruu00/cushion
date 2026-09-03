@@ -63,9 +63,9 @@ export function MembersDialog({
         <DialogHeader>
           <DialogTitle>멤버</DialogTitle>
           <DialogDescription>
-            멤버는 이 라이브러리의 문서를 읽고 쓸 수 있어요. 초대·제거는 소유자만 해요 —
-            자기 자신을 지우는 나가기는 누구나 할 수 있어요. 마지막 멤버가 나가면 아무도
-            볼 수 없게 돼요.
+            멤버는 이 라이브러리의 문서를 읽고 쓸 수 있어요. 다른 사람을 초대하거나 제거하는
+            일은 소유자만 할 수 있지만, 자기 자신을 지우고 나가는 일은 누구나 할 수 있어요.
+            마지막 멤버까지 나가면 아무도 이 라이브러리를 볼 수 없게 돼요.
           </DialogDescription>
         </DialogHeader>
 
@@ -93,9 +93,9 @@ export function MembersDialog({
                       <span className="mt-2 block">
                         {member.email === currentEmail
                           ? members.length === 1
-                            ? "마지막 멤버예요. 나가면 아무도 이 라이브러리를 볼 수 없게 돼요."
+                            ? "지금 남아 있는 마지막 멤버예요. 나가면 아무도 이 라이브러리를 볼 수 없게 돼요."
                             : "나가면 이 라이브러리의 문서를 더는 볼 수 없어요. 소유자가 다시 초대할 수 있어요."
-                          : "문서를 더는 읽고 쓸 수 없게 돼요. 다시 초대할 수 있어요."}
+                          : "이 멤버는 문서를 더는 읽고 쓸 수 없게 돼요. 나중에 다시 초대할 수 있어요."}
                       </span>
                     </>
                   }
@@ -126,14 +126,14 @@ export function MembersDialog({
             <div>
               <h3 className="text-sm font-medium">초대 링크</h3>
               <p className="text-xs text-muted-foreground">
-                이메일을 몰라도 돼요 — 링크를 가진 사람은 로그인만 하면 참여해요. 라이브러리당
-                링크는 한 번에 하나만 살아있어요.
+                상대의 이메일을 몰라도 돼요. 링크를 가진 사람은 로그인만 하면 바로 참여할 수
+                있어요. 라이브러리마다 살아 있는 링크는 한 번에 하나뿐이에요.
               </p>
             </div>
 
             {hasActiveInvite && (
               <div className="flex items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm">
-                <span className="text-muted-foreground">활성 링크가 있어요</span>
+                <span className="text-muted-foreground">지금 살아 있는 링크가 있어요</span>
                 <form action={revokeInviteLink}>
                   <input type="hidden" name="library_id" value={libraryId} />
                   <input type="hidden" name="library_slug" value={librarySlug} />

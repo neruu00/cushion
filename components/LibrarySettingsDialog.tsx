@@ -53,8 +53,9 @@ export function LibrarySettingsDialog({
         <DialogHeader>
           <DialogTitle>라이브러리 설정</DialogTitle>
           <DialogDescription>
-            <strong>칸을 비우면 지워져요.</strong> slug는 여기서 바꿀 수 없어요 — 바꾸면 팀원의
-            URL과 에이전트가 쓰던 <code>library</code> 인자가 깨져요.
+            <strong>칸을 비우면 그 값이 지워져요.</strong> slug는 여기서 바꿀 수 없어요. slug를
+            바꾸면 팀원이 쓰던 URL과 에이전트가 쓰던 <code>library</code> 인자가 모두 깨지기
+            때문이에요.
           </DialogDescription>
         </DialogHeader>
 
@@ -72,7 +73,7 @@ export function LibrarySettingsDialog({
             name="github_repos"
             label="이 라이브러리를 보는 GitHub 레포"
             placeholder={"acme/web\nacme/api"}
-            hint="한 줄에 하나씩. 조직 전체는 acme/* 한 줄이면 돼요"
+            hint="한 줄에 하나씩 적어 주세요. 조직 전체를 지정하려면 acme/* 한 줄이면 돼요"
             defaultValue={githubRepos.join("\n")}
           />
           <Field
@@ -105,10 +106,11 @@ export function LibrarySettingsDialog({
             <span className="grid gap-1">
               <span className="font-medium">링크가 있으면 누구나 읽기</span>
               <span className="text-xs font-normal text-muted-foreground">
-                켜면 <strong className="text-foreground">로그인 없이도</strong> 이 라이브러리의
-                문서를 읽을 수 있어요. 쓰기·이력·멤버 목록은 그대로 멤버만이에요. 검색엔진에는
-                올라가지 않지만, <strong className="text-foreground">링크를 받은 사람은 전부</strong>{" "}
-                볼 수 있으니 비공개 내용이 있으면 켜지 마세요.
+                이 설정을 켜면 <strong className="text-foreground">로그인하지 않은 사람도</strong>{" "}
+                이 라이브러리의 문서를 읽을 수 있어요. 쓰기와 이력, 멤버 목록은 그대로 멤버에게만
+                보여요. 검색엔진에 올라가지는 않지만{" "}
+                <strong className="text-foreground">링크를 받은 사람은 누구나</strong> 볼 수 있으니,
+                공개하면 안 되는 내용이 있다면 켜지 마세요.
               </span>
             </span>
           </label>

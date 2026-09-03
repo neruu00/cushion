@@ -52,7 +52,9 @@ export default async function ChangesPage({ params }: PageProps<"/libraries/[lib
         }
         title="변경 내역"
         description={
-          events.length === LIMIT ? `최근 ${LIMIT}건` : `${events.length}건`
+          events.length === LIMIT
+            ? `가장 최근 ${LIMIT}건을 보여 줘요.`
+            : `모두 ${events.length}건이에요.`
         }
       />
 

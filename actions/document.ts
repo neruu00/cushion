@@ -120,7 +120,7 @@ export async function restoreVersion(formData: FormData): Promise<void> {
     path: parsed.data.path,
     content: version.content,
     baseSha: current?.content_sha,
-    note: `${version.created_at.slice(0, 19)} 버전으로 되돌림`,
+    note: `${version.created_at.slice(0, 19)} 버전으로 되돌렸어요`,
   });
   if (!result.ok) console.error("restoreVersion", result.code, result.message);
 

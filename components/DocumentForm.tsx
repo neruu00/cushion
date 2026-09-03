@@ -74,7 +74,7 @@ export function DocumentForm({ library, path, content, sha }: DocumentFormProps)
           {pending ? "저장 중…" : "저장"}
         </Button>
         {state?.success ? (
-          <span className="text-sm text-muted-foreground">저장됨</span>
+          <span className="text-sm text-muted-foreground">저장했어요</span>
         ) : null}
       </div>
 
@@ -87,8 +87,8 @@ export function DocumentForm({ library, path, content, sha }: DocumentFormProps)
               {/* 병합하지 않는다. 사람이 두 본문을 보고 정한다 — 그게 유일하게 안전한 방법이다.
                   base_sha는 이미 갱신됐으므로 지금 그대로 저장하면 내 내용이 이긴다. */}
               <p>
-                쓰던 내용은 그대로 뒀어요. 아래 서버 본문과 비교해 보세요 — 이대로 저장하면 내
-                내용으로 덮어써요.
+                쓰던 내용은 그대로 뒀어요. 아래에 있는 서버의 본문과 비교해 보세요. 지금 이대로
+                저장하면 내가 쓴 내용이 서버의 본문을 덮어써요.
               </p>
               <details className="rounded-lg border bg-background/50">
                 <summary className="cursor-pointer px-3 py-1.5 text-sm">
@@ -104,7 +104,7 @@ export function DocumentForm({ library, path, content, sha }: DocumentFormProps)
                 size="sm"
                 onClick={() => setDraft(state.conflict?.content ?? draft)}
               >
-                서버 내용으로 바꾸기 (내 수정 버림)
+                서버 내용으로 바꾸기 (내가 쓴 내용은 버리기)
               </Button>
             </AlertDescription>
           ) : null}
