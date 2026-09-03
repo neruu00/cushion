@@ -2,6 +2,9 @@
  * @file lib/mirror.ts
  * @description 편집 한 번이 남기는 흔적 — 이력 · 델타 이벤트 · 알림.
  *
+ * 알림은 **편집마다 한 통**이다. 시간 창으로 묶던 디바운스는 걷어냈다 —
+ * 근거는 `notifyChange` 주석에.
+ *
  * 세 곳(웹 편집 화면, MCP 쓰기 툴, 삭제)이 같은 뒷정리를 해야 한다. 한 군데라도 빠지면
  * 이력이 비거나, 에이전트가 변경을 못 보거나(`[stale]`이 안 뜬다), 팀이 알림을 못 받는다.
  * 그래서 쓰기 경로는 전부 여기를 지난다.
@@ -44,8 +47,6 @@ export interface NotifiableLibrary {
   slug: string;
   mattermost_webhook_url: string | null;
   discord_webhook_url: string | null;
-  /** 마지막으로 **실제 발송**한 시각. 디바운스 창의 기준점 */
-  last_notified_at: string | null;
 }
 
 export async function recordChange(
@@ -80,81 +81,45 @@ export async function recordChange(
     if (latestError) console.error("mirror: latest_event_id", latestError);
   }
 
-  await maybeNotify(repo);
+  // 방금 만든 이벤트 하나를 그대로 보낸다. 대기분을 다시 조회하지 않는다 —
+  // 보낼 내용을 이미 손에 들고 있다.
+  await notifyChange(repo, eventId, {
+    author: edit.author,
+    changed_paths: edit.after === null ? [] : [edit.path],
+    deleted_paths: edit.after === null ? [edit.path] : [],
+    summary,
+  });
   return eventId;
 }
 
 /**
- * 디바운스 창(분). 0이면 즉시 발송 — 디바운스를 끄는 탈출구다.
+ * 이 편집 하나를 채널로 보낸다. **묶지 않는다 — 편집마다 한 통이다.**
  *
- * 5분인 근거는 실측이다. sync_events 49건을 묶어 보면 1분 창이 15건(69% 감소), 5분 창이
- * 10건(80%)이고 **15분 창도 10건**이다. 5분을 넘겨도 더 안 줄어든다는 뜻이라, 더 늘리면
- * 감소는 그대로인데 꼬리 지연만 길어진다.
- */
-function windowMs(): number {
-  const raw = Number(process.env.CUSHION_NOTIFY_WINDOW_MIN);
-  return (Number.isFinite(raw) && raw >= 0 ? raw : 5) * 60_000;
-}
-
-/** 한 번에 묶어 볼 이벤트 수 상한. 이 뒤는 다음 발송으로 넘어간다 */
-const MAX_BATCH = 500;
-
-/**
- * 창이 열려 있으면 안 보낸다 — 쌓아 두고 창이 닫힌 뒤 첫 쓰기가 한 통으로 묶어 보낸다.
+ * 예전에는 `CUSHION_NOTIFY_WINDOW_MIN`분 창으로 디바운스했다. 도배는 줄었지만 창이
+ * **라이브러리 단위**라 그 안에 들어온 남의 무관한 작업까지 한 통에 섞였다. 묶음의 기준이
+ * "같은 작업"이 아니라 "같은 시간"이어서, 사람이 읽고 오해하는 편이 더 나빴다.
+ * 시간은 작업의 대용물로 너무 거칠다.
  *
- * **선두는 즉시 보낸다**(조용하다 처음 온 편집). 그래야 팀이 "누가 뭘 건드리기 시작했다"를
- * 바로 알고, 뒤따르는 연속 편집만 묶인다. 대신 버스트의 **꼬리는 다음 쓰기까지 지연된다** —
- * 크론이 없으니 창이 닫히는 걸 알려 줄 게 없다. 알림이 사라지는 건 아니고(`sync_events`에
- * 남고 변경 목록 화면에서 보인다) 늦을 뿐이다. 크론을 얹기로 하면 이 함수를 그대로
- * 부르면 된다 — 스키마가 같다.
+ * 묶을 축을 다시 고르기 전까지는 안 묶는다. 대신 알고 감수하는 비용이 둘 있다 —
+ * 채널이 시끄러워지고(실측 49건 기준 10회 → 49회), 쓰기마다 웹훅 왕복을 기다린다.
+ * 조용히 하고 싶으면 그 라이브러리의 웹훅 URL을 비우면 된다. 첫 줄에서 바로 빠진다.
+ *
+ * 창이 없어지면서 꼬리 지연도 없어졌다. 예전에는 버스트의 마지막 편집이 **다음 쓰기까지**
+ * 발송을 기다렸다 — 크론이 없어 창이 닫히는 걸 알려 줄 게 없었다. 이제 그 상태가 없다.
  */
-async function maybeNotify(repo: NotifiableLibrary): Promise<void> {
-  // 채널이 없으면 상태를 건드리지 않는다. 나중에 웹훅을 붙였을 때 그때부터의 변경만 간다 —
+async function notifyChange(
+  repo: NotifiableLibrary,
+  eventId: number | null,
+  event: PendingEvent,
+): Promise<void> {
+  // 채널이 없으면 아무것도 하지 않는다. 나중에 웹훅을 붙였을 때 그때부터의 변경만 간다 —
   // 붙이는 순간 과거 수백 건이 쏟아지는 게 더 나쁘다.
   if (!repo.mattermost_webhook_url && !repo.discord_webhook_url) return;
 
-  const previous = repo.last_notified_at;
-  if (previous && Date.now() - Date.parse(previous) < windowMs()) return;
-
-  /*
-   * 창을 여는 것부터 한다. 조건부 UPDATE라 동시 쓰기 둘이 같은 창을 봤어도 하나만 통과한다 —
-   * documents의 CAS와 같은 이유다. 먼저 읽고 보내고 나중에 표시하면 그 사이에 낀 쓰기가
-   * 같은 묶음을 한 번 더 보낸다.
-   */
-  const now = new Date().toISOString();
-  const claim = supabase.from("libraries").update({ last_notified_at: now }).eq("id", repo.id);
-  const { data: claimed, error: claimError } = await (
-    previous === null ? claim.is("last_notified_at", null) : claim.eq("last_notified_at", previous)
-  ).select("id");
-
-  if (claimError) {
-    console.error("mirror: notify claim", claimError);
-    return;
-  }
-  if (!claimed?.length) return; // 남이 이미 보내는 중
-
-  const { data: pending, error } = await supabase
-    .from("sync_events")
-    .select("id, author, changed_paths, deleted_paths, summary")
-    .eq("library_id", repo.id)
-    .is("notified_at", null)
-    .order("id", { ascending: true })
-    .limit(MAX_BATCH);
-
-  if (error) {
-    console.error("mirror: notify pending", error);
-    return;
-  }
-  if (!pending?.length) return;
-
-  const text = buildNotification({
-    base: baseUrl(),
-    slug: repo.slug,
-    events: pending as PendingEvent[],
-  });
+  const text = buildNotification({ base: baseUrl(), slug: repo.slug, events: [event] });
   if (!text) return;
 
-  await Promise.all([
+  const [mattermost, discord] = await Promise.all([
     postWebhook(repo.mattermost_webhook_url, { text }),
     // Discord는 `content`만 읽는다 — `text`를 보내면 400이고, 그 실패는 조용하다.
     // 2000자가 상한이라 넘치면 통째로 거부당한다. 요약은 짧지만 상한을 믿지 않는다.
@@ -162,20 +127,20 @@ async function maybeNotify(repo: NotifiableLibrary): Promise<void> {
   ]);
 
   /*
-   * 보낸 뒤에 표시한다. 먼저 표시하면 발송이 실패했을 때 그 변경들이 영구히 안 나간다 —
-   * 중복 알림보다 나쁘다.
+   * **한 곳이라도 실제로 받았을 때만 표시한다.** 붙은 채널이 전부 실패했으면 `notified_at`을
+   * null로 남긴다 — "안 나갔다"가 사실이고, 그 상태로 남아 있어야 나중에 재발송이나 묶음을
+   * 붙일 때 이 행들이 대상이 된다.
    *
-   * `lte(마지막 본 id)`가 중요하다. "안 보낸 것 전부"로 표시하면 select와 update 사이에
-   * 끼어든 쓰기의 이벤트까지 발송된 것으로 찍혀 **조용히 사라진다.**
+   * 편집마다 보내므로 발송 빈도가 올라가고 Discord 웹훅에는 레이트 리밋이 있다.
+   * 429를 성공으로 찍으면 그 알림이 조용히 사라진다.
    */
-  const lastId = pending[pending.length - 1].id;
-  const { error: markError } = await supabase
+  if (eventId === null || !(mattermost || discord)) return;
+
+  const { error } = await supabase
     .from("sync_events")
-    .update({ notified_at: now })
-    .eq("library_id", repo.id)
-    .is("notified_at", null)
-    .lte("id", lastId);
-  if (markError) console.error("mirror: notify mark", markError);
+    .update({ notified_at: new Date().toISOString() })
+    .eq("id", eventId);
+  if (error) console.error("mirror: notify mark", error);
 }
 
 /**
@@ -184,9 +149,13 @@ async function maybeNotify(repo: NotifiableLibrary): Promise<void> {
  *
  * 페이로드는 호출부가 준다. 여기서 URL을 보고 종류를 추측하지 않는다 —
  * 어느 칸에 넣었는지가 이미 답이고, 추측은 틀리는 날이 온다.
+ *
+ * **실제로 전달됐는지를 돌려준다.** 예외를 던지지 않는 건 그대로지만, 삼키고 void를 주면
+ * 호출부가 429·500을 성공과 구분할 수 없어 `notified_at`을 찍어 버린다 — 그러면 그 알림이
+ * 조용히 사라진다. 붙지 않은 채널(url === null)은 보낸 적이 없으므로 false다.
  */
-async function postWebhook(url: string | null, payload: Record<string, string>): Promise<void> {
-  if (!url) return;
+async function postWebhook(url: string | null, payload: Record<string, string>): Promise<boolean> {
+  if (!url) return false;
 
   try {
     const response = await fetch(url, {
@@ -195,9 +164,14 @@ async function postWebhook(url: string | null, payload: Record<string, string>):
       body: JSON.stringify(payload),
       signal: AbortSignal.timeout(5000),
     });
-    if (!response.ok) console.error("mirror: webhook", response.status, await response.text());
+    if (!response.ok) {
+      console.error("mirror: webhook", response.status, await response.text());
+      return false;
+    }
+    return true;
   } catch (cause) {
     console.error("mirror: webhook", cause);
+    return false;
   }
 }
 

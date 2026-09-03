@@ -22,7 +22,6 @@ export interface Library {
   /** 레포별 최신 이벤트 (D-012 비정규화). [stale] 판단이 추가 쿼리 없이 된다 */
   latest_event_id: number;
   /** 알림 디바운스 창의 기준점. 쓰기 경로가 이 값 하나로 발송 여부를 정한다 */
-  last_notified_at: string | null;
   /** 멤버 관리·설정·이력 되돌리기를 할 수 있는 단 한 사람 (D-021). null이면 admin만 */
   owner_email: string | null;
   /**
@@ -51,7 +50,7 @@ export function isPublic(library: Library): boolean {
  * 빼고 한 번 더 시도한다. 마이그레이션이 돌면 첫 시도가 그냥 성공한다.
  */
 const BASE_COLUMNS =
-  "id, slug, name, github_repos, mattermost_webhook_url, discord_webhook_url, latest_event_id, last_notified_at, owner_email";
+  "id, slug, name, github_repos, mattermost_webhook_url, discord_webhook_url, latest_event_id, owner_email";
 const OPTIONAL_COLUMNS = ["is_public"];
 const LIBRARY_COLUMNS = [BASE_COLUMNS, ...OPTIONAL_COLUMNS].join(", ");
 

@@ -78,9 +78,6 @@ create table if not exists libraries (
   discord_webhook_url     text,
   -- 최신 이벤트 id 비정규화 (D-012). 갱신은 lib/mirror.ts recordChange 한 곳뿐이다.
   latest_event_id         bigint not null default 0,
-  -- 마지막으로 실제 발송한 시각. 알림 디바운스 창의 기준점이고, 조건부 UPDATE의 CAS 키다.
-  -- null = 아직 한 번도 안 보냄 → 다음 변경이 즉시 나간다.
-  last_notified_at        timestamptz,
   -- 멤버 관리·설정 변경·이력 되돌리기를 할 수 있는 단 한 사람 (D-021). 만든 사람으로 시작한다.
   -- null = 소유자 없음(마지막 멤버가 나가는 등) — 그때는 admin만 손댈 수 있다.
   owner_email             text,
@@ -197,7 +194,8 @@ create table if not exists sync_events (
   changed_paths  text[] not null default '{}',
   deleted_paths  text[] not null default '{}',
   summary        text,                             -- 구조적 요약 (SPEC §8). LLM 아님
-  -- 이 이벤트가 알림에 실려 나간 시각. null = 아직 안 보냄 (디바운스 대기 중).
+  -- 이 이벤트가 알림에 실려 나간 시각. 알림은 편집마다 즉시 나가므로 보통 created_at과
+  -- 거의 같다. null = 붙은 채널이 없었거나 발송이 전부 실패했다 (재발송 장치는 없다).
   -- 델타 피드(doc_changes_since)는 이 값을 보지 않는다 — 커서는 token_cursors가 따로 센다.
   notified_at    timestamptz,
   created_at     timestamptz not null default now()
@@ -330,7 +328,6 @@ create index if not exists request_logs_status_idx on request_logs (status, id d
 alter table libraries add column if not exists discord_webhook_url text;
 alter table libraries add column if not exists latest_event_id bigint not null default 0;
 alter table libraries add column if not exists github_repos text[] not null default '{}';
-alter table libraries add column if not exists last_notified_at timestamptz;
 alter table libraries add column if not exists owner_email text;
 alter table libraries add column if not exists is_public boolean not null default false;
 alter table libraries drop constraint if exists libraries_owner_email_lower;
@@ -352,14 +349,15 @@ update libraries l
 alter table documents add column if not exists updated_by text;
 alter table sync_events add column if not exists notified_at timestamptz;
 
--- 발송 대기분만 훑는 부분 인덱스. 보낸 이벤트는 계속 쌓이지만 이 인덱스는 안 커진다.
--- 컬럼을 참조하므로 반드시 위 add column 뒤다.
+-- 발송에 실패한 이벤트만 남는 부분 인덱스. 지금 이걸 읽는 질의는 없다 — 디바운스를 걷어내며
+-- 대기분 조회가 사라졌다. 재발송이나 묶음을 붙이면 그때 쓸 자리라 남겨 둔다. 정상 상태에서는
+-- 거의 비어 있어 비용이 없다. 컬럼을 참조하므로 반드시 위 add column 뒤다.
 create index if not exists sync_events_pending_idx
   on sync_events (library_id, id) where notified_at is null;
 
--- 이미 있던 이벤트는 발송된 것으로 친다. 안 그러면 배포 후 첫 쓰기가 과거 전부를
--- 한 통에 묶어 쏜다. '1시간 이전'으로 제한하는 건 이 파일을 다시 돌려도 그 사이
--- 대기 중인 알림을 삼키지 않게 하려는 것이다.
+-- 오래된 미발송 이벤트를 발송된 것으로 정리한다. 디바운스가 있던 때는 배포 후 첫 쓰기가
+-- 과거 전부를 한 통에 묶어 쏘는 것을 막는 장치였다. 지금은 편집마다 자기 것만 보내므로
+-- 그 위험은 없고, 남는 효과는 위 부분 인덱스를 비워 두는 것이다.
 update sync_events
    set notified_at = created_at
  where notified_at is null
@@ -399,6 +397,11 @@ alter table sync_events drop column if exists message;           -- note와 summ
 -- 위 record_usage가 이미 2인자 버전으로 바뀌었으므로 쓰는 쪽도 없다.
 alter table usage_hourly drop column if exists in_chars;
 alter table usage_hourly drop column if exists out_chars;
+
+-- 알림 디바운스 창의 기준점이자 CAS 키였다. 디바운스를 걷어내며 읽고 쓰는 코드가 0건이 됐다.
+-- 나중에 묶음을 되살려도 이 칸은 안 쓴다 — 창이 라이브러리 단위였던 게 문제였으므로
+-- 그때 필요한 건 (library, author) 같은 더 좁은 키다.
+alter table libraries drop column if exists last_notified_at;
 
 -- ─────────────────────────────────────────────────────────────
 -- RLS
