@@ -50,7 +50,7 @@ export default async function AdminLogsPage({ searchParams }: PageProps<"/admin/
           </Link>
         }
         title="요청 로그"
-        description="MCP 요청 전체를 보여 주는 화면이에요. 5xx 응답은 그대로 버그라고 보면 되고, 에러 원문은 자르지 않고 전부 보여 줘요."
+        description="MCP 요청 전부예요. 5xx는 곧 버그이고, 에러 원문은 자르지 않아요."
         action={
           <nav aria-label="상태 필터" className="flex shrink-0 gap-1 text-xs">
             {LOG_STATUS_FILTERS.map((item) => (

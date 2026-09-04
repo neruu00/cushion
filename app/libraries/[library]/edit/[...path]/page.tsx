@@ -70,8 +70,7 @@ export default async function EditDocumentPage({ params }: PageProps<"/libraries
       <section className="space-y-2 border-t pt-4">
         <h2 className="text-sm font-medium">삭제</h2>
         <p className="text-sm text-muted-foreground">
-          삭제해도 이전 본문은 이력에 남고, 이력 화면에서 되돌릴 수 있어요. 문서 목록에서만
-          사라져요.
+          이전 본문은 이력에 남아요. 이력 화면에서 되돌릴 수 있어요.
         </p>
         <ConfirmDialog
           trigger="이 문서 삭제"
@@ -84,8 +83,7 @@ export default async function EditDocumentPage({ params }: PageProps<"/libraries
             <>
               <span className="block font-mono text-xs">{doc.path}</span>
               <span className="mt-2 block">
-                본문은 이력에 그대로 남아요. 문서 목록에서만 사라지고, 이력 화면에서 다시
-                되돌릴 수 있어요.
+                본문은 이력에 남아요. 이력 화면에서 되돌릴 수 있어요.
               </span>
             </>
           }

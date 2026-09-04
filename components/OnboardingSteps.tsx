@@ -38,12 +38,8 @@ export function OnboardingSteps({ connectSlot, skillsUrl }: OnboardingStepsProps
       >
         <CopyBlock value="/cushion-use" label="에이전트에게 그대로 보내세요" />
         <p className="text-sm text-muted-foreground">
-          에이전트가 이 프로젝트에 맞는 라이브러리를 <code>git remote</code>로 찾아{" "}
-          <code>AGENTS.md</code>에 적어 둬요. <strong>아직 라이브러리가 없으면</strong> 새로 만들지를
-          먼저 물어봐요.
-          <br />
-          팀원이 이미 <code>AGENTS.md</code>를 커밋해 뒀다면 이 단계는 건너뛰어도 돼요. 그때는
-          ①만 마쳐도 바로 문서를 읽을 수 있어요.
+          에이전트가 <code>git remote</code>로 이 프로젝트에 맞는 라이브러리를 찾아{" "}
+          <code>AGENTS.md</code>에 적어 둬요. 팀원이 이미 커밋해 뒀다면 건너뛰어도 돼요.
         </p>
       </Step>
     </ol>

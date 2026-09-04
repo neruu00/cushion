@@ -66,9 +66,8 @@ export default async function TokensPage() {
         title="access token"
         description={
           <>
-            에이전트가 MCP로 연결할 때 쓰는 값이에요. 권한은 토큰이 아니라 <code>{email}</code>{" "}
-            계정에 붙어 있어서, 라이브러리 멤버에서 빠지면 토큰을 재발급하지 않아도 그 즉시
-            접근이 막혀요.
+            에이전트가 MCP로 연결할 때 쓰는 값이에요. 권한은 토큰이 아니라{" "}
+            <code>{email}</code> 계정을 따라가요.
           </>
         }
       />
@@ -77,9 +76,7 @@ export default async function TokensPage() {
         <CardHeader>
           <CardTitle>연결하는 순서</CardTitle>
           <CardDescription>
-            모두 세 단계예요. ①만 마쳐도 에이전트가 문서를 읽고 쓸 수 있어요. ②는 사용법을 더
-            자세히 알려 주고, ③은 에이전트가 <strong>다음 세션부터 알아서 문서를 찾게</strong>{" "}
-            만들어요.
+            모두 세 단계예요. ①만 마쳐도 에이전트가 문서를 읽고 써요.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -88,12 +85,9 @@ export default async function TokensPage() {
             connectSlot={
               <div className="space-y-2">
                 <p className="text-sm text-muted-foreground">
-                  발급하면 Claude Code와 Antigravity, Codex CLI에 연결하는 스니펫이
-                  클라이언트별로 함께 나와요. 실제로 쓰는 것만 골라서 붙여 넣으면 끝나고, 레포를
-                  클론하거나 서버에 환경변수를 설정할 필요는 없어요. 어느 쪽을 고르든 토큰은 내
-                  컴퓨터의 개인 설정 파일에 평문으로 남아요. 환경변수를 dotfile에 두는 것과 같은
-                  수준이에요. 토큰이 유출되면 바로 재발급하세요. 재발급하는 즉시 이전 토큰은
-                  무효가 돼요.
+                  발급하면 Claude Code · Antigravity · Codex CLI용 스니펫이 함께 나와요. 쓰는
+                  것만 골라 붙여 넣으면 돼요. 토큰은 내 컴퓨터의 설정 파일에 평문으로 남으니,
+                  유출되면 재발급하세요. 이전 토큰은 그 즉시 무효가 돼요.
                 </p>
                 <ActionForm action={createAccessToken} submitLabel="발급" filesLayout="tabs">
                   <Label className="grid gap-1.5">

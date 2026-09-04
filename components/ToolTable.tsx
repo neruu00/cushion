@@ -55,9 +55,8 @@ export function ToolTable() {
         );
       })}
       <p className="text-xs text-muted-foreground">
-        <span className="font-mono">*</span> 표시는 필수 인자를 뜻해요. 이 표는 서버가 실제로
-        알리는 <code>tools/list</code> 응답에서 그대로 생성되기 때문에, 에이전트가 받는 설명과
-        똑같은 문자열이에요.
+        <span className="font-mono">*</span> 는 필수 인자예요. 이 표는 서버의{" "}
+        <code>tools/list</code> 응답에서 그대로 생성돼요.
       </p>
     </div>
   );

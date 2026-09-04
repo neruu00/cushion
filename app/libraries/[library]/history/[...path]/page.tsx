@@ -130,9 +130,7 @@ async function VersionList({ libraryId, slug, docPath, basePath, before }: ViewP
         title="변경 이력"
         description={
           live
-            ? `현재 버전은 ${formatDateTime(live.updated_at)}에 저장됐어요.${
-                live.updated_by ? ` 마지막으로 저장한 사람은 ${live.updated_by}예요.` : ""
-              }`
+            ? `현재 ${formatDateTime(live.updated_at)}${live.updated_by ? ` · ${live.updated_by}` : ""}`
             : "이 문서는 삭제됐어요. 아래에서 되돌릴 수 있어요."
         }
       />
@@ -140,7 +138,7 @@ async function VersionList({ libraryId, slug, docPath, basePath, before }: ViewP
       {versions.length === 0 ? (
         <p className="text-sm text-muted-foreground">
           {before === null
-            ? "아직 이력이 없어요. 처음 저장된 뒤 한 번도 바뀌지 않았다는 뜻이에요."
+            ? "아직 이력이 없어요. 처음 저장된 뒤로 바뀌지 않았어요."
             : "이 뒤로는 더 남은 기록이 없어요."}
         </p>
       ) : (
@@ -173,8 +171,7 @@ async function VersionList({ libraryId, slug, docPath, basePath, before }: ViewP
 
       {/* 되돌리기는 덮어쓰기가 아니라 새 저장이다 — 그 사실이 화면에도 보여야 한다 */}
       <p className="border-t pt-4 text-xs text-muted-foreground">
-        되돌려도 지금 내용이 사라지지는 않아요. 현재 내용을 이력에 남긴 다음 그 위에 새로
-        저장해요.
+        되돌려도 지금 내용은 이력에 남아요.
       </p>
     </PageShell>
   );
@@ -254,8 +251,7 @@ async function VersionDetail({
                     <span className="mt-1 block">&ldquo;{version.note}&rdquo;</span>
                   ) : null}
                   <span className="mt-2 block">
-                    되돌려도 지금 내용이 사라지지는 않아요. 현재 내용을 이력에 남긴 다음 그 위에
-                    새로 저장해요.
+                    되돌려도 지금 내용은 이력에 남아요.
                   </span>
                 </>
               }
