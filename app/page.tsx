@@ -29,13 +29,16 @@ export default async function LandingPage() {
     <PageShell className="space-y-12 py-14">
       <section className="space-y-5">
         <h1 className="text-3xl font-semibold leading-tight">에이전트를 위한 문서 도서관.</h1>
-        <p className="max-w-xl text-muted-foreground">
+        {/* break-keep = word-break: keep-all. 한국어는 기본값이 글자 단위로 끊겨서
+            "에이전트가 MCP로 필요한 조각" 같은 어절이 아무 데서나 잘린다.
+            keep-all이면 공백에서만 끊어져 어절이 붙어 다닌다 */}
+        <p className="max-w-xl break-keep text-muted-foreground">
           스펙과 ADR, 런북, 회의록, 용어집처럼 흩어지기 쉬운 프로젝트 문서를 한곳에 모아 두면,
           에이전트가 MCP로 <strong className="text-foreground">필요한 조각만</strong> 읽고 써요.
           사람이 아니라 에이전트를 1차 독자로 삼아서 설계한 문서 저장소예요. 같은 문서를 세션마다
           통째로 다시 싣느라 소모하는 토큰을 줄이는 것이 Cushion의 유일한 목적이에요.
         </p>
-        <p className="max-w-xl text-sm text-muted-foreground">
+        <p className="max-w-xl break-keep text-sm text-muted-foreground">
           Cushion 자신의 문서로 측정해 보면, 문서 전체를 한꺼번에 불러올 때와 비교해서 토큰
           사용량이 <strong className="text-foreground">20% 미만</strong>으로 줄어들어요. 5배 이상
           절감되는 셈이에요.
@@ -57,14 +60,6 @@ export default async function LandingPage() {
             <BookOpen /> 문서 보기
           </Button>
         </div>
-        <p className="text-xs text-muted-foreground">
-          로그인하면 바로 라이브러리를 만들 수 있어요. 라이브러리에 담긴 내용은 멤버만 열람할 수
-          있지만, 사용법을 설명하는{" "}
-          <Link href="/docs" className="underline underline-offset-4">
-            문서
-          </Link>
-          는 로그인하지 않아도 읽을 수 있어요.
-        </p>
       </section>
 
       <section className="space-y-1">
