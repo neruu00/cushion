@@ -33,15 +33,13 @@ export default async function LandingPage() {
             "에이전트가 MCP로 필요한 조각" 같은 어절이 아무 데서나 잘린다.
             keep-all이면 공백에서만 끊어져 어절이 붙어 다닌다 */}
         <p className="max-w-xl break-keep text-muted-foreground">
-          스펙과 ADR, 런북, 회의록, 용어집처럼 흩어지기 쉬운 프로젝트 문서를 한곳에 모아 두면,
-          에이전트가 MCP로 <strong className="text-foreground">필요한 조각만</strong> 읽고 써요.
-          사람이 아니라 에이전트를 1차 독자로 삼아서 설계한 문서 저장소예요. 같은 문서를 세션마다
-          통째로 다시 싣느라 소모하는 토큰을 줄이는 것이 Cushion의 유일한 목적이에요.
+          스펙과 ADR, 런북, 회의록을 한곳에 모아 두면 에이전트가 MCP로{" "}
+          <strong className="text-foreground">필요한 조각만</strong> 읽고 써요. 같은 문서를
+          세션마다 다시 싣느라 소모하는 토큰을 줄이는 것이 목적이에요.
         </p>
         <p className="max-w-xl break-keep text-sm text-muted-foreground">
-          Cushion 자신의 문서로 측정해 보면, 문서 전체를 한꺼번에 불러올 때와 비교해서 토큰
-          사용량이 <strong className="text-foreground">20% 미만</strong>으로 줄어들어요. 5배 이상
-          절감되는 셈이에요.
+          자체 문서로 측정 해보면 전부 불러올 때보다 토큰을{" "}
+          <strong className="text-foreground">5배 이상</strong> 아껴요.
         </p>
 
         <div className="flex flex-wrap items-center gap-3">
@@ -65,8 +63,7 @@ export default async function LandingPage() {
       <section className="space-y-1">
         <CushionDrop />
         <p className="text-center text-xs text-muted-foreground">
-          쿠션은 떨어지는 것을 튕겨내지 않고 푹 꺼지면서 받아내요. 에이전트가 컨텍스트에 실어야
-          하는 토큰도 Cushion이 그렇게 받아 줘요.
+          에이전트가 컨텍스트에 실어야 하는 토큰을 쿠션처럼 받아 내요.
         </p>
       </section>
     </PageShell>

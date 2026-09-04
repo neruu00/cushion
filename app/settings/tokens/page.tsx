@@ -85,9 +85,8 @@ export default async function TokensPage() {
             connectSlot={
               <div className="space-y-2">
                 <p className="text-sm text-muted-foreground">
-                  발급하면 Claude Code · Antigravity · Codex CLI용 스니펫이 함께 나와요. 쓰는
-                  것만 골라 붙여 넣으면 돼요. 토큰은 내 컴퓨터의 설정 파일에 평문으로 남으니,
-                  유출되면 재발급하세요. 이전 토큰은 그 즉시 무효가 돼요.
+                  발급하면 Claude Code · Antigravity · Codex CLI용 스니펫이 나와요. 쓰는 것만
+                  골라 붙여 넣으세요. 토큰은 설정 파일에 평문으로 남으니 유출되면 재발급하세요.
                 </p>
                 <ActionForm action={createAccessToken} submitLabel="발급" filesLayout="tabs">
                   <Label className="grid gap-1.5">
