@@ -5,7 +5,13 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { antigravityConfig, codexConfig, codexEnvExport, connectCommand } from "./snippets.ts";
+import {
+  antigravityConfig,
+  codexConfig,
+  codexEnvExport,
+  connectCommand,
+  pluginCommands,
+} from "./snippets.ts";
 
 test("연결 명령은 한 줄이다", () => {
   // 백슬래시 줄바꿈은 PowerShell·cmd에서 깨진다. 여러 줄로 만드는 순간
@@ -50,4 +56,16 @@ test("Codex 설정은 토큰을 파일에 박지 않고 환경변수 이름만 �
   assert.ok(config.includes('bearer_token_env_var = "CUSHION_TOKEN"'));
   assert.ok(!config.includes("cshn_pat_"));
   assert.ok(codexEnvExport("cshn_pat_abc").includes('export CUSHION_TOKEN="cshn_pat_abc"'));
+});
+
+test("플러그인 두 줄에는 토큰이 없다", () => {
+  // `plugin install`이 설치 중에 물어보므로 스니펫에 토큰을 실을 자리가 없다.
+  // 실리는 순간 이 경로의 유일한 이점(평문으로 안 남는다)이 사라진다.
+  const lines = pluginCommands().trim().split("\n");
+
+  assert.equal(lines.length, 2);
+  assert.ok(!pluginCommands().includes("cshn_pat_"));
+  assert.ok(lines[0].startsWith("/plugin marketplace add "));
+  // 마켓플레이스 이름과 플러그인 이름이 둘 다 `cushion`이라 `cushion@cushion`이다.
+  assert.equal(lines[1], "/plugin install cushion@cushion");
 });

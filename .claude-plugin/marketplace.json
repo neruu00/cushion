@@ -1,0 +1,12 @@
+{
+  "name": "cushion",
+  "owner": { "name": "JaeHyeon, Woo", "url": "https://github.com/neruu00" },
+  "description": "Cushion — 에이전트용 문서 도서관",
+  "plugins": [
+    {
+      "name": "cushion",
+      "source": "./",
+      "description": "문서를 MCP로 조각 단위로 읽고 쓴다. 스킬 7개 + 원격 MCP 서버를 함께 설치한다."
+    }
+  ]
+}

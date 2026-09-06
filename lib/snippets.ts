@@ -20,6 +20,25 @@ export function skillsUrl(): string {
   return `${baseUrl()}/api/skills`;
 }
 
+/**
+ * Claude Code 플러그인 저장소. 마켓플레이스는 배포 도메인이 아니라 **GitHub 레포**에서
+ * 오므로 `baseUrl()`로 만들 수 없는 유일한 스니펫이다. 레포를 옮기면 여기도 옮긴다.
+ * 매니페스트는 `.claude-plugin/`에 있다.
+ */
+const PLUGIN_REPO = "neruu00/cushion";
+
+/**
+ * Claude Code 플러그인 설치. 이 두 줄이 아래 ①(연결)과 ②(스킬 설치)를 한꺼번에 한다 —
+ * 플러그인이 MCP 서버 설정과 스킬 전부를 함께 들고 오기 때문이다.
+ *
+ * **여기엔 토큰을 넣지 않는다.** `plugin install`이 설치 중에 물어보고 Claude Code의
+ * 보안 저장소에 넣으므로 평문 설정 파일에 남지 않는다 — `connectCommand`보다
+ * 이쪽이 안전한 이유고, 그래서 발급 직후가 아니어도 화면에 그냥 둘 수 있다.
+ */
+export function pluginCommands(): string {
+  return `/plugin marketplace add ${PLUGIN_REPO}\n/plugin install cushion@cushion\n`;
+}
+
 export function connectCommand(token: string): string {
   return `claude mcp add --transport http --scope user cushion ${baseUrl()}/api/mcp --header "Authorization: Bearer ${token}"\n`;
 }
