@@ -1,6 +1,6 @@
 {
   "name": "cushion",
-  "description": "에이전트를 1차 독자로 삼은 문서 도서관. MCP로 스펙·ADR·런북을 조각 단위로 읽고 쓴다.",
+  "description": "A documentation library whose first reader is an agent. Read and write specs, ADRs and runbooks a piece at a time over MCP.",
   "version": "0.1.0",
   "author": { "name": "JaeHyeon, Woo", "url": "https://github.com/neruu00" },
   "homepage": "https://cushion-archive.vercel.app/docs/install",
@@ -11,7 +11,7 @@
     "token": {
       "type": "string",
       "title": "Cushion access token",
-      "description": "https://cushion-archive.vercel.app/settings/tokens 에서 발급한 cshn_pat_ 토큰",
+      "description": "A cshn_pat_ token issued at https://cushion-archive.vercel.app/settings/tokens",
       "sensitive": true,
       "required": true
     }

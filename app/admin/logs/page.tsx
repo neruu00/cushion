@@ -19,6 +19,8 @@ import {
   type LogStatusFilter,
 } from "@/lib/logs.db";
 import { cn } from "@/lib/utils";
+import { getDict } from "@/lib/i18n";
+import { fill } from "@/lib/utils";
 
 const PAGE_SIZE = 200;
 
@@ -39,20 +41,26 @@ export default async function AdminLogsPage({ searchParams }: PageProps<"/admin/
   const beforeRaw = Number(params.before);
   const before = Number.isInteger(beforeRaw) && beforeRaw > 0 ? beforeRaw : undefined;
 
-  const logs = await getRequestLogs({ status: filter, before, limit: PAGE_SIZE });
+  const dict = await getDict();
+  const t = dict.admin;
+  const logs = await getRequestLogs({
+    status: filter,
+    before,
+    limit: PAGE_SIZE,
+  });
 
   return (
     <PageShell className="space-y-6">
       <PageHeader
         breadcrumb={
           <Link href="/admin" className="hover:underline">
-            관리
+            {t.title}
           </Link>
         }
-        title="요청 로그"
-        description="MCP 요청 전부예요. 5xx는 곧 버그이고, 에러 원문은 자르지 않아요."
+        title={t.logsTitle}
+        description={t.logsDescription}
         action={
-          <nav aria-label="상태 필터" className="flex shrink-0 gap-1 text-xs">
+          <nav aria-label={t.filterLabel} className="flex shrink-0 gap-1 text-xs">
             {LOG_STATUS_FILTERS.map((item) => (
               <Link
                 key={item.value}
@@ -65,7 +73,9 @@ export default async function AdminLogsPage({ searchParams }: PageProps<"/admin/
                     : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
                 )}
               >
-                {item.label}
+                {item.label in dict.logs
+                  ? dict.logs[item.label as keyof typeof dict.logs]
+                  : item.label}
               </Link>
             ))}
           </nav>
@@ -74,7 +84,7 @@ export default async function AdminLogsPage({ searchParams }: PageProps<"/admin/
 
       {logs.length === 0 ? (
         <p className="rounded-lg border border-dashed px-4 py-10 text-center text-sm text-muted-foreground">
-          {before ? "여기가 마지막이에요." : "이 조건에 해당하는 로그가 없어요."}
+          {before ? t.logsEnd : t.logsNoMatch}
         </p>
       ) : (
         <>
@@ -86,7 +96,7 @@ export default async function AdminLogsPage({ searchParams }: PageProps<"/admin/
                 href={href(filter, logs[logs.length - 1].id)}
                 className="text-muted-foreground underline underline-offset-4 hover:text-foreground"
               >
-                이전 {PAGE_SIZE}건 더 보기
+                {fill(t.logsOlder, { count: PAGE_SIZE })}
               </Link>
             </p>
           )}

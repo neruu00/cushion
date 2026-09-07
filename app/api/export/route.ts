@@ -11,6 +11,7 @@
 import type { NextRequest } from "next/server";
 
 import { getAccessibleLibraries, getSessionEmail, identityFromAccessToken } from "@/lib/authz";
+import { getDict } from "@/lib/i18n";
 import { supabase } from "@/lib/supabase";
 
 const SEPARATOR = "=".repeat(70);
@@ -22,7 +23,10 @@ export async function GET(request: NextRequest): Promise<Response> {
   if (!email) return new Response("unauthorized", { status: 401 });
 
   const repos = await getAccessibleLibraries(email);
-  if (repos.length === 0) return new Response("접근할 수 있는 문서가 없어요.\n", { status: 200 });
+  if (repos.length === 0) {
+    // 브라우저로 받는 사람도 이 파일을 그대로 읽는다 — 다른 응답과 달리 사람의 언어로 낸다
+    return new Response(`${(await getDict()).export.empty}\n`, { status: 200 });
+  }
 
   const { data, error } = await supabase
     .from("documents")

@@ -17,15 +17,19 @@ import { formatDate } from "@/lib/datetime";
 import { PageShell } from "@/components/PageShell";
 import { Markdown } from "@/components/Markdown";
 import { getReadableLibrary, getSessionEmail } from "@/lib/authz";
+import { getDict } from "@/lib/i18n";
 import { baseNameOf, breadcrumbs, dirOf } from "@/lib/docpath";
 import { supabase } from "@/lib/supabase";
 
 /** 링크를 아는 사람만 보는 것이지 검색으로 찾는 것이 아니다 (D-024). */
 export const metadata: Metadata = { robots: { index: false, follow: false } };
 
-export default async function DocumentPage({ params }: PageProps<"/libraries/[library]/[...path]">) {
+export default async function DocumentPage({
+  params,
+}: PageProps<"/libraries/[library]/[...path]">) {
   const { library: slug, path } = await params;
   const docPath = path.join("/");
+  const t = (await getDict()).doc;
 
   const email = await getSessionEmail();
   const view = await getReadableLibrary(email, slug);
@@ -34,7 +38,9 @@ export default async function DocumentPage({ params }: PageProps<"/libraries/[li
   // 로그인했는데도 못 보면 그때는 404다(존재를 알려주지 않는다).
   if (!view) {
     if (!email) {
-      redirect(`/api/auth/signin?callbackUrl=${encodeURIComponent(`/libraries/${slug}/${docPath}`)}`);
+      redirect(
+        `/api/auth/signin?callbackUrl=${encodeURIComponent(`/libraries/${slug}/${docPath}`)}`,
+      );
     }
     notFound();
   }
@@ -89,13 +95,13 @@ export default async function DocumentPage({ params }: PageProps<"/libraries/[li
                 href={`/libraries/${library.slug}/edit/${doc.path}`}
                 className="inline-flex items-center gap-1 underline underline-offset-4 hover:text-foreground"
               >
-                편집 <Pencil className="size-3" />
+                {t.edit} <Pencil className="size-3" />
               </Link>
               <Link
                 href={`/libraries/${library.slug}/history/${doc.path}`}
                 className="inline-flex items-center gap-1 underline underline-offset-4 hover:text-foreground"
               >
-                이력 <History className="size-3" />
+                {t.history} <History className="size-3" />
               </Link>
             </>
           )}
@@ -106,7 +112,7 @@ export default async function DocumentPage({ params }: PageProps<"/libraries/[li
               target="_blank"
               rel="noreferrer"
             >
-              관련 GitHub 레포 <ExternalLink className="size-3" />
+              {t.sourceRepo} <ExternalLink className="size-3" />
             </a>
           ) : null}
         </div>

@@ -22,6 +22,8 @@ import { ChevronRight } from "lucide-react";
 import { RowCard } from "@/components/RowCard";
 import { formatDate } from "@/lib/datetime";
 import { buildTree, type DirNode, type DocNode } from "@/lib/docpath";
+import { getDict } from "@/lib/i18n";
+import { fill } from "@/lib/utils";
 
 /** 목록이 실제로 그리는 것만. 본문은 절약 추정에만 쓰고 여기 오지 않는다 */
 interface TreeDocument {
@@ -35,8 +37,10 @@ interface DocumentTreeProps {
   documents: TreeDocument[];
 }
 
-export function DocumentTree({ librarySlug, documents }: DocumentTreeProps) {
+export async function DocumentTree({ librarySlug, documents }: DocumentTreeProps) {
   const tree = buildTree(documents);
+  // 재귀 컴포넌트라 문구를 인자로 내린다 — 깊이마다 사전을 다시 읽을 이유가 없다
+  const countLabel = (await getDict()).library.documentCount;
 
   return (
     <div className="space-y-3">
@@ -44,7 +48,12 @@ export function DocumentTree({ librarySlug, documents }: DocumentTreeProps) {
           아래로 밀리면 매번 스크롤이 된다 */}
       <DocumentRows librarySlug={librarySlug} docs={tree.docs} />
       {tree.dirs.map((dir) => (
-        <DirectoryGroup key={dir.path} librarySlug={librarySlug} dir={dir} />
+        <DirectoryGroup
+          key={dir.path}
+          librarySlug={librarySlug}
+          dir={dir}
+          countLabel={countLabel}
+        />
       ))}
     </div>
   );
@@ -78,9 +87,11 @@ function DocumentRows({ librarySlug, docs }: DocumentRowsProps) {
 interface DirectoryGroupProps {
   librarySlug: string;
   dir: DirNode<TreeDocument>;
+  /** `{count}` 자리표시자를 쓴 사전 문자열 */
+  countLabel: string;
 }
 
-function DirectoryGroup({ librarySlug, dir }: DirectoryGroupProps) {
+function DirectoryGroup({ librarySlug, dir, countLabel }: DirectoryGroupProps) {
   return (
     // 중첩은 카드 안의 카드로 표현한다 — 깊이마다 여백 규칙을 따로 두지 않아도 된다
     <details id={`dir-${dir.path}`} open className="group scroll-mt-4 rounded-lg border">
@@ -89,12 +100,19 @@ function DirectoryGroup({ librarySlug, dir }: DirectoryGroupProps) {
           <ChevronRight className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-90" />
           <span className="truncate font-mono text-sm">{dir.name}/</span>
         </span>
-        <span className="shrink-0 text-xs text-muted-foreground">문서 {dir.count}</span>
+        <span className="shrink-0 text-xs text-muted-foreground">
+          {fill(countLabel, { count: dir.count })}
+        </span>
       </summary>
       <div className="space-y-2 border-t p-2">
         <DocumentRows librarySlug={librarySlug} docs={dir.docs} />
         {dir.dirs.map((child) => (
-          <DirectoryGroup key={child.path} librarySlug={librarySlug} dir={child} />
+          <DirectoryGroup
+            key={child.path}
+            librarySlug={librarySlug}
+            dir={child}
+            countLabel={countLabel}
+          />
         ))}
       </div>
     </details>

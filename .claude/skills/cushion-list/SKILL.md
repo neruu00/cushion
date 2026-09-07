@@ -1,28 +1,31 @@
 ---
 name: cushion-list
-description: 접근 가능한 Cushion 라이브러리(문서 묶음) 목록을 보여준다. 사용자가 /cushion-list 로 부를 때만.
+description: Show the Cushion libraries (document bundles) you can reach. Only when the user asks with /cushion-list.
 ---
 
-# 접근 가능한 문서 라이브러리
+# Document libraries you can reach
 
 ```
 doc_outline(depth:"libraries")
 ```
 
-`depth`를 빼면 전 문서의 `##` 헤딩까지 딸려 온다 — 목록을 물었지 목차를 물은 게 아니다.
+Leave `depth` off and you drag in the `##` headings of every document — they asked for a
+list, not an outline.
 
-응답은 한 줄에 하나씩 이렇게 온다:
+The response comes back one per line, like this:
 
 ```
-cushion — Cushion 문서 (neruu00/cushion) · 문서 2
-design-system — 디자인 시스템 (acme/*) · 문서 0
+cushion — Cushion docs (neruu00/cushion) · 2 docs
+design-system — Design system (acme/*) · 0 docs
 ```
 
-거의 그대로 내면 된다. 앞에 `- `만 붙이고, 손대지 않는다.
+Pass it through almost as is. Add a leading `- ` and leave the rest alone.
 
-- `acme/*`는 그 조직 전체가 이 라이브러리를 본다는 뜻이다. 풀어 쓰지 말 것
-- `접근 가능한 라이브러리가 없다`가 오면 그대로 전하고, `library_create`로 만들 수 있다고 한 줄 덧붙인다
-- 툴이 없으면 MCP가 안 붙은 것이다. 먼저 `claude mcp list`로 확인해 원인(미등록인지 401인지)을
-  말해 주고, `/settings/tokens`에서 연결 명령을 받으라고 안내한다
+- `acme/*` means that whole organisation uses this library. Do not expand it
+- If you get `No libraries you can reach`, relay that and add one line saying
+  `library_create` makes one
+- No tools at all means MCP is not connected. Check with `claude mcp list` first, say which
+  it is (not registered, or a 401), and point them at `/settings/tokens` for the connect
+  command
 
-목록 외에 다른 말을 덧붙이지 않는다.
+Do not add anything beyond the list.

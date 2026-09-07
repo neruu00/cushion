@@ -8,7 +8,9 @@
  *
  * 인자도 `inputSchema`에서 뽑는다. 필수 인자는 굵게 표시한다.
  */
+import { getDict } from "@/lib/i18n";
 import { TOOLS } from "@/lib/mcp";
+import { fill } from "@/lib/utils";
 
 /**
  * `TOOLS`는 `as const`라 readonly 튜플이다. JSON Schema를 좁게 타이핑하면
@@ -19,7 +21,9 @@ interface ToolSchema {
   required?: readonly string[];
 }
 
-export function ToolTable() {
+export async function ToolTable() {
+  const t = await getDict();
+
   return (
     <div className="space-y-4">
       {TOOLS.map((tool) => {
@@ -41,7 +45,7 @@ export function ToolTable() {
                     <dt className="font-mono">
                       {name}
                       {required.has(name) && (
-                        <span className="ml-1 text-muted-foreground" title="필수">
+                        <span className="ml-1 text-muted-foreground" title={t.common.required}>
                           *
                         </span>
                       )}
@@ -54,9 +58,9 @@ export function ToolTable() {
           </div>
         );
       })}
+      {/* 문장 안의 `*`와 `tools/list`가 코드 조각이라 자리표시자로 끼운다 */}
       <p className="text-xs text-muted-foreground">
-        <span className="font-mono">*</span> 는 필수 인자예요. 이 표는 서버의{" "}
-        <code>tools/list</code> 응답에서 그대로 생성돼요.
+        {fill(t.form.toolsRequired, { marker: "*", endpoint: "tools/list" })}
       </p>
     </div>
   );

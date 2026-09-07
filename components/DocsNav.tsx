@@ -14,18 +14,24 @@
 import Link from "next/link";
 import { useSelectedLayoutSegment } from "next/navigation";
 
-import { DOCS_PAGES, docsIndexOf } from "@/lib/docs";
+import { docsIndexOf, type DocsPage } from "@/lib/docs";
 import { cn } from "@/lib/utils";
 
-export function DocsNav() {
+interface DocsNavProps {
+  /** 요청 언어로 채워진 목차. 문구 선택은 서버가 하고 여기는 현재 위치만 안다 */
+  pages: DocsPage[];
+  label: string;
+}
+
+export function DocsNav({ pages, label }: DocsNavProps) {
   const current = docsIndexOf(useSelectedLayoutSegment());
 
   return (
     // 모바일은 가로 칩 한 줄이다. 세로로 쌓으면 목차 4개가 첫 화면을 다 차지해서
     // 본문이 스크롤 밑으로 밀린다. summary도 모바일에서는 접는다 — 칩이 문장이 되면 줄이 넘친다.
-    <nav aria-label="문서 목차">
+    <nav aria-label={label}>
       <ul className="flex gap-1.5 overflow-x-auto pb-1 md:block md:space-y-1 md:pb-0">
-        {DOCS_PAGES.map((page, index) => {
+        {pages.map((page, index) => {
           const active = index === current;
           return (
             <li key={page.href} className="shrink-0">

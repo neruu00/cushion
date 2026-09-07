@@ -26,6 +26,8 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { DiffView } from "@/components/DiffView";
 import { VersionCard, type VersionSummary } from "@/components/VersionCard";
 import { getMemberLibrary, getSessionEmail, isAdmin } from "@/lib/authz";
+import { getDict } from "@/lib/i18n";
+import { fill } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 
 /** 한 쪽에 실을 버전 수. 본문을 안 읽으므로 넉넉해도 가볍다 */
@@ -41,7 +43,9 @@ export default async function HistoryPage({
 
   const email = await getSessionEmail();
   if (!email) {
-    redirect(`/api/auth/signin?callbackUrl=${encodeURIComponent(`/libraries/${slug}/history/${docPath}`)}`);
+    redirect(
+      `/api/auth/signin?callbackUrl=${encodeURIComponent(`/libraries/${slug}/history/${docPath}`)}`,
+    );
   }
 
   const library = await getMemberLibrary(email, slug);
@@ -94,7 +98,13 @@ interface ViewProps {
 }
 
 /** 목록 — 본문을 읽지 않는다 */
-async function VersionList({ libraryId, slug, docPath, basePath, before }: ViewProps & { before: number | null }) {
+async function VersionList({
+  libraryId,
+  slug,
+  docPath,
+  basePath,
+  before,
+}: ViewProps & { before: number | null }) {
   // `content`를 고르지 않는 게 이 화면 경량화의 전부다. 컬럼 하나를 되살리는 순간
   // 목록이 다시 수백 KB가 된다.
   let listQuery = supabase
@@ -117,6 +127,8 @@ async function VersionList({ libraryId, slug, docPath, basePath, before }: ViewP
       .maybeSingle(),
   ]);
 
+  const t = (await getDict()).history;
+
   if (history.error) console.error("HistoryPage: list", history.error);
   const rows: VersionSummary[] = history.data ?? [];
   const versions = rows.slice(0, PAGE_SIZE);
@@ -127,19 +139,21 @@ async function VersionList({ libraryId, slug, docPath, basePath, before }: ViewP
     <PageShell className="space-y-6">
       <PageHeader
         breadcrumb={<Breadcrumb slug={slug} docPath={docPath} live={!!live} />}
-        title="변경 이력"
+        title={t.title}
         description={
           live
-            ? `현재 ${formatDateTime(live.updated_at)}${live.updated_by ? ` · ${live.updated_by}` : ""}`
-            : "이 문서는 삭제됐어요. 아래에서 되돌릴 수 있어요."
+            ? fill(t.current, {
+                when: `${formatDateTime(live.updated_at)}${
+                  live.updated_by ? ` · ${live.updated_by}` : ""
+                }`,
+              })
+            : t.deleted
         }
       />
 
       {versions.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          {before === null
-            ? "아직 이력이 없어요. 처음 저장된 뒤로 바뀌지 않았어요."
-            : "이 뒤로는 더 남은 기록이 없어요."}
+          {before === null ? t.emptyFirst : t.emptyEnd}
         </p>
       ) : (
         <ul className="divide-y rounded-lg border">
@@ -153,8 +167,11 @@ async function VersionList({ libraryId, slug, docPath, basePath, before }: ViewP
 
       <div className="flex justify-between text-sm">
         {before !== null ? (
-          <Link href={basePath} className="text-muted-foreground underline underline-offset-4 hover:text-foreground">
-            처음으로
+          <Link
+            href={basePath}
+            className="text-muted-foreground underline underline-offset-4 hover:text-foreground"
+          >
+            {t.first}
           </Link>
         ) : (
           <span />
@@ -164,15 +181,13 @@ async function VersionList({ libraryId, slug, docPath, basePath, before }: ViewP
             href={`${basePath}?before=${nextCursor}`}
             className="text-muted-foreground underline underline-offset-4 hover:text-foreground"
           >
-            이전 기록 더보기
+            {t.older}
           </Link>
         ) : null}
       </div>
 
       {/* 되돌리기는 덮어쓰기가 아니라 새 저장이다 — 그 사실이 화면에도 보여야 한다 */}
-      <p className="border-t pt-4 text-xs text-muted-foreground">
-        되돌려도 지금 내용은 이력에 남아요.
-      </p>
+      <p className="border-t pt-4 text-xs text-muted-foreground">{t.restoreNote}</p>
     </PageShell>
   );
 }
@@ -194,6 +209,8 @@ async function VersionDetail({
     .eq("library_id", libraryId)
     .eq("path", docPath)
     .maybeSingle();
+
+  const t = (await getDict()).history;
 
   if (error) console.error("HistoryPage: detail", error);
   if (!version) notFound();
@@ -239,9 +256,9 @@ async function VersionDetail({
         action={
           isOwner ? (
             <ConfirmDialog
-              trigger="이 버전으로 되돌리기"
-              title="이 버전으로 되돌릴까요?"
-              confirmLabel="되돌리기"
+              trigger={t.restoreTrigger}
+              title={t.restoreConfirmTitle}
+              confirmLabel={t.restoreConfirmLabel}
               description={
                 <>
                   <span className="block font-mono text-xs">
@@ -250,9 +267,7 @@ async function VersionDetail({
                   {version.note ? (
                     <span className="mt-1 block">&ldquo;{version.note}&rdquo;</span>
                   ) : null}
-                  <span className="mt-2 block">
-                    되돌려도 지금 내용은 이력에 남아요.
-                  </span>
+                  <span className="mt-2 block">{t.restoreNote}</span>
                 </>
               }
               triggerSize="sm"
@@ -272,7 +287,7 @@ async function VersionDetail({
         href={basePath}
         className="inline-flex items-center gap-1 text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
       >
-        <ArrowLeft className="size-3" /> 이력 목록
+        <ArrowLeft className="size-3" /> {t.backToList}
       </Link>
 
       <div className="rounded-lg border">
@@ -282,7 +297,7 @@ async function VersionDetail({
       {/* diff가 상한에 걸려 생략될 때 전문이 유일한 수단이다 — 그래서 남겨 둔다 */}
       <details className="rounded-lg border">
         <summary className="cursor-pointer px-3 py-2 text-xs text-muted-foreground">
-          이 버전의 전문 보기 ({version.content.split("\n").length}줄)
+          {fill(t.showFull, { count: version.content.split("\n").length })}
         </summary>
         <pre className="max-h-96 overflow-auto border-t px-3 py-2 font-mono text-xs leading-relaxed">
           {version.content}

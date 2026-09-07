@@ -13,19 +13,23 @@ import type { Metadata } from "next";
 
 import { DocsNav } from "@/components/DocsNav";
 import { PageShell } from "@/components/PageShell";
+import { docsPages } from "@/lib/docs";
+import { getDict } from "@/lib/i18n";
 
-export const metadata: Metadata = {
-  title: { template: "%s · Cushion 문서", default: "Cushion 문서" },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = (await getDict()).meta;
+  return {
+    title: { template: t.docsTitleTemplate, default: t.docsTitleDefault },
+  };
+}
 
-export default function DocsLayout({ children }: LayoutProps<"/docs">) {
+export default async function DocsLayout({ children }: LayoutProps<"/docs">) {
+  const t = (await getDict()).docsNav;
+
   return (
     <PageShell className="grid gap-x-10 gap-y-6 md:grid-cols-[12rem_minmax(0,1fr)] md:items-start">
-      <aside
-        style={{ viewTransitionName: "docs-sidebar" }}
-        className="md:sticky md:top-8"
-      >
-        <DocsNav />
+      <aside style={{ viewTransitionName: "docs-sidebar" }} className="md:sticky md:top-8">
+        <DocsNav pages={docsPages(t)} label={t.label} />
       </aside>
       <div className="min-w-0">{children}</div>
     </PageShell>

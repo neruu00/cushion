@@ -15,18 +15,27 @@ import { signInWithGoogle, signOutEverywhere } from "@/actions/session";
 import { SignInButton } from "@/components/SignInButton";
 import { UserMenu } from "@/components/UserMenu";
 import { getSessionEmail, isAdminEmail } from "@/lib/authz";
+import { getDict } from "@/lib/i18n";
 
 export async function SessionNav() {
   const email = await getSessionEmail();
+  const t = await getDict();
 
   if (!email) {
     return (
       <form action={signInWithGoogle}>
-        <SignInButton />
+        <SignInButton t={t.common} />
       </form>
     );
   }
 
   // 관리 링크가 메뉴 안에 보이는 것과 들어갈 수 있는 것은 별개다. 실제 판정은 각 페이지가 한다
-  return <UserMenu email={email} isAdmin={isAdminEmail(email)} signOutAction={signOutEverywhere} />;
+  return (
+    <UserMenu
+      email={email}
+      isAdmin={isAdminEmail(email)}
+      signOutAction={signOutEverywhere}
+      t={{ ...t.nav, signOut: t.common.signOut }}
+    />
+  );
 }

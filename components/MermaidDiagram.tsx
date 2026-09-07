@@ -14,16 +14,17 @@
  */
 import { useEffect, useId, useRef, useState } from "react";
 
+import { useUiCopy } from "@/components/UiCopyProvider";
+
 interface MermaidDiagramProps {
   code: string;
 }
 
 type RenderState =
-  | { status: "loading" }
-  | { status: "done" }
-  | { status: "error"; message: string };
+  { status: "loading" } | { status: "done" } | { status: "error"; message: string };
 
 export function MermaidDiagram({ code }: MermaidDiagramProps) {
+  const { form } = useUiCopy();
   const containerRef = useRef<HTMLDivElement>(null);
   const [state, setState] = useState<RenderState>({ status: "loading" });
   // useId는 렌더마다 안정적이고 SSR과도 어긋나지 않는다 — mermaid는 id별로 내부 캐시를 쓴다.
@@ -37,7 +38,10 @@ export function MermaidDiagram({ code }: MermaidDiagramProps) {
       try {
         // 앱에 다크모드 토글이 없다(SPEC §9) — OS 설정을 그대로 따른다.
         const prefersDark = window.matchMedia?.("(prefers-color-scheme: dark)").matches;
-        mermaid.initialize({ startOnLoad: false, theme: prefersDark ? "dark" : "default" });
+        mermaid.initialize({
+          startOnLoad: false,
+          theme: prefersDark ? "dark" : "default",
+        });
 
         const { svg } = await mermaid.render(`mermaid-${id}`, code);
         if (cancelled) return;
@@ -47,7 +51,7 @@ export function MermaidDiagram({ code }: MermaidDiagramProps) {
         if (!cancelled) {
           setState({
             status: "error",
-            message: error instanceof Error ? error.message : "다이어그램을 그리지 못했어요",
+            message: error instanceof Error ? error.message : form.diagramFailed,
           });
         }
       }
@@ -56,14 +60,14 @@ export function MermaidDiagram({ code }: MermaidDiagramProps) {
     return () => {
       cancelled = true;
     };
-  }, [code, id]);
+  }, [code, id, form.diagramFailed]);
 
   if (state.status === "error") {
     // 문법이 틀려도 페이지 전체를 죽이지 않는다 — 원본 코드를 그대로 보여준다.
     return (
       <div className="not-prose space-y-2 rounded-lg border border-dashed p-3">
         <p className="text-xs text-muted-foreground">
-          다이어그램을 그리지 못했어요: {state.message}
+          {form.diagramFailed}: {state.message}
         </p>
         <pre className="overflow-x-auto text-xs">{code}</pre>
       </div>

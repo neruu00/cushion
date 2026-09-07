@@ -11,6 +11,7 @@
  */
 import { formatDateTime } from "@/lib/datetime";
 import { RowCard } from "@/components/RowCard";
+import { getDict } from "@/lib/i18n";
 
 export interface VersionSummary {
   id: number;
@@ -25,12 +26,14 @@ interface VersionCardProps {
   href: string;
 }
 
-export function VersionCard({ version, href }: VersionCardProps) {
+export async function VersionCard({ version, href }: VersionCardProps) {
+  const t = (await getDict()).history;
+
   return (
     <RowCard
       href={href}
       title={version.content_sha.slice(0, 8)}
-      subtitle={version.note ?? "메모 없음"}
+      subtitle={version.note ?? t.noNote}
       meta={
         <>
           <span className="block max-w-40 truncate">{version.author}</span>

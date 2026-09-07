@@ -12,15 +12,21 @@ import { removeDocument } from "@/actions/document";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { DocumentForm } from "@/components/DocumentForm";
 import { getMemberLibrary, getSessionEmail } from "@/lib/authz";
+import { getDict } from "@/lib/i18n";
 import { supabase } from "@/lib/supabase";
 
-export default async function EditDocumentPage({ params }: PageProps<"/libraries/[library]/edit/[...path]">) {
+export default async function EditDocumentPage({
+  params,
+}: PageProps<"/libraries/[library]/edit/[...path]">) {
   const { library: slug, path } = await params;
   const docPath = path.join("/");
+  const t = (await getDict()).doc;
 
   const email = await getSessionEmail();
   if (!email) {
-    redirect(`/api/auth/signin?callbackUrl=${encodeURIComponent(`/libraries/${slug}/edit/${docPath}`)}`);
+    redirect(
+      `/api/auth/signin?callbackUrl=${encodeURIComponent(`/libraries/${slug}/edit/${docPath}`)}`,
+    );
   }
 
   // 멤버가 아니면 404. 읽기와 쓰기의 문턱이 같다 — 볼 수 있으면 고칠 수 있다.
@@ -54,37 +60,39 @@ export default async function EditDocumentPage({ params }: PageProps<"/libraries
             </Link>
           </>
         }
-        title="편집"
+        title={t.editTitle}
         description={
           <Link
             href={`/libraries/${library.slug}/history/${doc.path}`}
             className="underline underline-offset-4 hover:text-foreground"
           >
-            변경 이력
+            {t.changeHistory}
           </Link>
         }
       />
 
-      <DocumentForm library={library.slug} path={doc.path} content={doc.content} sha={doc.content_sha} />
+      <DocumentForm
+        library={library.slug}
+        path={doc.path}
+        content={doc.content}
+        sha={doc.content_sha}
+        t={t}
+      />
 
       <section className="space-y-2 border-t pt-4">
-        <h2 className="text-sm font-medium">삭제</h2>
-        <p className="text-sm text-muted-foreground">
-          이전 본문은 이력에 남아요. 이력 화면에서 되돌릴 수 있어요.
-        </p>
+        <h2 className="text-sm font-medium">{t.deleteHeading}</h2>
+        <p className="text-sm text-muted-foreground">{t.deleteHelp}</p>
         <ConfirmDialog
-          trigger="이 문서 삭제"
+          trigger={t.deleteTrigger}
           triggerVariant="destructive"
           triggerSize="sm"
-          title="이 문서를 삭제할까요?"
-          confirmLabel="삭제"
+          title={t.deleteConfirmTitle}
+          confirmLabel={t.deleteHeading}
           destructive
           description={
             <>
               <span className="block font-mono text-xs">{doc.path}</span>
-              <span className="mt-2 block">
-                본문은 이력에 남아요. 이력 화면에서 되돌릴 수 있어요.
-              </span>
+              <span className="mt-2 block">{t.deleteConfirmBody}</span>
             </>
           }
           formId="delete-document"

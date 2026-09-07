@@ -16,9 +16,11 @@ import { z } from "zod";
 import { getMemberLibraries, type Library, type TokenIdentity } from "@/lib/authz";
 import { deleteDocument, putDocument } from "@/lib/document";
 import { deleteDocumentSchema, putDocumentSchema } from "@/lib/document.schema";
+import { en } from "@/lib/i18n.en";
 import { createLibraryFor } from "@/lib/library";
 import { findSection, headings, scoreSection, snippet, splitSections } from "@/lib/markdown";
 import { supabase } from "@/lib/supabase";
+import { fill } from "@/lib/utils";
 
 export const SERVER_INFO = { name: "cushion", version: "0.1.0" } as const;
 
@@ -27,23 +29,27 @@ export const SERVER_INFO = { name: "cushion", version: "0.1.0" } as const;
  * 툴 description이 "무엇을"이라면 여기는 "어떤 순서로"다.
  */
 export const INSTRUCTIONS =
-  "프로젝트 문서는 여기 있다. 통째로 읽지 말 것: doc_outline → 필요한 섹션만 doc_get(heading). " +
-  "재조회는 if_none_match에 직전 sha. [stale]이면 doc_changes_since. " +
-  "쓰기는 doc_put — base_sha는 직전 sha, 섹션만 고칠 땐 heading에 그 섹션 전체.";
+  "This project's docs live here. Never read one whole: doc_outline first, then doc_get(heading) for just " +
+  "the section you need. Re-reading? Pass the previous sha as if_none_match. Saw [stale]? Call doc_changes_since. " +
+  "Writing is doc_put — base_sha is the sha you last read, and to change one section pass heading plus that whole section.";
 
 export const TOOLS = [
   {
     name: "doc_outline",
     description:
-      "문서 목록과 ## 헤딩 (스펙·ADR·런북·회의록 등). 먼저 부른다. library 생략 = 접근 가능한 전체.",
+      "List of documents and their ## headings (specs, ADRs, runbooks, meeting notes). Call this first. Omit library for everything you can reach.",
     inputSchema: {
       type: "object",
       properties: {
-        library: { type: "string", description: "라이브러리 slug. 생략하면 전체" },
+        library: {
+          type: "string",
+          description: "Library slug. Omit for all of them",
+        },
         depth: {
           type: "string",
           enum: ["libraries", "documents"],
-          description: "libraries = 라이브러리 목록만(이름·GitHub 레포·문서 수). 기본은 documents",
+          description:
+            "libraries = just the library list (name, GitHub repos, document count). Defaults to documents",
         },
       },
     },
@@ -51,21 +57,25 @@ export const TOOLS = [
   {
     name: "doc_get",
     description:
-      "문서 전체 또는 heading의 ## 섹션 하나. if_none_match에 직전 sha를 주면 안 바뀐 경우 unchanged만 온다.",
+      "A whole document, or the single ## section named by heading. Pass the previous sha as if_none_match and an unchanged document comes back as just `unchanged`.",
     inputSchema: {
       type: "object",
       properties: {
         library: { type: "string" },
-        path: { type: "string", description: "라이브러리 루트 기준 경로" },
-        heading: { type: "string", description: "## 섹션 제목" },
-        if_none_match: { type: "string", description: "직전에 받은 sha" },
+        path: { type: "string", description: "Path from the library root" },
+        heading: { type: "string", description: "The ## section title" },
+        if_none_match: {
+          type: "string",
+          description: "The sha you received last time",
+        },
       },
       required: ["library", "path"],
     },
   },
   {
     name: "doc_search",
-    description: "본문 검색, 매칭 섹션 상위 몇 개. 어느 문서에 있는지 모를 때.",
+    description:
+      "Full-text search returning the top matching sections. Use it when you do not know which document holds it.",
     inputSchema: {
       type: "object",
       properties: { query: { type: "string" }, library: { type: "string" } },
@@ -74,35 +84,52 @@ export const TOOLS = [
   },
   {
     name: "doc_changes_since",
-    description: "커서 이후의 변경 요약. 인자 없이 부르면 커서를 전진시킨다.",
+    description:
+      "A summary of everything changed after your cursor. Called with no arguments it also advances the cursor.",
     inputSchema: {
       type: "object",
       properties: {
         library: { type: "string" },
-        since: { type: "number", description: "이벤트 id. 주면 커서를 움직이지 않는다" },
+        since: {
+          type: "number",
+          description: "An event id. Passing it leaves the cursor where it is",
+        },
       },
     },
   },
   {
     name: "doc_put",
     description:
-      "문서 생성·수정. 새 경로면 그대로 새 문서가 된다. 기존 문서는 base_sha 필수 — 그 사이 남이 고쳤으면 거부하고 현재 sha를 준다. heading을 주면 그 섹션만 교체된다.",
+      "Create or update a document. A new path simply becomes a new document. For an existing one base_sha is required: if someone edited in the meantime the write is rejected and the current sha is returned. Pass heading to replace only that section.",
     inputSchema: {
       type: "object",
       properties: {
         library: { type: "string" },
-        path: { type: "string", description: ".md 로 끝나는 경로" },
-        content: { type: "string", description: "문서 전체. heading을 줬으면 그 섹션 전체(## 줄 포함)" },
-        heading: { type: "string", description: "이 ## 섹션만 교체. 문서 전체를 보내지 않아도 된다" },
-        base_sha: { type: "string", description: "직전 doc_get의 sha. 새 문서면 생략" },
-        note: { type: "string", description: "무엇을 왜 바꿨는지 한 줄" },
+        path: { type: "string", description: "Path ending in .md" },
+        content: {
+          type: "string",
+          description:
+            "The whole document, or - if heading is given - that whole section including its ## line",
+        },
+        heading: {
+          type: "string",
+          description: "Replace only this ## section, so you never send the whole document",
+        },
+        base_sha: {
+          type: "string",
+          description: "The sha from your last doc_get. Omit for a new document",
+        },
+        note: {
+          type: "string",
+          description: "One line on what changed and why",
+        },
       },
       required: ["library", "path", "content"],
     },
   },
   {
     name: "doc_delete",
-    description: "삭제. base_sha 필수. 이전 본문은 이력에 남는다.",
+    description: "Delete a document. base_sha is required. The previous body stays in the history.",
     inputSchema: {
       type: "object",
       properties: {
@@ -117,16 +144,20 @@ export const TOOLS = [
   {
     name: "library_create",
     description:
-      "새 라이브러리(문서 묶음)를 만든다. 부른 토큰의 주인이 첫 멤버가 된다. 넣을 곳이 없을 때만.",
+      "Create a new library (a bundle of documents). Whoever owns the calling token becomes its first member. Only when there is nowhere to put the document.",
     inputSchema: {
       type: "object",
       properties: {
-        slug: { type: "string", description: "소문자·숫자·하이픈. URL에 쓰인다" },
-        name: { type: "string", description: "사람이 읽는 이름" },
+        slug: {
+          type: "string",
+          description: "Lowercase letters, digits and hyphens. It appears in the URL",
+        },
+        name: { type: "string", description: "A human-readable name" },
         github_repos: {
           type: "array",
           items: { type: "string" },
-          description: "이 라이브러리를 보는 GitHub 레포. 'org/repo' 또는 조직 전체면 'org/*'",
+          description:
+            "GitHub repos that use this library: 'org/repo', or 'org/*' for a whole organisation",
         },
       },
       required: ["slug", "name"],
@@ -266,9 +297,14 @@ export const getArgs = z.object({
   heading: z.string().optional(),
   if_none_match: z.string().optional(),
 });
-export const searchArgs = z.object({ query: z.string().min(1), library: z.string().optional() });
-export const changesArgs = z.object({ library: z.string().optional(), since: z.number().int().optional() });
-
+export const searchArgs = z.object({
+  query: z.string().min(1),
+  library: z.string().optional(),
+});
+export const changesArgs = z.object({
+  library: z.string().optional(),
+  since: z.number().int().optional(),
+});
 
 /** 접근 불가와 존재하지 않음을 구분하지 않는다 — 구분하면 레포의 존재가 새어 나간다. */
 function librariesFor(context: McpContext, slug?: string): Library[] {
@@ -328,12 +364,27 @@ export async function callTool(
     case "library_create":
       return libraryCreate(context, rawArgs);
     default:
-      return { text: `그런 툴이 없다: ${name}`, isError: true, status: 404 };
+      return { text: `No such tool: ${name}`, isError: true, status: 404 };
   }
 }
 
+/**
+ * 스키마가 메시지 자리에 넣어 둔 **사전 키**를 문장으로 바꾼다.
+ *
+ * 에이전트에게 나가는 문장은 언제나 영어다 — 감지되는 국가는 읽는 사람이 아니라 그 CLI가
+ * 도는 머신이라 분기의 근거가 못 된다. 그래서 `getDict()`가 아니라 `en`을 직접 쓴다.
+ * 모르는 값(우리가 메시지를 안 붙인 Zod 기본 제약)은 그대로 흘린다.
+ */
+function agentIssue(issue: string): string {
+  return issue in en.errors ? en.errors[issue as keyof typeof en.errors] : issue;
+}
+
 function badArgs(issue: string): ToolResult {
-  return { text: `인자가 잘못됐다: ${issue}`, isError: true, status: 400 };
+  return {
+    text: `Invalid argument: ${agentIssue(issue)}`,
+    isError: true,
+    status: 400,
+  };
 }
 
 async function docOutline(context: McpContext, rawArgs: unknown): Promise<ToolResult> {
@@ -345,8 +396,12 @@ async function docOutline(context: McpContext, rawArgs: unknown): Promise<ToolRe
     // "오타 난 slug"와 "레포가 하나도 없음"을 구분한다. 뭉뚱그리면 오타 하나에
     // 에이전트가 library_create를 불러 중복 레포를 만든다.
     return args.data.library
-      ? { text: `그런 라이브러리가 없다: ${args.data.library}`, isError: true, status: 404 }
-      : { text: "접근 가능한 라이브러리가 없다. library_create로 만들 수 있다." };
+      ? {
+          text: `No such library: ${args.data.library}`,
+          isError: true,
+          status: 404,
+        }
+      : { text: "No libraries you can reach. library_create makes one." };
   }
 
   // depth=libraries는 "어디에 넣을까 / 이 코드 레포는 어느 라이브러리를 보나"에 답한다.
@@ -355,7 +410,10 @@ async function docOutline(context: McpContext, rawArgs: unknown): Promise<ToolRe
     const { data, error } = await supabase
       .from("documents")
       .select("library_id")
-      .in("library_id", repos.map((library) => library.id));
+      .in(
+        "library_id",
+        repos.map((library) => library.id),
+      );
     if (error) console.error("mcp: outline counts", error);
 
     const counts = new Map<string, number>();
@@ -366,7 +424,7 @@ async function docOutline(context: McpContext, rawArgs: unknown): Promise<ToolRe
       text: repos
         .map((library) => {
           const github = library.github_repos.length ? ` (${library.github_repos.join(", ")})` : "";
-          return `${library.slug} — ${library.name}${github} · 문서 ${counts.get(library.id) ?? 0}`;
+          return `${library.slug} — ${library.name}${github} · ${counts.get(library.id) ?? 0} docs`;
         })
         .join("\n"),
     };
@@ -382,7 +440,7 @@ async function docOutline(context: McpContext, rawArgs: unknown): Promise<ToolRe
     // 빈 레포도 한 줄로 알린다. 안 그러면 방금 만든 레포가 목록에서 사라져
     // "생성이 실패했나"로 읽힌다 — library_create 직후가 정확히 그 상황이다.
     if (own.length === 0) {
-      lines.push(`${repo.slug}/ — 문서 없음`);
+      lines.push(`${repo.slug}/ — no documents`);
       continue;
     }
     for (const doc of own) {
@@ -399,10 +457,19 @@ async function docGet(context: McpContext, rawArgs: unknown): Promise<ToolResult
 
   const [library] = librariesFor(context, args.data.library);
   if (!library)
-    return { text: `그런 라이브러리가 없다: ${args.data.library}`, isError: true, status: 404 };
+    return {
+      text: `No such library: ${args.data.library}`,
+      isError: true,
+      status: 404,
+    };
 
   const [doc] = await documentsOf([library], args.data.path);
-  if (!doc) return { text: `그런 문서가 없다: ${args.data.path}`, isError: true, status: 404 };
+  if (!doc)
+    return {
+      text: `No such document: ${args.data.path}`,
+      isError: true,
+      status: 404,
+    };
 
   // 해시가 같으면 본문 대신 5토큰. doc_get 재호출의 대부분이 여기서 끝난다.
   if (args.data.if_none_match && args.data.if_none_match === doc.content_sha) {
@@ -411,9 +478,15 @@ async function docGet(context: McpContext, rawArgs: unknown): Promise<ToolResult
 
   const body = args.data.heading ? findSection(doc.content, args.data.heading) : doc.content;
   if (body === null)
-    return { text: `그런 섹션이 없다: ${args.data.heading}`, isError: true, status: 404 };
+    return {
+      text: `No such section: ${args.data.heading}`,
+      isError: true,
+      status: 404,
+    };
 
-  return { text: `${library.slug}/${doc.path} sha:${doc.content_sha}\n\n${body}` };
+  return {
+    text: `${library.slug}/${doc.path} sha:${doc.content_sha}\n\n${body}`,
+  };
 }
 
 const SEARCH_LIMIT = 5;
@@ -443,7 +516,7 @@ async function docSearch(context: McpContext, rawArgs: unknown): Promise<ToolRes
     }
   }
 
-  if (hits.length === 0) return { text: `매칭 없음: ${query}` };
+  if (hits.length === 0) return { text: `No matches: ${query}` };
   hits.sort((a, b) => b.score - a.score);
 
   return {
@@ -471,11 +544,13 @@ async function libraryCreate(context: McpContext, rawArgs: unknown): Promise<Too
     ...args.data,
     github_repos: args.data.github_repos?.join(" "),
   });
-  if (!result.ok)
-    return { text: result.message, isError: true, status: ERROR_STATUS[result.code] };
+  if (!result.ok) {
+    const text = result.code === "invalid" ? agentIssue(result.issue) : en.errors[result.reason];
+    return { text, isError: true, status: ERROR_STATUS[result.code] };
+  }
 
   return {
-    text: `만들었다 ${result.slug} — 멤버: ${context.identity.email}. doc_put(library:"${result.slug}", …)으로 문서를 넣는다`,
+    text: `Created ${result.slug} — member: ${context.identity.email}. Add documents with doc_put(library:"${result.slug}", …)`,
   };
 }
 
@@ -528,7 +603,7 @@ async function docChangesSince(context: McpContext, rawArgs: unknown): Promise<T
     }
   }
 
-  return { text: blocks.length > 0 ? blocks.join("\n\n") : "변경 없음" };
+  return { text: blocks.length > 0 ? blocks.join("\n\n") : "No changes" };
 }
 
 // ─── 쓰기 ────────────────────────────────────────────────────────────
@@ -561,12 +636,19 @@ async function docPut(context: McpContext, rawArgs: unknown): Promise<ToolResult
   });
 
   if (!result.ok) {
-    const current = result.currentSha ? ` 현재 sha:${result.currentSha}` : "";
-    return { text: `${result.message}${current}`, isError: true, status: ERROR_STATUS[result.code] };
+    const current = result.currentSha ? ` Current sha:${result.currentSha}` : "";
+    const reason = fill(en.errors[result.reason], result.params ?? {});
+    return {
+      text: `${reason}${current}`,
+      isError: true,
+      status: ERROR_STATUS[result.code],
+    };
   }
   // DB뿐 아니라 이번 요청의 컨텍스트도 밀어 준다 — 안 그러면 방금 쓴 응답에 [stale]이 붙는다
   markSeen(context, result.libraryId, result.eventId);
-  return { text: `저장했다 ${args.data.library}/${args.data.path} sha:${result.sha}` };
+  return {
+    text: `Saved ${args.data.library}/${args.data.path} sha:${result.sha}`,
+  };
 }
 
 async function docDelete(context: McpContext, rawArgs: unknown): Promise<ToolResult> {
@@ -583,9 +665,14 @@ async function docDelete(context: McpContext, rawArgs: unknown): Promise<ToolRes
   });
 
   if (!result.ok) {
-    const current = result.currentSha ? ` 현재 sha:${result.currentSha}` : "";
-    return { text: `${result.message}${current}`, isError: true, status: ERROR_STATUS[result.code] };
+    const current = result.currentSha ? ` Current sha:${result.currentSha}` : "";
+    const reason = fill(en.errors[result.reason], result.params ?? {});
+    return {
+      text: `${reason}${current}`,
+      isError: true,
+      status: ERROR_STATUS[result.code],
+    };
   }
   markSeen(context, result.libraryId, result.eventId);
-  return { text: `지웠다 ${args.data.library}/${args.data.path}` };
+  return { text: `Deleted ${args.data.library}/${args.data.path}` };
 }

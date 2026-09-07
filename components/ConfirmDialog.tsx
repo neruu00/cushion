@@ -21,6 +21,7 @@
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { useUiCopy } from "@/components/UiCopyProvider";
 import {
   Dialog,
   DialogClose,
@@ -66,6 +67,7 @@ export function ConfirmDialog({
   formId,
   ...rest
 }: ConfirmDialogProps) {
+  const { common } = useUiCopy();
   // 제출하면 서버 액션이 revalidate로 화면을 새로 그리는데, 다이얼로그가 열린 채면
   // 사라진 대상을 가리키고 있게 된다. 눌렀을 때 바로 닫는다.
   const [open, setOpen] = useState(false);
@@ -89,7 +91,7 @@ export function ConfirmDialog({
         {children}
 
         <DialogFooter>
-          <DialogClose render={<Button variant="outline" />}>취소</DialogClose>
+          <DialogClose render={<Button variant="outline" />}>{common.cancel}</DialogClose>
           <Button
             type="submit"
             form={formId}

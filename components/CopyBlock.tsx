@@ -9,6 +9,7 @@ import { useRef, useState } from "react";
 import { flushSync } from "react-dom";
 
 import { Button } from "@/components/ui/button";
+import { useUiCopy } from "@/components/UiCopyProvider";
 
 interface CopyBlockProps {
   value: string;
@@ -22,6 +23,7 @@ interface CopyBlockProps {
 }
 
 export function CopyBlock({ value, label, hideValue = false }: CopyBlockProps) {
+  const { form } = useUiCopy();
   const [state, setState] = useState<"idle" | "copied" | "failed">("idle");
   /**
    * 복사가 실패하면 감춰 둔 값을 드러낸다 — 손으로 복사할 길이 그것뿐이다.
@@ -65,7 +67,7 @@ export function CopyBlock({ value, label, hideValue = false }: CopyBlockProps) {
         <span className="min-w-0 font-mono text-xs text-muted-foreground">{label ?? ""}</span>
         <Button type="button" variant="ghost" size="xs" className="shrink-0" onClick={copy}>
           {state === "copied" ? <Check /> : state === "failed" ? <TriangleAlert /> : <Copy />}
-          {state === "copied" ? "복사했어요" : state === "failed" ? "선택했어요: Ctrl+C" : "복사"}
+          {state === "copied" ? form.copied : state === "failed" ? form.copyFailed : form.copy}
         </Button>
       </div>
       {showValue && (

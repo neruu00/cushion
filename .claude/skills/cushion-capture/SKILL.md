@@ -1,69 +1,74 @@
 ---
 name: cushion-capture
-description: 이번 작업에서 확정된 결정·규칙·함정을 Cushion 문서에 반영한다. 사용자가 /cushion-capture 로 부를 때만.
+description: Fold the decisions, rules and traps settled during this session back into the Cushion docs. Only when the user asks with /cushion-capture.
 ---
 
-# 정해진 것을 문서로 되돌리기
+# Writing what was settled back into the docs
 
-문서가 낡는 이유는 읽지 않아서가 아니라 **아무도 되돌려 쓰지 않아서**다. 이 스킬이 그 자리다.
+Docs go stale not because nobody reads them but because **nobody writes back to them.**
+This skill is that step.
 
-## 1. 무엇이 확정됐나 추린다
+## 1. Work out what actually got settled
 
-이번 대화에서 **결론이 난 것만** 고른다:
+Take only what **reached a conclusion** in this conversation:
 
-- 결정과 그 **근거** (무엇을 왜 그렇게 하기로 했나, 무엇을 기각했나)
-- 코드를 읽어서는 알기 어려운 규칙·함정 (순서 의존, 조용히 실패하는 경로)
-- 바뀐 계약 (API 형태, 스키마, 툴 인자)
+- Decisions and their **rationale** (what, why, and what was rejected)
+- Rules and traps you could not learn by reading the code (order dependencies, paths that
+  fail silently)
+- Contracts that changed (API shape, schema, tool arguments)
 
-**넣지 않는 것**: 아직 논의 중인 것, 코드를 보면 아는 것(함수 시그니처·파일 구조),
-이 세션에만 유효한 맥락(임시 디버깅 로그, 일회성 명령).
-남길 게 없으면 **없다고 말하고 끝낸다.** 억지로 채우면 다음 사람이 문서를 안 믿게 된다.
+**Leave out**: anything still under discussion, anything the code already tells you
+(function signatures, file structure), and context that only mattered this session
+(throwaway debug logging, one-off commands).
+If there is nothing to record, **say so and stop.** Padding it out is how the next person
+learns not to trust the docs.
 
-## 2. 어디에 속하는지 찾는다
-
-```
-doc_outline                      # 무슨 문서가 있는지
-doc_search(query:"관련 키워드")   # 이미 그 얘기를 하는 섹션이 있나
-```
-
-- **이미 있는 섹션을 고치는 게 기본이다.** 새 섹션을 만들면 같은 주제가 두 군데로 갈린다
-- 결정은 결정 로그에, 규칙은 해당 스펙 섹션에, 절차는 런북에
-- 어느 문서인지 확신이 안 서면 **묻는다**
-
-## 3. 보여주고, 승인받고, 쓴다
-
-**이 순서를 건너뛰지 않는다.** 에이전트가 스펙을 조용히 고치면 그게 곧 드리프트의 새 원인이다.
-
-먼저 이렇게 요약해서 보여준다:
+## 2. Find where it belongs
 
 ```
-cushion/PLAN.md ## 📌 결정 로그
-  + D-017. 스킬을 서비스가 배포한다 — 근거: …
-
-cushion/SPEC.md ## 9. 화면
-  ~ 온보딩 3단계 표 추가
+doc_outline                       # what documents exist
+doc_search(query:"relevant terms")  # is there already a section about this
 ```
 
-승인받은 뒤에만:
+- **Editing an existing section is the default.** A new section splits one topic across two places
+- Decisions go in the decision log, rules in the relevant spec section, procedures in the runbook
+- If you are not sure which document, **ask**
+
+## 3. Show it, get approval, then write
+
+**Do not skip this order.** An agent quietly editing a spec is itself a new source of drift.
+
+Show a summary like this first:
 
 ```
-doc_get(library:"…", path:"…", heading:"…")   # sha를 받고
+cushion/PLAN.md ## Decision log
+  + D-017. The service ships the skills — rationale: …
+
+cushion/SPEC.md ## 9. Screens
+  ~ added the three-step onboarding table
+```
+
+Only once approved:
+
+```
+doc_get(library:"…", path:"…", heading:"…")   # take the sha
 doc_put(library:"…", path:"…", heading:"…", content:"…",
-        base_sha:"<받은 sha>", note:"무엇을 왜")
+        base_sha:"<the sha you got>", note:"what and why")
 ```
 
-- **`heading`으로 그 섹션만 바꾼다.** 문서 전체를 다시 쓰지 않는다
-- `base_sha`가 어긋나면 그 사이 남이 고친 것이다 — 병합하지 말고 현재 본문 위에 다시 얹는다
-- `note`에 **왜**를 적는다. 그게 다음 사람이 읽는 줄이다
+- **Use `heading` to change only that section.** Do not rewrite the whole document
+- A mismatched `base_sha` means someone edited in the meantime — do not merge, reapply on
+  top of the current body
+- Put the **why** in `note`. That is the line the next person reads
 
-## 4. 결정을 쓸 때
+## 4. When you write a decision
 
-근거 없는 결정은 다음 사람이 뒤집는다. 최소한 이 셋을 담는다:
+A decision with no rationale gets reversed by the next person. Cover at least these three:
 
-- **결정**: 무엇을 하기로 했나
-- **근거**: 왜. 무엇을 기각했고 그 이유는
-- **재검토 조건**: 어떤 상황이 오면 다시 볼 것인가
+- **Decision**: what we are doing
+- **Rationale**: why. What was rejected, and for what reason
+- **Revisit when**: what would make us look at this again
 
-## 5. 보고
+## 5. Report
 
-고친 문서와 섹션을 한 줄씩, 그게 전부다. 본문을 다시 출력하지 않는다.
+One line per document and section you changed. That is all. Do not print the body back out.

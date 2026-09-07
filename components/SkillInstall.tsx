@@ -14,10 +14,15 @@
  * 출처: antigravity.google/docs/skills, learn.chatgpt.com/docs/build-skills
  */
 import { CopyBlock } from "@/components/CopyBlock";
+import { Fill } from "@/components/Fill";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import type { Dict } from "@/lib/i18n.en";
+import { fill } from "@/lib/utils";
 
 interface SkillInstallProps {
   skillsUrl: string;
+  /** 서버 컴포넌트(`OnboardingSteps`)가 고른 언어 조각만 내려 준다 */
+  t: Dict["skillInstall"];
 }
 
 interface ScopeOption {
@@ -26,9 +31,8 @@ interface ScopeOption {
   hint: React.ReactNode;
 }
 
-export function SkillInstall({ skillsUrl }: SkillInstallProps) {
-  const sentence = (root: string) =>
-    `${skillsUrl} 를 받아서 files의 각 항목을 ${root}<path> 경로에 저장해 줘. 이미 파일이 있으면 덮어써도 괜찮아.`;
+export function SkillInstall({ skillsUrl, t }: SkillInstallProps) {
+  const sentence = (root: string) => fill(t.sentence, { url: skillsUrl, root });
 
   const scopes = (options: ScopeOption[]) => (
     <div className="space-y-4">
@@ -38,7 +42,7 @@ export function SkillInstall({ skillsUrl }: SkillInstallProps) {
           <p className="text-sm text-muted-foreground">{option.hint}</p>
           <CopyBlock
             value={sentence(option.root)}
-            label={`에이전트에게 그대로 보내세요 (${option.root})`}
+            label={fill(t.copyLabel, { root: option.root })}
           />
         </div>
       ))}
@@ -57,24 +61,28 @@ export function SkillInstall({ skillsUrl }: SkillInstallProps) {
         {scopes([
           {
             root: "~/.claude/skills/",
-            label: "내 컴퓨터 전체",
+            label: t.everywhere,
             hint: (
-              <>
-                <code>~/.claude/skills/</code>에 두면 한 번만 설치해도{" "}
-                <strong>모든 프로젝트</strong>에서 쓸 수 있어요. 스킬 파일에는 프로젝트별 정보가
-                없어서 보통 이쪽이 맞아요.
-              </>
+              <Fill
+                template={t.claudeGlobal}
+                parts={{
+                  path: <code>~/.claude/skills/</code>,
+                  scope: <strong>{t.claudeGlobalScope}</strong>,
+                }}
+              />
             ),
           },
           {
             root: ".claude/skills/",
-            label: "이 프로젝트만",
+            label: t.thisProject,
             hint: (
-              <>
-                <code>.claude/skills/</code>에 두고 커밋하면 <strong>팀 전원</strong>이 자동으로
-                받아요. 대신 프로젝트마다 따로 설치해야 하고, 원본이 갱신돼도 커밋해 둔 사본은
-                그대로 남아요.
-              </>
+              <Fill
+                template={t.claudeProject}
+                parts={{
+                  path: <code>.claude/skills/</code>,
+                  scope: <strong>{t.claudeProjectScope}</strong>,
+                }}
+              />
             ),
           },
         ])}
@@ -84,21 +92,22 @@ export function SkillInstall({ skillsUrl }: SkillInstallProps) {
         {scopes([
           {
             root: "~/.gemini/config/skills/",
-            label: "내 컴퓨터 전체",
+            label: t.everywhere,
             hint: (
-              <>
-                <code>~/.gemini/config/skills/</code>에 두면 모든 프로젝트에서 쓸 수 있어요.
-              </>
+              <Fill
+                template={t.antigravityGlobal}
+                parts={{ path: <code>~/.gemini/config/skills/</code> }}
+              />
             ),
           },
           {
             root: ".agents/skills/",
-            label: "이 프로젝트만",
+            label: t.thisProject,
             hint: (
-              <>
-                프로젝트 루트의 <code>.agents/skills/</code>에 두고 커밋하면 팀 전원이 받아요.
-                이 경로는 Codex CLI와 같아서, 두 클라이언트를 함께 쓴다면 한 번만 설치해도 돼요.
-              </>
+              <Fill
+                template={t.antigravityProject}
+                parts={{ path: <code>.agents/skills/</code> }}
+              />
             ),
           },
         ])}
@@ -108,22 +117,15 @@ export function SkillInstall({ skillsUrl }: SkillInstallProps) {
         {scopes([
           {
             root: "~/.agents/skills/",
-            label: "내 컴퓨터 전체",
+            label: t.everywhere,
             hint: (
-              <>
-                <code>~/.agents/skills/</code>에 두면 모든 저장소에서 쓸 수 있어요.
-              </>
+              <Fill template={t.codexGlobal} parts={{ path: <code>~/.agents/skills/</code> }} />
             ),
           },
           {
             root: ".agents/skills/",
-            label: "이 프로젝트만",
-            hint: (
-              <>
-                프로젝트 루트의 <code>.agents/skills/</code>에 두고 커밋하면 팀 전원이 받아요.
-                Antigravity의 프로젝트 스코프와 경로가 같아요.
-              </>
-            ),
+            label: t.thisProject,
+            hint: <Fill template={t.codexProject} parts={{ path: <code>.agents/skills/</code> }} />,
           },
         ])}
       </TabsContent>

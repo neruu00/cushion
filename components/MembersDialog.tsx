@@ -33,6 +33,8 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import type { Dict } from "@/lib/i18n.en";
+import { fill } from "@/lib/utils";
 
 interface MembersDialogProps {
   libraryId: string;
@@ -44,6 +46,8 @@ interface MembersDialogProps {
   isOwner: boolean;
   /** 지금 살아있는 초대 링크가 있는가. 값 자체는 안 보여준다 — access token과 같다 */
   hasActiveInvite: boolean;
+  /** 서버 페이지가 고른 언어 조각. `email`은 여러 폼이 공유하는 라벨이라 common에서 온다 */
+  t: Dict["members"] & Pick<Dict["common"], "email">;
 }
 
 export function MembersDialog({
@@ -53,19 +57,17 @@ export function MembersDialog({
   currentEmail,
   isOwner,
   hasActiveInvite,
+  t,
 }: MembersDialogProps) {
   return (
     <Dialog>
       <DialogTrigger render={<Button variant="outline" size="sm" />}>
-        <Users /> 멤버 {members.length}
+        <Users /> {fill(t.trigger, { count: members.length })}
       </DialogTrigger>
       <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>멤버</DialogTitle>
-          <DialogDescription>
-            멤버는 이 라이브러리의 문서를 읽고 쓸 수 있어요. 초대와 제거는 소유자만 하고,
-            나가기는 누구나 할 수 있어요.
-          </DialogDescription>
+          <DialogTitle>{t.title}</DialogTitle>
+          <DialogDescription>{t.description}</DialogDescription>
         </DialogHeader>
 
         <ul className="divide-y rounded-lg border">
@@ -73,7 +75,7 @@ export function MembersDialog({
             <li key={member.email} className="flex items-center justify-between gap-2 px-3 py-1.5">
               <span className="truncate font-mono text-sm">
                 {member.email}
-                {member.email === currentEmail ? " (나)" : ""}
+                {member.email === currentEmail ? t.you : ""}
               </span>
               {/* 자기 자신 제거는 나가기라 누구나 된다. 남을 빼는 건 소유자만 (D-021) —
                   버튼 자체를 숨긴다. 되돌리려면 소유자가 다시 불러야 하고,
@@ -82,9 +84,9 @@ export function MembersDialog({
                 <ConfirmDialog
                   trigger={<Trash2 />}
                   triggerVariant="destructive"
-                  aria-label={`${member.email} 제거`}
-                  title={member.email === currentEmail ? "이 라이브러리에서 나갈까요?" : "멤버를 제거할까요?"}
-                  confirmLabel={member.email === currentEmail ? "나가기" : "제거"}
+                  aria-label={fill(t.removeLabel, { email: member.email })}
+                  title={member.email === currentEmail ? t.leaveTitle : t.removeTitle}
+                  confirmLabel={member.email === currentEmail ? t.leave : t.remove}
                   destructive
                   description={
                     <>
@@ -92,9 +94,9 @@ export function MembersDialog({
                       <span className="mt-2 block">
                         {member.email === currentEmail
                           ? members.length === 1
-                            ? "마지막 멤버예요. 나가면 아무도 이 라이브러리를 볼 수 없어요."
-                            : "나가면 문서를 더는 볼 수 없어요. 소유자가 다시 초대할 수 있어요."
-                          : "문서를 더는 읽고 쓸 수 없어요. 다시 초대할 수 있어요."}
+                            ? t.leaveLast
+                            : t.leaveBody
+                          : t.removeBody}
                       </span>
                     </>
                   }
@@ -111,10 +113,10 @@ export function MembersDialog({
         </ul>
 
         {isOwner && (
-          <ActionForm action={addMember} submitLabel="초대">
+          <ActionForm action={addMember} submitLabel={t.invite}>
             <input type="hidden" name="library_id" value={libraryId} />
             <Label className="grid gap-1.5">
-              <span>이메일</span>
+              <span>{t.email}</span>
               <Input name="email" type="email" placeholder="teammate@example.com" required />
             </Label>
           </ActionForm>
@@ -123,20 +125,18 @@ export function MembersDialog({
         {isOwner && (
           <div className="space-y-2 border-t pt-4">
             <div>
-              <h3 className="text-sm font-medium">초대 링크</h3>
-              <p className="text-xs text-muted-foreground">
-                링크를 가진 사람은 로그인만 하면 참여해요. 살아 있는 링크는 한 번에 하나예요.
-              </p>
+              <h3 className="text-sm font-medium">{t.inviteLink}</h3>
+              <p className="text-xs text-muted-foreground">{t.inviteLinkHelp}</p>
             </div>
 
             {hasActiveInvite && (
               <div className="flex items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm">
-                <span className="text-muted-foreground">지금 살아 있는 링크가 있어요</span>
+                <span className="text-muted-foreground">{t.liveLink}</span>
                 <form action={revokeInviteLink}>
                   <input type="hidden" name="library_id" value={libraryId} />
                   <input type="hidden" name="library_slug" value={librarySlug} />
                   <Button type="submit" variant="destructive" size="xs">
-                    무효화
+                    {t.revokeLink}
                   </Button>
                 </form>
               </div>
@@ -146,7 +146,7 @@ export function MembersDialog({
                 뚫고 나간다. 어차피 읽을 값이 아니라 복사해서 보낼 값이다 */}
             <ActionForm
               action={createInviteLink}
-              submitLabel={hasActiveInvite ? "재생성" : "생성"}
+              submitLabel={hasActiveInvite ? t.regenerate : t.generate}
               hideSecret
             >
               <input type="hidden" name="library_id" value={libraryId} />

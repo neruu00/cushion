@@ -12,10 +12,12 @@ import { notFound, redirect } from "next/navigation";
 import { PageHeader } from "@/components/PageHeader";
 import { PageShell } from "@/components/PageShell";
 import { ChangeCard, type ChangeEvent } from "@/components/ChangeCard";
+import { Fill } from "@/components/Fill";
 import { DocumentTree } from "@/components/DocumentTree";
 import { LibrarySettingsDialog } from "@/components/LibrarySettingsDialog";
 import { MembersDialog } from "@/components/MembersDialog";
 import { getReadableLibrary, getSessionEmail, isAdmin, isPublic } from "@/lib/authz";
+import { getDict } from "@/lib/i18n";
 import { supabase } from "@/lib/supabase";
 
 interface DocRow {
@@ -29,6 +31,7 @@ export const metadata: Metadata = { robots: { index: false, follow: false } };
 
 export default async function LibraryPage({ params }: PageProps<"/libraries/[library]">) {
   const { library: slug } = await params;
+  const t = await getDict();
 
   const email = await getSessionEmail();
   // 공개 라이브러리는 비로그인도 문서 목록·본문까지 본다 (D-024).
@@ -36,7 +39,8 @@ export default async function LibraryPage({ params }: PageProps<"/libraries/[lib
   if (!view) {
     // 비로그인이면 로그인부터 — 로그인하면 보이는 라이브러리일 수 있다.
     // 로그인했는데도 못 보면 404다. 403은 "그 라이브러리가 존재한다"를 알려준다 (SPEC §6).
-    if (!email) redirect(`/api/auth/signin?callbackUrl=${encodeURIComponent(`/libraries/${slug}`)}`);
+    if (!email)
+      redirect(`/api/auth/signin?callbackUrl=${encodeURIComponent(`/libraries/${slug}`)}`);
     notFound();
   }
   const { library, isMember } = view;
@@ -122,7 +126,7 @@ export default async function LibraryPage({ params }: PageProps<"/libraries/[lib
                   library.discord_webhook_url ? "Discord" : null,
                 ]
                   .filter(Boolean)
-                  .join(" · ") || "알림 채널 없음"}
+                  .join(" · ") || t.library.noChannel}
               </>
             ) : null}
           </>
@@ -140,6 +144,7 @@ export default async function LibraryPage({ params }: PageProps<"/libraries/[lib
                 currentEmail={email}
                 isOwner={isOwner}
                 hasActiveInvite={hasActiveInvite}
+                t={{ ...t.members, email: t.common.email }}
               />
             )}
             {isOwner && (
@@ -150,6 +155,8 @@ export default async function LibraryPage({ params }: PageProps<"/libraries/[lib
                 mattermostWebhookUrl={library.mattermost_webhook_url}
                 discordWebhookUrl={library.discord_webhook_url}
                 isPublic={isPublic(library)}
+                t={t.librarySettings}
+                common={t.common}
               />
             )}
           </div>
@@ -162,18 +169,18 @@ export default async function LibraryPage({ params }: PageProps<"/libraries/[lib
       {isMember && (
         <section className="space-y-2">
           <div className="flex items-center justify-between gap-4">
-            <h2 className="text-sm font-medium">최근 변경</h2>
+            <h2 className="text-sm font-medium">{t.library.recentChanges}</h2>
             {timeline.length > 0 ? (
               <Link
                 href={`/libraries/${library.slug}/changes`}
                 className="text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
               >
-                더보기
+                {t.library.seeAll}
               </Link>
             ) : null}
           </div>
           {timeline.length === 0 ? (
-            <p className="text-sm text-muted-foreground">아직 변경 기록이 없어요.</p>
+            <p className="text-sm text-muted-foreground">{t.library.noChanges}</p>
           ) : (
             <ul className="divide-y rounded-lg border">
               {/* 최신 하나만. 나머지는 더보기로 간다 */}
@@ -187,25 +194,22 @@ export default async function LibraryPage({ params }: PageProps<"/libraries/[lib
 
       <section className="space-y-2">
         <div className="flex items-center justify-between gap-4">
-          <h2 className="text-sm font-medium">문서</h2>
+          <h2 className="text-sm font-medium">{t.library.documents}</h2>
           {isMember && (
             <Link
               href={`/libraries/${library.slug}/new`}
               className="text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
             >
-              새 문서
+              {t.library.newDocument}
             </Link>
           )}
         </div>
         {documents.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             {isMember ? (
-              <>
-                아직 문서가 없어요. 위에 있는 &quot;새 문서&quot;로 직접 만들거나, 에이전트가{" "}
-                <code>doc_put</code>으로 만들 수 있어요.
-              </>
+              <Fill template={t.library.noDocumentsMember} parts={{ tool: <code>doc_put</code> }} />
             ) : (
-              "아직 문서가 없어요."
+              t.library.noDocuments
             )}
           </p>
         ) : (

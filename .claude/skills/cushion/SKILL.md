@@ -1,69 +1,75 @@
 ---
 name: cushion
-description: 이 프로젝트의 문서(스펙·ADR·런북·회의록·용어집 등)를 읽거나 쓸 때. 문서는 레포가 아니라 Cushion에 있고, MCP 서버 `cushion`의 doc_* 툴로 조각 단위로 읽고 쓴다. 로컬에서 문서를 못 찾았을 때도 이걸 먼저 본다.
+description: For reading or writing this project's docs (specs, ADRs, runbooks, meeting notes, glossaries). The docs live in Cushion, not in the repo, and you read and write them a piece at a time with the doc_* tools on the `cushion` MCP server. Check this first when you cannot find a document locally.
 ---
 
-# Cushion — 문서 도서관 사용법
+# Cushion — how to use the doc library
 
-문서 원본이 **Cushion에 있다.** 로컬 레포에 `SPEC.md`가 없는 건 누락이 아니라 설계다.
-되돌릴 git이 없으므로 아래 규칙은 편의가 아니라 안전장치다.
+**The source of truth lives in Cushion.** There being no `SPEC.md` in the local repo is the
+design, not an omission. There is no git to fall back on, so the rules below are safety
+equipment rather than convenience.
 
-## 읽기
-
-```
-doc_outline                                    # 무엇이 있는지부터. 본문 아님
-doc_get(library:"…", path:"SPEC.md", heading:"6. 인증 · 권한")
-```
-
-- **문서를 통째로 읽지 않는다.** 목차를 보고 필요한 `##` 섹션만 가져온다.
-  그게 이 도구가 존재하는 이유다
-- 어느 문서에 있는지 모르면 `doc_search(query:"…")` — 매칭 섹션만 온다
-- 같은 문서를 다시 볼 땐 `if_none_match`에 직전 sha를 넣는다. 안 바뀌었으면
-  본문 대신 `unchanged` 다섯 글자로 끝난다
-- `doc_get` 응답 첫 줄의 `sha:…`를 **버리지 말 것.** 고칠 때 그대로 되돌려줘야 한다
-
-## 쓰기
+## Reading
 
 ```
-doc_put(library:"…", path:"SPEC.md", heading:"6. 인증 · 권한",
-        content:"## 6. 인증 · 권한\n…", base_sha:"<doc_get의 sha>", note:"무엇을 왜")
+doc_outline                                    # what exists, not the body
+doc_get(library:"…", path:"SPEC.md", heading:"6. Auth")
 ```
 
-- **`base_sha`는 필수다**(새 문서만 예외). 읽을 때 받은 sha를 그대로 넘긴다
-- **섹션만 고칠 땐 `heading`을 준다.** 문서 전체를 다시 보내지 않아도 되고,
-  `content`에는 그 섹션 전체(`##` 줄 포함)를 넣는다
-- `note`는 커밋 메시지 자리다. 무엇을 **왜** 바꿨는지 한 줄
-- 새 문서는 `path`만 새로 주면 된다. `.md`로 끝나야 한다
+- **Never read a whole document.** Read the outline, then take only the `##` section you
+  need. That is the entire reason this tool exists
+- If you do not know which document holds it, use `doc_search(query:"…")` — you get back
+  the matching sections only
+- Reading the same document again? Pass the previous sha as `if_none_match`. If nothing
+  changed you get the single word `unchanged` instead of a body
+- **Do not throw away the `sha:…` on the first line of a `doc_get` response.** You have to
+  hand it back when you edit
 
-## 충돌이 나면
+## Writing
 
-`base_sha`가 어긋나면 거부되고 **현재 sha와 본문**이 온다.
+```
+doc_put(library:"…", path:"SPEC.md", heading:"6. Auth",
+        content:"## 6. Auth\n…", base_sha:"<sha from doc_get>", note:"what changed and why")
+```
 
-**병합하지 말 것.** 브랜치가 없어 병합할 근거가 없다. 받은 현재 본문 위에 내 변경을
-다시 얹고, 받은 sha를 `base_sha`로 써서 다시 보낸다. 남이 고친 내용을 지우게 될 것
-같으면 멈추고 사람에게 알린다.
+- **`base_sha` is required** (only a brand-new document is exempt). Pass back the sha you
+  got when reading
+- **To change one section, pass `heading`.** Then you never resend the whole document, and
+  `content` holds that entire section including its `##` line
+- `note` is the commit message slot. One line on what changed and **why**
+- For a new document just give a new `path`. It has to end in `.md`
 
-## `[stale]`이 보이면
+## When there is a conflict
 
-응답 끝에 `[stale] repo: path…` 한 줄이 붙는 건 **내가 마지막으로 본 뒤 누가 고쳤다**는
-뜻이다. `doc_changes_since`를 부르면 무엇이 바뀌었는지 요약이 오고 커서가 전진한다.
-그 줄이 없으면 최신이다 — 확인하려고 다시 읽지 않는다.
+If `base_sha` no longer matches, the write is rejected and you get back **the current sha
+and body**.
 
-## 실수하기 쉬운 것
+**Do not merge.** There are no branches, so there is nothing to merge against. Reapply your
+change on top of the body you were handed, and send it again with the sha you were handed as
+`base_sha`. If it looks like you would be erasing someone else's edit, stop and tell the
+person you are working with.
 
-- 로컬에 문서가 없다고 새로 만들지 않는다. **`doc_outline`을 먼저 부른다**
-- 큰 문서를 통째로 `doc_get` 하지 않는다. `heading`을 쓴다
-- 고친 뒤 확인하려고 다시 읽지 않는다. `doc_put` 응답이 새 sha를 준다
-- 문서를 지울 땐 `doc_delete` — 이전 본문은 이력에 남으니 백업하려고 복사본을
-  만들지 않는다
+## When you see `[stale]`
 
-## 새 문서를 어디 둘까
+A trailing `[stale] repo: path…` line means **someone edited since you last looked**. Call
+`doc_changes_since` and you get a summary of what changed, and your cursor moves forward.
+No such line means you are up to date — do not re-read to check.
 
-경로가 곧 분류다. 이미 있는 관례를 `doc_outline`으로 먼저 보고 따른다
-(`adr/0001-*.md`, `runbook/*.md`, `meetings/2026-08-13.md` 같은 식).
-넣을 레포 자체가 없으면 `library_create(slug:"…", name:"…")`.
+## Easy mistakes
 
-## 붙어 있지 않다면
+- Do not create a document just because there is nothing locally. **Call `doc_outline` first**
+- Do not `doc_get` a large document whole. Use `heading`
+- Do not re-read after editing to confirm. The `doc_put` response gives you the new sha
+- To remove a document use `doc_delete` — the previous body stays in the history, so do not
+  make a backup copy first
 
-`doc_*` 툴이 안 보이면 MCP가 연결되지 않은 것이다. Cushion의 `/settings/tokens`에서
-토큰을 발급하면 화면이 `claude mcp add` 명령을 통째로 준다.
+## Where to put a new document
+
+The path is the taxonomy. Look at the conventions already in use with `doc_outline` and
+follow them (`adr/0001-*.md`, `runbook/*.md`, `meetings/2026-08-13.md`, and so on).
+If there is no library to put it in at all, `library_create(slug:"…", name:"…")`.
+
+## If you are not connected
+
+No `doc_*` tools means MCP is not connected. Issue a token at Cushion's `/settings/tokens`
+and the screen hands you the whole `claude mcp add` command.

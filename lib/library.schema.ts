@@ -1,6 +1,9 @@
 /**
  * @file lib/library.schema.ts
  * @description 라이브러리 폼 입력 검증. formData는 외부 입력이므로 `as`가 아니라 여기를 지난다.
+ *
+ * 메시지 자리에 **사전 키**를 넣는 이유는 `lib/document.schema.ts`와 같다 —
+ * 문장은 `translateIssue()`가 요청 언어로 만든다.
  */
 import { z } from "zod";
 
@@ -14,7 +17,7 @@ const webhookUrl = z
   .trim()
   .optional()
   .transform((v) => v || null)
-  .pipe(z.url("웹훅은 https:// 로 시작하는 URL이어야 해요.").nullable());
+  .pipe(z.url("webhook_url").nullable());
 
 /**
  * 이 라이브러리를 보는 GitHub 레포들. **여러 개인 게 기본이다** — FE·BE 레포가 API 계약
@@ -46,11 +49,7 @@ const githubRepos = z
       )
       .filter(Boolean),
   )
-  .pipe(
-    z
-      .array(z.string().regex(ONE_REPO, "GitHub 레포는 org/repo 또는 org/* 형태로 입력해 주세요."))
-      .max(50, "GitHub 레포는 50개까지 등록할 수 있어요."),
-  );
+  .pipe(z.array(z.string().regex(ONE_REPO, "github_repo_format")).max(50, "github_repo_max"));
 
 /** `org/*`가 있으면 그 조직 전체가 일치한다. 매칭 규칙은 이 함수 하나뿐이다. */
 export function matchesGithubRepo(patterns: string[], fullName: string): boolean {
@@ -67,8 +66,8 @@ export const createLibrarySchema = z.object({
   slug: z
     .string()
     .trim()
-    .regex(/^[a-z0-9][a-z0-9-]{0,62}$/, "slug에는 소문자와 숫자, 하이픈만 쓸 수 있어요."),
-  name: z.string().trim().min(1, "이름을 입력해 주세요.").max(100),
+    .regex(/^[a-z0-9][a-z0-9-]{0,62}$/, "slug_format"),
+  name: z.string().trim().min(1, "name_required").max(100, "name_too_long"),
   github_repos: githubRepos,
   // 둘 다 둘 수 있다. 페이로드 키가 달라서(text vs content) 한 칸으로 합치지 않는다.
   mattermost_webhook_url: webhookUrl,
@@ -92,7 +91,7 @@ const checkbox = z
 
 export const librarySettingsSchema = z.object({
   library_id: z.uuid(),
-  name: z.string().trim().min(1, "이름을 입력해 주세요.").max(100),
+  name: z.string().trim().min(1, "name_required").max(100, "name_too_long"),
   github_repos: githubRepos,
   mattermost_webhook_url: webhookUrl,
   discord_webhook_url: webhookUrl,
@@ -106,7 +105,7 @@ export const memberSchema = z.object({
   email: z
     .string()
     .transform((v) => v.trim().toLowerCase())
-    .pipe(z.email("이메일 형식에 맞지 않아요.")),
+    .pipe(z.email("email_format")),
 });
 
 /** 초대 링크 생성·무효화. 재발급(무효화 후 생성)이라 slug까지 같이 받아 revalidate에 쓴다. */
@@ -119,4 +118,3 @@ export const inviteActionSchema = z.object({
 export const joinInviteSchema = z.object({
   token: z.string().min(1),
 });
-

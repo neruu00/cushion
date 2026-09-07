@@ -12,7 +12,9 @@
  * 서버 컴포넌트다. 클라이언트가 필요한 건 복사 버튼과 탭뿐이라 그것만 리프로 내려간다.
  */
 import { CopyBlock } from "@/components/CopyBlock";
+import { Fill } from "@/components/Fill";
 import { SkillInstall } from "@/components/SkillInstall";
+import { getDict } from "@/lib/i18n";
 
 interface OnboardingStepsProps {
   /** 1단계에 놓을 것. 토큰 발급 폼이거나, 랜딩의 자리표시 명령이거나 */
@@ -20,26 +22,30 @@ interface OnboardingStepsProps {
   skillsUrl: string;
 }
 
-export function OnboardingSteps({ connectSlot, skillsUrl }: OnboardingStepsProps) {
+export async function OnboardingSteps({ connectSlot, skillsUrl }: OnboardingStepsProps) {
+  const t = await getDict();
+  const o = t.onboarding;
+
   return (
     <ol className="space-y-6">
-      <Step n="1" title="연결하기" hint="셸에서 한 번만 실행하면 이때부터 doc_* 툴이 보여요">
+      <Step n="1" title={o.step1} hint={o.step1Hint}>
         {connectSlot}
       </Step>
 
-      <Step n="2" title="스킬 설치하기" hint="선택이지만 설치하기를 권해요. 없어도 기본 동작은 해요">
-        <SkillInstall skillsUrl={skillsUrl} />
+      <Step n="2" title={o.step2} hint={o.step2Hint}>
+        <SkillInstall skillsUrl={skillsUrl} t={t.skillInstall} />
       </Step>
 
-      <Step
-        n="3"
-        title="어느 라이브러리를 볼지 정하기"
-        hint="AGENTS.md에 한 줄을 적어 두면 다음 세션이 그 줄을 보고 시작해요"
-      >
-        <CopyBlock value="/cushion-use" label="에이전트에게 그대로 보내세요" />
+      <Step n="3" title={o.step3} hint={o.step3Hint}>
+        <CopyBlock value="/cushion-use" label={o.sendToAgent} />
         <p className="text-sm text-muted-foreground">
-          에이전트가 <code>git remote</code>로 이 프로젝트에 맞는 라이브러리를 찾아{" "}
-          <code>AGENTS.md</code>에 적어 둬요. 팀원이 이미 커밋해 뒀다면 건너뛰어도 돼요.
+          <Fill
+            template={o.step3Body}
+            parts={{
+              remote: <code>git remote</code>,
+              file: <code>AGENTS.md</code>,
+            }}
+          />
         </p>
       </Step>
     </ol>

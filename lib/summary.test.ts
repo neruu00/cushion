@@ -40,7 +40,10 @@ test("머리말만 고치면 섹션 이름이 없다 — 대신 수치로 보인
   const after = BEFORE.replace("머리말.", "머리말을 고쳤다.");
 
   assert.deepEqual(changedSections(BEFORE, after), []);
-  assert.match(summarizeEdit({ path: "a.md", before: BEFORE, after, author: "n" }), /^a\.md \(\+1 −1\)/);
+  assert.match(
+    summarizeEdit({ path: "a.md", before: BEFORE, after, author: "n" }),
+    /^a\.md \(\+1 −1\)/,
+  );
 });
 
 test("CRLF 문서도 같은 결과", () => {
@@ -53,9 +56,29 @@ test("CRLF 문서도 같은 결과", () => {
 
 test("옮겨 적기만 한 줄은 변경으로 세지 않는다", () => {
   // 섹션 순서를 바꿨을 뿐 내용은 그대로 — diff였다면 크게 잡혔을 자리다.
-  const swapped = ["# 기능", "", "머리말.", "", "## 댓글", "", "대댓글은 1단계.", "", "## 인증", "", "세션은 30일이다."].join("\n");
+  const swapped = [
+    "# 기능",
+    "",
+    "머리말.",
+    "",
+    "## 댓글",
+    "",
+    "대댓글은 1단계.",
+    "",
+    "## 인증",
+    "",
+    "세션은 30일이다.",
+  ].join("\n");
 
-  assert.match(summarizeEdit({ path: "a.md", before: BEFORE, after: swapped, author: "n" }), /\(\+0 −0\)/);
+  assert.match(
+    summarizeEdit({
+      path: "a.md",
+      before: BEFORE,
+      after: swapped,
+      author: "n",
+    }),
+    /\(\+0 −0\)/,
+  );
 });
 
 test("새 문서 · 수정 · 삭제의 첫 줄이 다르다", () => {
@@ -63,11 +86,11 @@ test("새 문서 · 수정 · 삭제의 첫 줄이 다르다", () => {
 
   assert.match(
     summarizeEdit({ path: "a.md", before: null, after: BEFORE, author }),
-    /^a\.md 새 문서 \(\+11\)/,
+    /^a\.md new document \(\+11\)/,
   );
   assert.match(
     summarizeEdit({ path: "a.md", before: BEFORE, after: null, author }),
-    /^삭제: a\.md/,
+    /^deleted: a\.md/,
   );
   assert.match(
     summarizeEdit({
@@ -83,7 +106,12 @@ test("새 문서 · 수정 · 삭제의 첫 줄이 다르다", () => {
 
 test("메모가 없으면 작성자만 남는다", () => {
   assert.match(
-    summarizeEdit({ path: "a.md", before: null, after: "# x", author: "neruu00" }),
+    summarizeEdit({
+      path: "a.md",
+      before: null,
+      after: "# x",
+      author: "neruu00",
+    }),
     /\n— neruu00$/,
   );
 });
@@ -98,5 +126,5 @@ test("섹션이 많으면 끊고 남은 개수를 적는다", () => {
     author: "n",
   });
 
-  assert.ok(summary.includes("외 3개"), summary);
+  assert.ok(summary.includes("+3 more"), summary);
 });

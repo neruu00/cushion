@@ -6,6 +6,7 @@
  * 그때는 옆의 "전문 보기"가 유일한 수단이라는 걸 읽는 사람이 알아야 한다.
  */
 import { countChanges, diffLines, toHunks } from "@/lib/diff";
+import { getDict } from "@/lib/i18n";
 
 interface DiffViewProps {
   before: string;
@@ -18,20 +19,17 @@ const TONE: Record<string, string> = {
   " ": "text-muted-foreground",
 };
 
-export function DiffView({ before, after }: DiffViewProps) {
+export async function DiffView({ before, after }: DiffViewProps) {
+  const t = (await getDict()).diff;
   const lines = diffLines(before, after);
 
   if (lines === null) {
-    return (
-      <p className="px-3 py-2 text-xs text-muted-foreground">
-        변경이 너무 커서 diff를 생략했어요. 아래 전문을 봐주세요.
-      </p>
-    );
+    return <p className="px-3 py-2 text-xs text-muted-foreground">{t.tooLarge}</p>;
   }
 
   const { added, removed } = countChanges(lines);
   if (added === 0 && removed === 0) {
-    return <p className="px-3 py-2 text-xs text-muted-foreground">내용 변경이 없어요.</p>;
+    return <p className="px-3 py-2 text-xs text-muted-foreground">{t.noChange}</p>;
   }
 
   return (
@@ -42,7 +40,7 @@ export function DiffView({ before, after }: DiffViewProps) {
       {toHunks(lines, after).map((hunk, index) => (
         <div key={index} className="overflow-hidden rounded border">
           <p className="border-b bg-muted/40 px-2 py-1 font-mono text-xs text-muted-foreground">
-            {hunk.heading ? `## ${hunk.heading}` : "(머리말)"}
+            {hunk.heading ? `## ${hunk.heading}` : t.preamble}
           </p>
           <pre className="overflow-x-auto font-mono text-xs leading-relaxed">
             {hunk.lines.map((line, i) => (

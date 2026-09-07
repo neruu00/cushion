@@ -1,89 +1,98 @@
 ---
 name: cushion-divide
-description: 굵어진 섹션을 쪼개거나 새 문서로 옮겨 에이전트가 읽는 단위를 줄인다. 사용자가 /cushion-divide [문서] 로 부를 때만. 문서명을 주면 그 문서만, 없으면 전체에서 후보를 찾는다.
+description: Split a section that has grown heavy, or move it into its own document, so the unit an agent reads gets smaller. Only when the user asks with /cushion-divide [document]. Given a name it does that document, otherwise it looks for candidates across all of them.
 ---
 
-# 읽는 단위가 굵어졌을 때 쪼개기
+# Splitting when the unit you read gets too heavy
 
-**문서 크기는 읽기 비용이 아니다.** `doc_get(heading:)`이 섹션 단위라 문서가 커져도 필요한
-섹션만 나온다. 세션마다 통째로 실리는 목차는 본문에 비해 미미하다.
+**Document size is not read cost.** `doc_get(heading:)` works per section, so a document can
+grow and you still only get the section you asked for. The outline, which does load every
+session, is tiny next to the bodies.
 
-비용은 **주소 단위가 필요보다 굵을 때** 생긴다. 항목 하나를 보려고 그 항목이 든 거대한
-섹션 전체를 실어야 하는 식이다 — 결정 로그가 전형이다. 그러니 재는 것은 문서가 아니라
-**섹션**이다.
+The cost appears when **the addressable unit is coarser than what you need** — when reading
+one item means loading the enormous section that item sits in. A decision log is the classic
+case. So what you measure is not the document, it is the **section**.
 
-## 1. 범위를 정한다
+## 1. Set the scope
 
-인자로 문서명이 오면 그것만 본다(`.md` 생략 가능, 대소문자 무시):
+If a document name came in as an argument, look only at that one (`.md` optional, case
+insensitive):
 
 ```
 /cushion-divide PLAN     →  PLAN.md
 ```
 
-없으면 `doc_outline`으로 목록을 보고 후보를 고른다. **섹션 크기는 본문을 읽어야 안다** —
-목차에는 길이가 없다. 문서가 10개를 넘으면 전부 읽기 전에 먼저 묻는다.
+Otherwise list them with `doc_outline` and pick candidates. **You only learn a section's size
+by reading the body** — the outline carries no lengths. If there are more than ten documents,
+ask before reading them all.
 
-## 2. 언제 쪼개나
+## 2. When to split
 
-세 조건 중 **하나라도** 맞을 때만 제안한다. 아니면 그냥 두는 게 낫다.
+Propose a split only if **at least one** of these three holds. Otherwise leaving it alone is
+better.
 
-1. **섹션이 그 라이브러리 섹션 중앙값의 5배 이상**
-2. **한 섹션에 서로 다른 독자·작업이 섞여 있다** — 하나를 보려고 나머지를 실어야 한다
-3. **자주 고치는 섹션이다** — `base_sha` 충돌은 문서 단위라, 떼면 경합이 준다
+1. **The section is 5× the median section size in that library or more**
+2. **One section mixes different readers or different tasks** — reading one means loading the rest
+3. **The section is edited often** — `base_sha` conflicts are per document, so splitting it out reduces contention
 
-## 3. 두 가지를 구분한다 — 기본은 섹션 쪼개기다
+## 3. Two different moves — splitting a section is the default
 
-| | 언제 | 목차 비용 | 읽기 이득 |
+| | When | Outline cost | Read benefit |
 |---|---|---|---|
-| **섹션 쪼개기** (같은 문서 안) | 큰 섹션이 한 주제일 때 | 헤딩 몇 줄 | 크다 |
-| **문서 분리** (새 문서로) | 주제 자체가 다를 때 | 경로 + 헤딩 전부 | 없다 |
+| **Split a section** (same document) | A big section is really one topic | A few heading lines | Large |
+| **Split out a document** (new file) | The topic itself is different | Path + every heading | None |
 
-**문서를 나눠도 읽기 비용은 줄지 않는다.** 섹션 수가 그대로라 목차만 길어진다.
-새 문서는 주제가 정말 다를 때만 만든다 — 그때 얻는 건 읽기 비용이 아니라 **찾기**와
-**쓰기 경합**이다.
+**Splitting a document does not reduce read cost.** The section count is unchanged; only the
+outline gets longer. Create a new document only when the topic genuinely differs — what you
+gain there is not read cost but **findability** and **write contention**.
 
-## 4. 인용을 먼저 조사한다
+## 4. Survey the references first
 
-섹션 번호(`§6`)와 결정 번호(`D-011`) 같은 식별자는 **문서 밖에서 인용된다** — 코드 주석과
-`AGENTS.md` 같은 레포 파일이 `(SPEC §6)`, `(D-011)` 형태로 가리키곤 한다. 깨져도 아무것도
-실패하지 않아서, 다음 사람이 없는 섹션을 찾아 헤맬 뿐이다.
+Identifiers like section numbers (`§6`) and decision numbers (`D-011`) **get cited from
+outside the document** — code comments and repo files such as `AGENTS.md` point at them as
+`(SPEC §6)` or `(D-011)`. Nothing fails when they break; the next person just hunts for a
+section that is not there.
 
-- **번호를 바꾸지 않는다.** 옮기더라도 번호는 따라간다
-- `doc_search`로 다른 문서가 그 섹션을 가리키는지 본다 — 가리키면 같이 고친다
-- 문서 밖(코드·레포 파일) 인용은 이 스킬이 못 고친다. **목록으로 보고**해 사람이 정하게 한다
+- **Do not renumber.** A number travels with its content even when it moves
+- Use `doc_search` to see whether other documents point at that section — fix those too
+- References from outside the docs (code, repo files) are beyond this skill's reach. **Report
+  them as a list** and let a person decide
 
-## 5. 보여주고, 승인받고, 옮긴다
+## 5. Show it, get approval, then move
 
-옮길(쪼갤) 범위와 결과 모양을 먼저 보여준다. 승인받은 뒤에 진행한다.
-어느 쪽이든 `content`에는 **`##` 줄까지 포함**한다 — 빼먹으면 섹션 제목이 사라진다.
+Show the range being moved (or split) and the resulting shape first. Proceed only once
+approved. Either way `content` must **include the `##` line** — leave it out and the section
+title disappears.
 
-**섹션 쪼개기** — 교체 한 번이면 된다. 교체 본문에 `##`를 여러 개 넣으면 갈라진다:
-
-```
-doc_get(library:"…", path:"…", heading:"큰 섹션")        # 본문과 sha를 받고
-doc_put(library:"…", path:"…", heading:"큰 섹션",
-        content:"## 주제 A\n…\n\n## 주제 B\n…",
-        base_sha:"<받은 sha>", note:"…")
-```
-
-**문서 분리** — 두 번이고 순서가 있다:
+**Splitting a section** — one replacement does it. Put several `##` headings in the
+replacement body and it splits:
 
 ```
-doc_get(library:"…", path:"<원본>", heading:"…")          # 본문과 sha를 받고
-doc_put(library:"…", path:"<새 경로>", content:"…")       # ① 새 문서를 먼저 만든다
-doc_put(library:"…", path:"<원본>", heading:"…",
-        content:"## …\n한 줄 요약 + 새 경로",
-        base_sha:"<받은 sha>", note:"…")                   # ② 그다음 원본을 줄인다
+doc_get(library:"…", path:"…", heading:"the big section")   # take the body and sha
+doc_put(library:"…", path:"…", heading:"the big section",
+        content:"## Topic A\n…\n\n## Topic B\n…",
+        base_sha:"<the sha you got>", note:"…")
 ```
 
-- **①②의 순서를 뒤집지 않는다.** 트랜잭션이 없어서 중간에 실패할 수 있는데, 이 순서면
-  실패해도 내용이 두 곳에 남는다(눈에 보이고 고칠 수 있다). 뒤집으면 원본은 지워졌는데
-  새 문서가 없는 상태가 된다
-- ①의 응답이 `이미 있는 문서`류면 **멈춘다.** 경로가 겹친 것이고, 덮으면 남의 문서가
-  사라진다. 다른 경로를 제안한다
-- 원본에는 **한 줄 요약 + 새 경로**를 남긴다. 빈 껍데기 헤딩은 목차만 먹고 아무것도
-  안 알려준다
+**Splitting out a document** — two calls, and the order matters:
 
-## 6. 보고
+```
+doc_get(library:"…", path:"<original>", heading:"…")        # take the body and sha
+doc_put(library:"…", path:"<new path>", content:"…")        # ① create the new document first
+doc_put(library:"…", path:"<original>", heading:"…",
+        content:"## …\none-line summary + the new path",
+        base_sha:"<the sha you got>", note:"…")              # ② then shrink the original
+```
 
-새 문서 경로, 원본 감소량, **손봐야 할 문서 밖 인용 목록** 한 줄씩. 본문은 다시 출력하지 않는다.
+- **Do not reverse ① and ②.** There are no transactions, so a call can fail halfway; in this
+  order a failure leaves the content in two places (visible, and fixable). Reversed, it
+  leaves the original gone and the new document missing
+- If ① comes back saying the document already exists, **stop.** The path collided, and
+  overwriting destroys somebody's document. Propose another path
+- Leave **a one-line summary plus the new path** in the original. An empty shell heading eats
+  outline space and tells you nothing
+
+## 6. Report
+
+One line each for the new document path, how much the original shrank, and **the list of
+outside references that need fixing**. Do not print the body back out.

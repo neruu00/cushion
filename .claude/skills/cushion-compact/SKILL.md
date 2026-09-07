@@ -1,79 +1,86 @@
 ---
 name: cushion-compact
-description: Cushion 문서에서 더는 일하지 않는 내용을 걷어낸다. 사용자가 /cushion-compact [문서] 로 부를 때만. 문서명을 주면 그 문서만, 없으면 전체에서 후보를 찾는다.
+description: Strip out the parts of a Cushion document that no longer do any work. Only when the user asks with /cushion-compact [document]. Given a name it does that document, otherwise it looks for candidates across all of them.
 ---
 
-# 문서에서 죽은 문장 걷어내기
+# Cutting dead sentences out of a document
 
-문서는 늘어나기만 한다. 완료된 작업의 진행 중 서술, 해결된 질문의 경위, 두 곳에 같은 말 —
-전부 에이전트가 매번 실어 나르는 비용이다.
+Documents only ever grow. In-progress narration of finished work, the backstory of a settled
+question, the same thing said in two places — all of it is weight an agent carries every time.
 
-**요약이 아니라 삭제다.** 남기는 문장은 원문 그대로 둔다. 고쳐 쓰면 그건 압축이 아니라
-재작성이고, 근거가 슬쩍 바뀐다.
+**This is deletion, not summarising.** Sentences that stay keep their exact wording. Rewriting
+them is not compaction, it is a rewrite, and the rationale quietly shifts underneath.
 
-## 1. 범위를 정한다
+## 1. Set the scope
 
-인자로 문서명이 오면 그것만 본다 — `.md`는 생략해도 되고 대소문자도 가린다:
+If a document name came in as an argument, look only at that one — `.md` is optional and case
+does not matter:
 
 ```
 /cushion-compact SPEC     →  SPEC.md
 ```
 
-인자가 없으면 `doc_outline`으로 목록을 보고 후보를 고른다. **문서가 10개를 넘으면
-전부 읽기 전에 먼저 묻는다** — 판단하려면 본문을 읽어야 하고, 그게 곧 비용이다.
-이름이 여러 개에 걸리면 고르게 한다.
+With no argument, list them with `doc_outline` and choose candidates. **If there are more
+than ten documents, ask before reading them all** — judging requires reading the bodies, and
+that is the cost. If the name matches several, let the user pick.
 
-## 2. 지울 수 있는 것 / 없는 것
+## 2. What can go, and what cannot
 
-**이 목록이 이 스킬의 본체다.** 없으면 에이전트는 자기가 이해 못 한 문장을 지운다.
+**This list is the whole point of the skill.** Without it an agent deletes the sentences it
+did not understand.
 
-**지운다**
+**Delete**
 
-- 완료된 작업의 진행 중 서술 — `[x]`인데 "다음엔 …할 것"이 남은 것
-- **`~~취소선~~`으로 해결 표시된 항목** — 결론 한 줄만 남기고 경위는 지운다
-- 같은 내용이 두 곳에 있는 것 → 한쪽을 참조 한 줄로
-- 코드·툴·화면이 이미 답하는 것 — 파일 구조, 함수 시그니처, 화면에 뜨는 수치
+- In-progress narration of finished work — an item marked `[x]` that still says "next we should …"
+- **Items struck through with `~~strikethrough~~` to mark them resolved** — keep the one-line
+  conclusion, drop the backstory
+- The same content in two places → make one of them a one-line reference
+- Anything the code, the tools or the screen already answers — file structure, function
+  signatures, numbers that the UI displays
 
-**지우지 않는다**
+**Do not delete**
 
-- **결정의 근거와 기각 이유.** 다음 사람이 같은 걸 다시 제안하지 않게 하는 유일한 장치다
-- **함정과 순서 의존.** "A가 B보다 먼저 와야 한다" 류는 짧아서 지우기 쉬운데, 그게 정확히
-  코드를 읽어서는 알 수 없는 것이다
-- **재검토 조건**
-- 낡아 보이지만 "왜 없앴나"를 설명하는 문장. 없애면 그 결정이 되살아난다
+- **The rationale for a decision, and why alternatives were rejected.** It is the only thing
+  stopping the next person proposing the same idea again
+- **Traps and order dependencies.** "A has to come before B" is short and therefore easy to
+  delete, and it is exactly what you cannot learn by reading the code
+- **Revisit-when conditions**
+- Sentences that look stale but explain *why something was removed*. Delete those and the
+  decision comes back
 
-## 3. 보여주고, 승인받고, 지운다
+## 3. Show it, get approval, then delete
 
-지울 줄마다 **위 목록 중 어느 항목인지 라벨을 붙여** 보여준다. 라벨을 못 붙이겠으면
-그건 지울 게 아니다.
-
-```
-SPEC.md ## 9. 화면
-  − 12줄  완료된 작업의 진행 중 서술
-  − 5줄   화면에 뜨는 수치 (코드가 답한다)
-  = 6,796자 → 5,100자 (−25%)
-```
-
-승인받은 뒤에만:
+For every line you would cut, **label which of the categories above it falls under**. If you
+cannot label it, it is not something to cut.
 
 ```
-doc_get(library:"…", path:"…", heading:"…")     # sha를 받고
+SPEC.md ## 9. Screens
+  − 12 lines  in-progress narration of finished work
+  − 5 lines   numbers the UI displays (the code answers this)
+  = 6,796 chars → 5,100 chars (−25%)
+```
+
+Only once approved:
+
+```
+doc_get(library:"…", path:"…", heading:"…")     # take the sha
 doc_put(library:"…", path:"…", heading:"…", content:"…",
-        base_sha:"<받은 sha>", note:"무엇을 왜 지웠나")
+        base_sha:"<the sha you got>", note:"what was cut and why")
 ```
 
-`content`에는 **`##` 줄까지 포함**한다 — 빼먹으면 섹션 제목이 같이 지워진다.
+`content` must **include the `##` line** — leave it out and the section title goes with it.
 
-## 4. 멈춰야 할 때
+## 4. When to stop
 
-- **한 번에 한 섹션.** 문서 전체를 한 번에 지우면 승인이 형식적이 된다
-- **한 섹션에서 30%를 넘게 지우게 되면 멈추고 묻는다.** 그건 압축이 아니라 재구성이고,
-  재구성은 사람이 정할 일이다
-- 지울 게 없으면 **없다고 말하고 끝낸다.** 억지로 채우면 근거가 사라진다
+- **One section at a time.** Cutting a whole document at once makes the approval a formality
+- **If you would cut more than 30% of a section, stop and ask.** That is a restructure, not
+  compaction, and restructuring is a person's call
+- If there is nothing to cut, **say so and stop.** Padding it out costs you rationale
 
-되돌릴 수 있다는 게 이 스킬을 허용 가능하게 만드는 근거다 — 모든 삭제는
-`document_versions`에 남고 이력 화면에서 복구된다. 그 경로를 깨뜨리는 작업과 같이 쓰지 않는다.
+What makes this skill acceptable at all is that it is reversible — every deletion lands in
+`document_versions` and can be restored from the history screen. Do not run it alongside work
+that touches that path.
 
-## 5. 보고
+## 5. Report
 
-섹션별로 `경로 ## 섹션 −N자(−N%)` 한 줄씩. 본문을 다시 출력하지 않는다.
+One line per section: `path ## section −N chars (−N%)`. Do not print the body back out.

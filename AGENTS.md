@@ -195,6 +195,34 @@ type ActionResult<T = void> =
 
 UI는 shadcn/ui(base·nova = Base UI + Lucide + Geist). 아이콘은 **`lucide-react`만**. 화면이 실제로 쓰는 컴포넌트만 `pnpm dlx shadcn@latest add`로 추가한다 — 미리 다 깔지 않는다.
 
+### 문구와 언어
+
+**접속 국가가 언어를 정한다 — 한국이면 한국어, 그 외에는 영어.** URL에는 언어가 없다.
+`lib/i18n.ts`의 `getLocale()`이 쿠키(사람이 고른 값) → `x-vercel-ip-country` → `Accept-Language`
+순으로 판정한다. 로케일이 붙는 건 **사람이 보는 화면뿐**이다.
+
+| 어디 | 언어 | 왜 |
+| --- | --- | --- |
+| 화면·서버 액션 에러 | 요청 언어 | 보는 사람의 언어 |
+| MCP 툴 설명·응답, `.claude/skills/**`, 플러그인 매니페스트 | **영어 고정** | 감지되는 국가는 읽는 사람이 아니라 그 CLI가 도는 머신이다. 플러그인은 스킬 경로가 하나뿐이라 분기 자체를 못 받는다 |
+| Mattermost·Discord 알림 | 한국어 | 레포당 웹훅이라 요청 국가를 알 수 없는 자리다 |
+| `sync_events.summary`의 이어주는 낱말 | 영어 | 저장된 한 벌을 알림·에이전트·타임라인이 나눠 쓴다. 자세한 건 `lib/summary.ts` 상단 |
+
+**문구를 새로 쓸 때**
+
+- 짧은 라벨·버튼·에러는 `lib/i18n.en.ts`에 키를 더한다. `lib/i18n.ko.ts`가 `Dict`를 받으므로
+  빠뜨리면 `pnpm typecheck`가 잡는다. 보간은 `{name}` + `fill()`, 문장 중간에 요소를 끼울 땐 `<Fill>`
+- **산문이 긴 화면**(랜딩·`/docs` 4쪽·`DocsDiagrams`)은 사전에 넣지 않는다. 그 파일 아래에
+  `Record<Locale, …>`로 두 언어를 나란히 둔다 — 골격은 한 벌만 두고 문장만 고른다
+- **웹과 MCP가 공유하는 함수는 문장을 만들지 않는다.** 사유 키만 돌려주고(`WriteReason`,
+  `CreateLibraryReason`), Zod 스키마도 메시지 자리에 사전 키를 넣는다. 문장은 경계에서 만든다 —
+  웹은 `translateIssue()`, MCP는 `agentIssue()`(영어 고정)
+- 클라이언트 컴포넌트는 사전을 import하지 않는다. 공용 문구는 `useUiCopy()`, 화면별 문구는
+  서버가 `t` prop으로 조각만 내린다 — import하면 두 언어가 통째로 번들에 들어간다
+
+`app/layout.tsx`의 Pretendard `preload: false`도 이 규칙의 일부다. 2MB짜리 한글 폰트를
+영어 방문자가 받지 않게 하는 장치라 켜지 않는다(주석에 이유가 있다).
+
 ### 주석
 
 파일 상단에 `@file` / `@description`. 인라인 주석은 **왜(Why)**를 쓴다. 주석 처리된 죽은 코드는 커밋하지 않는다.

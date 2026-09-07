@@ -15,7 +15,9 @@ import { Settings } from "lucide-react";
 
 import { updateLibrary } from "@/actions/library";
 import { ActionForm } from "@/components/ActionForm";
+import { Fill } from "@/components/Fill";
 import { Field } from "@/components/Field";
+import type { Dict } from "@/lib/i18n.en";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -34,6 +36,9 @@ interface LibrarySettingsDialogProps {
   discordWebhookUrl: string | null;
   /** 켜면 링크를 아는 누구나 로그인 없이 문서를 읽는다 (D-024) */
   isPublic: boolean;
+  /** 서버 페이지가 고른 언어 조각 */
+  t: Dict["librarySettings"];
+  common: Dict["common"];
 }
 
 export function LibrarySettingsDialog({
@@ -43,18 +48,18 @@ export function LibrarySettingsDialog({
   mattermostWebhookUrl,
   discordWebhookUrl,
   isPublic,
+  t,
+  common,
 }: LibrarySettingsDialogProps) {
   return (
     <Dialog>
       <DialogTrigger render={<Button variant="outline" size="sm" />}>
-        <Settings /> 설정
+        <Settings /> {t.trigger}
       </DialogTrigger>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>라이브러리 설정</DialogTitle>
-          <DialogDescription>
-            <strong>칸을 비우면 그 값이 지워져요.</strong> slug는 여기서 바꿀 수 없어요.
-          </DialogDescription>
+          <DialogTitle>{t.title}</DialogTitle>
+          <DialogDescription>{t.description}</DialogDescription>
         </DialogHeader>
 
         {/*
@@ -62,16 +67,16 @@ export function LibrarySettingsDialog({
           (revalidatePath), 언컨트롤드 입력은 초기화 이후 바뀐 defaultValue를 반영하지 못한다 —
           Base UI가 그걸 경고로 알려준다. 컨트롤드로 바꿔도 그 상태의 출처는 결국 같은 서버 값이다.
         */}
-        <ActionForm action={updateLibrary} submitLabel="저장" className="grid gap-3">
+        <ActionForm action={updateLibrary} submitLabel={common.save} className="grid gap-3">
           <input type="hidden" name="library_id" value={libraryId} />
-          <Field key={`nm:${name}`} name="name" label="이름" defaultValue={name} required />
+          <Field key={`nm:${name}`} name="name" label={common.name} defaultValue={name} required />
           <Field
             multiline
             key={`gh:${githubRepos.join(",")}`}
             name="github_repos"
-            label="이 라이브러리를 보는 GitHub 레포"
+            label={t.githubLabel}
             placeholder={"acme/web\nacme/api"}
-            hint="한 줄에 하나씩 적어 주세요. 조직 전체를 지정하려면 acme/* 한 줄이면 돼요"
+            hint={t.githubHint}
             defaultValue={githubRepos.join("\n")}
           />
           <Field
@@ -102,12 +107,15 @@ export function LibrarySettingsDialog({
               className="mt-0.5 size-4 shrink-0 accent-foreground"
             />
             <span className="grid gap-1">
-              <span className="font-medium">링크가 있으면 누구나 읽기</span>
+              <span className="font-medium">{t.publicLabel}</span>
               <span className="text-xs font-normal text-muted-foreground">
-                켜면 <strong className="text-foreground">로그인하지 않은 사람도</strong> 문서를
-                읽어요. 쓰기와 이력, 멤버 목록은 그대로 멤버에게만 보여요. 검색엔진에 올라가지는
-                않지만 <strong className="text-foreground">링크를 받은 사람은 누구나</strong> 볼 수
-                있어요.
+                <Fill
+                  template={t.publicHint}
+                  parts={{
+                    who: <strong className="text-foreground">{t.publicWho}</strong>,
+                    anyone: <strong className="text-foreground">{t.publicAnyone}</strong>,
+                  }}
+                />
               </span>
             </span>
           </label>

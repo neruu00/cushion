@@ -21,29 +21,35 @@ import {
   librarySettingsSchema,
   memberSchema,
 } from "@/lib/library.schema";
+import { getDict, translateIssue } from "@/lib/i18n";
 import { setupFiles } from "@/lib/snippets";
 import { supabase } from "@/lib/supabase";
 import { generateToken } from "@/lib/token";
 import { baseUrl, inviteUrl } from "@/lib/url";
+import { fill } from "@/lib/utils";
 
-export async function createLibrary(
-  _prev: SecretState,
-  formData: FormData,
-): Promise<SecretState> {
+export async function createLibrary(_prev: SecretState, formData: FormData): Promise<SecretState> {
+  const t = await getDict();
+
   // 로그인이면 누구나 만든다 (D-013). 열람·쓰기는 여전히 멤버만이다.
   const email = await getSessionEmail();
-  if (!email) return { success: false, error: "로그인이 필요해요." };
+  if (!email) return { success: false, error: t.errors.signInRequired };
 
   // 생성 로직은 lib/repository.ts 하나뿐이다. MCP library_create도 같은 함수를 지난다.
   const result = await createLibraryFor(email, Object.fromEntries(formData));
-  if (!result.ok) return { success: false, error: result.message };
+  if (!result.ok) {
+    return {
+      success: false,
+      error: result.code === "invalid" ? translateIssue(result.issue, t) : t.errors[result.reason],
+    };
+  }
 
   revalidatePath("/dashboard");
   return {
     success: true,
     data: {
-      hint: `${result.slug} 라이브러리를 만들었어요. 문서는 /libraries/${result.slug} 에서 관리하고, 에이전트를 붙이는 순서는 /settings/tokens 에서 확인하세요.`,
-      files: setupFiles(result.slug),
+      hint: fill(t.hints.libraryCreated, { slug: result.slug }),
+      files: setupFiles(result.slug, t.snippets),
     },
   };
 }
@@ -55,15 +61,22 @@ async function canManageLibrary(email: string, libraryId: string): Promise<boole
 }
 
 export async function addMember(_prev: SecretState, formData: FormData): Promise<SecretState> {
+  const t = await getDict();
+
   // 세션부터 — 레포 단위 판정은 library_id를 알아야 해서 Zod 뒤에 온다
   const email = await getSessionEmail();
-  if (!email) return { success: false, error: "로그인이 필요해요." };
+  if (!email) return { success: false, error: t.errors.signInRequired };
 
   const parsed = memberSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return { success: false, error: parsed.error.issues[0].message };
+  if (!parsed.success) {
+    return {
+      success: false,
+      error: translateIssue(parsed.error.issues[0].message, t),
+    };
+  }
 
   if (!(await canManageLibrary(email, parsed.data.library_id))) {
-    return { success: false, error: "이 라이브러리의 소유자만 초대할 수 있어요." };
+    return { success: false, error: t.errors.ownerOnlyInvite };
   }
 
   const { error } = await supabase.from("library_members").insert(parsed.data);
@@ -71,7 +84,7 @@ export async function addMember(_prev: SecretState, formData: FormData): Promise
     console.error("addMember", error);
     return {
       success: false,
-      error: error.code === "23505" ? "이미 등록된 멤버예요." : "등록하지 못했어요. 잠시 후 다시 시도해 주세요.",
+      error: error.code === "23505" ? t.errors.memberDuplicate : t.errors.memberFailed,
     };
   }
 
@@ -82,15 +95,22 @@ export async function addMember(_prev: SecretState, formData: FormData): Promise
 
 /** 이미 만든 라이브러리의 설정 갱신. 권한은 멤버 관리와 같은 문턱이다 (그 라이브러리의 소유자, D-021). */
 export async function updateLibrary(_prev: SecretState, formData: FormData): Promise<SecretState> {
+  const t = await getDict();
+
   const email = await getSessionEmail();
-  if (!email) return { success: false, error: "로그인이 필요해요." };
+  if (!email) return { success: false, error: t.errors.signInRequired };
 
   const parsed = librarySettingsSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return { success: false, error: parsed.error.issues[0].message };
+  if (!parsed.success) {
+    return {
+      success: false,
+      error: translateIssue(parsed.error.issues[0].message, t),
+    };
+  }
 
   const { library_id, ...settings } = parsed.data;
   if (!(await canManageLibrary(email, library_id))) {
-    return { success: false, error: "이 라이브러리의 소유자만 설정을 바꿀 수 있어요." };
+    return { success: false, error: t.errors.ownerOnlySettings };
   }
 
   // slug를 되받아 재검증에 쓴다 — 폼이 준 값을 믿고 경로를 만들지 않는다.
@@ -103,7 +123,7 @@ export async function updateLibrary(_prev: SecretState, formData: FormData): Pro
 
   if (error || !data) {
     console.error("updateLibrary", error);
-    return { success: false, error: "저장하지 못했어요. 잠시 후 다시 시도해 주세요." };
+    return { success: false, error: t.errors.settingsFailed };
   }
 
   revalidatePath(`/libraries/${data.slug}`);
@@ -118,11 +138,11 @@ export async function updateLibrary(_prev: SecretState, formData: FormData): Pro
     success: true,
     data: {
       // 공개 여부는 결과 문구에서 확인할 수 있어야 한다 — 실수로 켠 걸 알아채는 지점이다
-      hint: `설정을 저장했어요. GitHub 레포 ${settings.github_repos.length}개, 알림 ${
-        connected.length > 0 ? connected.join(" · ") : "없음"
-      }, 공개 범위는 ${
-        settings.is_public ? "링크를 아는 누구나 읽기" : "멤버만 읽기"
-      }예요.`,
+      hint: fill(t.hints.settingsSaved, {
+        repos: settings.github_repos.length,
+        channels: connected.length > 0 ? connected.join(" · ") : t.common.none,
+        visibility: settings.is_public ? t.hints.visibilityPublic : t.hints.visibilityMembers,
+      }),
     },
   };
 }
@@ -166,14 +186,16 @@ export async function createInviteLink(
   _prev: SecretState,
   formData: FormData,
 ): Promise<SecretState> {
+  const t = await getDict();
+
   const email = await getSessionEmail();
-  if (!email) return { success: false, error: "로그인이 필요해요." };
+  if (!email) return { success: false, error: t.errors.signInRequired };
 
   const parsed = inviteActionSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return { success: false, error: "잘못된 요청이에요." };
+  if (!parsed.success) return { success: false, error: t.errors.badRequest };
 
   if (!(await canManageLibrary(email, parsed.data.library_id))) {
-    return { success: false, error: "이 라이브러리의 소유자만 초대 링크를 만들 수 있어요." };
+    return { success: false, error: t.errors.ownerOnlyLink };
   }
 
   const { error: revokeError } = await supabase
@@ -192,7 +214,7 @@ export async function createInviteLink(
 
   if (error) {
     console.error("createInviteLink", error.code, error.message);
-    return { success: false, error: "초대 링크를 만들지 못했어요. 잠시 후 다시 시도해 주세요." };
+    return { success: false, error: t.errors.inviteFailed };
   }
 
   revalidatePath(`/libraries/${parsed.data.library_slug}`);
@@ -200,7 +222,7 @@ export async function createInviteLink(
     success: true,
     data: {
       secret: inviteUrl(baseUrl(), token.plaintext),
-      hint: "이 링크는 다시 볼 수 없어요. 링크를 가진 사람은 로그인만 하면 참여할 수 있으니, 꼭 필요한 사람에게만 보내세요.",
+      hint: t.hints.inviteCreated,
     },
   };
 }

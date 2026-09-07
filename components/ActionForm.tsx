@@ -15,6 +15,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { ConnectTabs, type ConnectGroup } from "@/components/ConnectTabs";
 import { CopyBlock } from "@/components/CopyBlock";
+import { useUiCopy } from "@/components/UiCopyProvider";
 import type { SecretState } from "@/lib/action.type";
 
 interface ActionFormProps {
@@ -59,6 +60,7 @@ export function ActionForm({
   filesLayout = "list",
   hideSecret = false,
 }: ActionFormProps) {
+  const { common, form } = useUiCopy();
   const [state, formAction, pending] = useActionState(action, null);
 
   return (
@@ -66,7 +68,7 @@ export function ActionForm({
       <form action={formAction} className={className ?? "flex flex-wrap items-end gap-2"}>
         {children}
         <Button type="submit" disabled={pending}>
-          {pending ? "처리 중…" : submitLabel}
+          {pending ? common.working : submitLabel}
         </Button>
       </form>
 
@@ -83,16 +85,10 @@ export function ActionForm({
           {state.data.secret ? (
             <>
               <Alert>
-                <AlertTitle>지금 한 번만 보여요</AlertTitle>
-                <AlertDescription>
-                  서버에는 해시만 저장돼요. 이 화면을 벗어나면 다시 볼 수 없고, 재발급만 할 수 있어요.
-                </AlertDescription>
+                <AlertTitle>{form.onlyOnce}</AlertTitle>
+                <AlertDescription>{form.onlyOnceBody}</AlertDescription>
               </Alert>
-              <CopyBlock
-                value={state.data.secret}
-                label={state.data.hint}
-                hideValue={hideSecret}
-              />
+              <CopyBlock value={state.data.secret} label={state.data.hint} hideValue={hideSecret} />
             </>
           ) : (
             <p className="text-sm text-muted-foreground">{state.data.hint}</p>

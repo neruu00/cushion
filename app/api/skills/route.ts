@@ -17,6 +17,7 @@ export async function GET() {
     // 배포 번들에 .claude/skills가 안 실리면 여기로 온다 (next.config.ts의 트레이싱 설정).
     // 로컬에서는 파일이 그냥 있어서 절대 재현되지 않는다 — 배포 후 프로덕션에서 확인할 것.
     console.error("skills: read", cause);
-    return Response.json({ error: "스킬을 읽지 못했다" }, { status: 500 });
+    // 이 응답을 받는 쪽은 에이전트·설치 스크립트다. 에이전트용 텍스트는 영어 한 벌이다
+    return Response.json({ error: "Could not read the skills" }, { status: 500 });
   }
 }

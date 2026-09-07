@@ -32,6 +32,9 @@ import { formatDateTime } from "@/lib/datetime";
 import { getRequestLogs } from "@/lib/logs.db";
 import { supabase } from "@/lib/supabase";
 import { dayKeys } from "@/lib/usage";
+import { getDict } from "@/lib/i18n";
+import { Fill } from "@/components/Fill";
+import { fill } from "@/lib/utils";
 
 interface LibraryRow {
   id: string;
@@ -75,10 +78,7 @@ export default async function AdminPage() {
     supabase.from("users").select("email, created_at").order("created_at", { ascending: false }),
     supabase.from("library_members").select("email"),
     supabase.from("access_tokens").select("email, last_used_at, revoked_at"),
-    supabase
-      .from("usage_hourly")
-      .select("day, tool, calls")
-      .gte("day", dayKeys(USAGE_DAYS)[0]),
+    supabase.from("usage_hourly").select("day, tool, calls").gte("day", dayKeys(USAGE_DAYS)[0]),
     getRequestLogs({ limit: RECENT_LOGS }),
   ]);
 
@@ -94,7 +94,13 @@ export default async function AdminPage() {
   const person = (email: string): UserRow => {
     let entry = people.get(email);
     if (!entry) {
-      entry = { email, libraries: 0, tokens: 0, lastUsedAt: null, createdAt: null };
+      entry = {
+        email,
+        libraries: 0,
+        tokens: 0,
+        lastUsedAt: null,
+        createdAt: null,
+      };
       people.set(email, entry);
     }
     return entry;
@@ -123,6 +129,7 @@ export default async function AdminPage() {
     byTool.set(row.tool, (byTool.get(row.tool) ?? 0) + row.calls);
     totalCalls += row.calls;
   }
+  const t = (await getDict()).admin;
   const peak = Math.max(1, ...byDay.values());
   const toolTotals = [...byTool.entries()].sort((a, b) => b[1] - a[1]);
   const documentCount = libraries.reduce((sum, row) => sum + (row.documents[0]?.count ?? 0), 0);
@@ -130,14 +137,14 @@ export default async function AdminPage() {
   return (
     <PageShell className="space-y-8">
       <PageHeader
-        title="관리"
+        title={t.title}
         description={
           <>
-            멤버 관리는 각 라이브러리 화면에서 해요.{" "}
+            {t.description}{" "}
             {/* git이 없으므로 이게 유일한 백업이다 (D-011).
                 라우트 핸들러가 파일을 내려주므로 <Link>의 클라이언트 이동으로는 다운로드가 안 된다. */}
             <a href="/api/export" className="underline underline-offset-4 hover:text-foreground">
-              전체 내보내기
+              {t.exportAll}
             </a>
           </>
         }
@@ -146,10 +153,10 @@ export default async function AdminPage() {
       {/* 요약 — 각 섹션 표의 행 수와 같은 값이라 따로 조회하지 않는다 */}
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[
-          ["라이브러리", libraries.length],
-          ["문서", documentCount],
-          ["사용자", users.length],
-          [`${USAGE_DAYS}일 요청`, totalCalls],
+          [t.statLibraries, libraries.length],
+          [t.statDocuments, documentCount],
+          [t.statUsers, users.length],
+          [fill(t.statCalls, { days: USAGE_DAYS }), totalCalls],
         ].map(([label, value]) => (
           <div key={label} className="rounded-lg border p-4">
             <p className="text-xs text-muted-foreground">{label}</p>
@@ -161,10 +168,15 @@ export default async function AdminPage() {
       {/* 요청 수 — usage_hourly.calls 합산 (D-020). 막대는 CSS 폭이면 충분하다 */}
       <section className="space-y-3 rounded-lg border p-5">
         <div className="space-y-1">
-          <h2 className="text-sm font-medium">요청 수</h2>
+          <h2 className="text-sm font-medium">{t.callsHeading}</h2>
           <p className="text-xs text-muted-foreground">
-            최근 {USAGE_DAYS}일 동안의 MCP 툴 호출 횟수예요. 날짜는 UTC 기준이고,{" "}
-            <code>library</code> 인자 없이 부른 <code>doc_outline</code>은 빠져요.
+            <Fill
+              template={fill(t.callsHelp, { days: USAGE_DAYS })}
+              parts={{
+                library: <code>library</code>,
+                outline: <code>doc_outline</code>,
+              }}
+            />
           </p>
         </div>
         <div className="space-y-1">
@@ -196,22 +208,22 @@ export default async function AdminPage() {
       <section className="space-y-3 rounded-lg border p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="space-y-1">
-            <h2 className="text-sm font-medium">요청 로그</h2>
+            <h2 className="text-sm font-medium">{t.logsHeading}</h2>
             <p className="text-xs text-muted-foreground">
-              가장 최근 {RECENT_LOGS}건이에요. 상태 필터와 전체 목록은 전체 보기에 있어요.
+              {fill(t.logsHelp, { count: RECENT_LOGS })}
             </p>
           </div>
           <Link
             href="/admin/logs"
             className="text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground"
           >
-            전체 보기 →
+            {t.seeAll}
           </Link>
         </div>
 
         {logs.length === 0 ? (
           <p className="rounded-lg border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
-            아직 로그가 없어요.
+            {t.logsEmpty}
           </p>
         ) : (
           <LogTable logs={logs} />
@@ -220,20 +232,20 @@ export default async function AdminPage() {
 
       {/* 라이브러리 */}
       <section className="space-y-3 rounded-lg border p-5">
-        <h2 className="text-sm font-medium">라이브러리</h2>
+        <h2 className="text-sm font-medium">{t.librariesHeading}</h2>
         {libraries.length === 0 ? (
-          <p className="text-sm text-muted-foreground">등록된 라이브러리가 없어요.</p>
+          <p className="text-sm text-muted-foreground">{t.librariesEmpty}</p>
         ) : (
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>slug</TableHead>
-                <TableHead>이름</TableHead>
-                <TableHead className="text-right">문서</TableHead>
-                <TableHead className="text-right">멤버</TableHead>
-                <TableHead>알림</TableHead>
+                <TableHead>{t.colName}</TableHead>
+                <TableHead className="text-right">{t.colDocuments}</TableHead>
+                <TableHead className="text-right">{t.colMembers}</TableHead>
+                <TableHead>{t.colNotify}</TableHead>
                 <TableHead>GitHub</TableHead>
-                <TableHead>생성</TableHead>
+                <TableHead>{t.colCreated}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -257,7 +269,7 @@ export default async function AdminPage() {
                       library.discord_webhook_url ? "Discord" : null,
                     ]
                       .filter(Boolean)
-                      .join(" · ") || "없음"}
+                      .join(" · ") || t.notifyNone}
                   </TableCell>
                   <TableCell className="max-w-48 truncate font-mono text-xs text-muted-foreground">
                     {library.github_repos.join(", ") || "—"}
@@ -275,21 +287,19 @@ export default async function AdminPage() {
       {/* 사용자 */}
       <section className="space-y-3 rounded-lg border p-5">
         <div className="space-y-1">
-          <h2 className="text-sm font-medium">사용자</h2>
-          <p className="text-xs text-muted-foreground">
-            한 번이라도 로그인한 적이 있는 사용자예요.
-          </p>
+          <h2 className="text-sm font-medium">{t.usersHeading}</h2>
+          <p className="text-xs text-muted-foreground">{t.usersHelp}</p>
         </div>
         {users.length === 0 ? (
-          <p className="text-sm text-muted-foreground">아직 아무도 없어요.</p>
+          <p className="text-sm text-muted-foreground">{t.usersEmpty}</p>
         ) : (
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>이메일</TableHead>
-                <TableHead className="text-right">라이브러리</TableHead>
-                <TableHead className="text-right">유효 토큰</TableHead>
-                <TableHead>토큰 최근 사용</TableHead>
+                <TableHead>{t.colEmail}</TableHead>
+                <TableHead className="text-right">{t.colLibraries}</TableHead>
+                <TableHead className="text-right">{t.colLiveTokens}</TableHead>
+                <TableHead>{t.colTokenLastUsed}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -322,4 +332,3 @@ export default async function AdminPage() {
     </PageShell>
   );
 }
-

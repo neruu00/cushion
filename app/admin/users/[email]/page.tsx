@@ -23,6 +23,8 @@ import { isAdmin } from "@/lib/authz";
 import { formatDateTime } from "@/lib/datetime";
 import { getRequestLogs } from "@/lib/logs.db";
 import { supabase } from "@/lib/supabase";
+import { getDict } from "@/lib/i18n";
+import { fill } from "@/lib/utils";
 
 interface MembershipRow {
   created_at: string;
@@ -38,9 +40,7 @@ interface TokenRow {
 
 const LOG_LIMIT = 50;
 
-export default async function UserDetailPage({
-  params,
-}: PageProps<"/admin/users/[email]">) {
+export default async function UserDetailPage({ params }: PageProps<"/admin/users/[email]">) {
   // admin이 아니면 404. 403은 "그런 화면이 있다"를 알려준다.
   if (!(await isAdmin())) notFound();
 
@@ -69,6 +69,8 @@ export default async function UserDetailPage({
   const memberships = (membershipsRes.data as MembershipRow[] | null) ?? [];
   const tokens = (tokensRes.data as TokenRow[] | null) ?? [];
 
+  const t = (await getDict()).admin;
+
   // users 테이블에도 없고 멤버도 아니고 토큰도 없으면 그런 사용자는 없다
   if (!userRes.data && memberships.length === 0 && tokens.length === 0) notFound();
 
@@ -77,24 +79,27 @@ export default async function UserDetailPage({
       <PageHeader
         breadcrumb={
           <Link href="/admin" className="hover:underline">
-            관리
+            {t.title}
           </Link>
         }
         title={<span className="font-mono">{email}</span>}
-        description={`라이브러리 ${memberships.length}개에 속해 있고, 발급한 토큰은 폐기한 것까지 포함해 ${tokens.length}개예요.`}
+        description={fill(t.userDescription, {
+          libraries: memberships.length,
+          tokens: tokens.length,
+        })}
       />
 
       <section className="space-y-3 rounded-lg border p-5">
-        <h2 className="text-sm font-medium">소속 라이브러리</h2>
+        <h2 className="text-sm font-medium">{t.memberOf}</h2>
         {memberships.length === 0 ? (
-          <p className="text-sm text-muted-foreground">어디에도 속해 있지 않아요.</p>
+          <p className="text-sm text-muted-foreground">{t.memberOfEmpty}</p>
         ) : (
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>slug</TableHead>
-                <TableHead>이름</TableHead>
-                <TableHead>합류</TableHead>
+                <TableHead>{t.colName}</TableHead>
+                <TableHead>{t.colJoined}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -124,17 +129,17 @@ export default async function UserDetailPage({
       </section>
 
       <section className="space-y-3 rounded-lg border p-5">
-        <h2 className="text-sm font-medium">토큰</h2>
+        <h2 className="text-sm font-medium">{t.tokensHeading}</h2>
         {tokens.length === 0 ? (
-          <p className="text-sm text-muted-foreground">발급한 토큰이 없어요.</p>
+          <p className="text-sm text-muted-foreground">{t.tokensEmpty}</p>
         ) : (
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>이름</TableHead>
-                <TableHead>상태</TableHead>
-                <TableHead>발급</TableHead>
-                <TableHead>최근 사용</TableHead>
+                <TableHead>{t.colName}</TableHead>
+                <TableHead>{t.colStatus}</TableHead>
+                <TableHead>{t.colIssued}</TableHead>
+                <TableHead>{t.colLastUsedShort}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -143,9 +148,9 @@ export default async function UserDetailPage({
                   <TableCell className="text-xs">{token.name ?? "—"}</TableCell>
                   <TableCell className="text-xs">
                     {token.revoked_at ? (
-                      <span className="text-muted-foreground">폐기</span>
+                      <span className="text-muted-foreground">{t.tokenRevoked}</span>
                     ) : (
-                      "유효"
+                      t.tokenLive
                     )}
                   </TableCell>
                   <TableCell className="whitespace-nowrap font-mono text-xs text-muted-foreground">
@@ -164,16 +169,16 @@ export default async function UserDetailPage({
 
       <section className="space-y-3 rounded-lg border p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <h2 className="text-sm font-medium">최근 요청 (최신 {LOG_LIMIT}건)</h2>
+          <h2 className="text-sm font-medium">{fill(t.recentRequests, { count: LOG_LIMIT })}</h2>
           <Link
             href="/admin/logs"
             className="text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground"
           >
-            전체 로그 →
+            {t.allLogs}
           </Link>
         </div>
         {logs.length === 0 ? (
-          <p className="text-sm text-muted-foreground">MCP 요청 기록이 없어요.</p>
+          <p className="text-sm text-muted-foreground">{t.noRequests}</p>
         ) : (
           <LogTable logs={logs} showActor={false} />
         )}

@@ -12,30 +12,31 @@ import { ArrowRight } from "lucide-react";
 import { useFormStatus } from "react-dom";
 
 import { Button } from "@/components/ui/button";
+import type { Dict } from "@/lib/i18n.en";
 
 interface SignInButtonProps {
   /** 랜딩의 큰 버튼(true) 또는 헤더의 텍스트 버튼(false) */
   hero?: boolean;
+  /** 서버 컴포넌트가 골라 내려 준다 — 클라이언트가 사전 두 벌을 번들에 싣지 않게 */
+  t: Dict["common"];
 }
 
-export function SignInButton({ hero = false }: SignInButtonProps) {
+export function SignInButton({ hero = false, t }: SignInButtonProps) {
   const { pending } = useFormStatus();
 
   if (!hero) {
+    // 헤더에서도 외곽선 버튼이다. 맨 텍스트로 두면 옆의 언어 선택·탐색 링크와 같은 무게로
+    // 보여서, 비로그인이 처음 해야 할 한 가지가 헤더에서 눈에 띄지 않는다
     return (
-      <button
-        type="submit"
-        disabled={pending}
-        className="cursor-pointer hover:text-foreground disabled:cursor-default disabled:opacity-60"
-      >
-        {pending ? "이동 중…" : "로그인"}
-      </button>
+      <Button type="submit" variant="outline" size="sm" disabled={pending}>
+        {pending ? t.signingIn : t.signIn}
+      </Button>
     );
   }
 
   return (
     <Button type="submit" size="lg" disabled={pending}>
-      {pending ? "Google로 이동 중…" : "Google로 시작하기"} <ArrowRight />
+      {pending ? t.signInWithGoogleBusy : t.signInWithGoogle} <ArrowRight />
     </Button>
   );
 }

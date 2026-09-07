@@ -108,25 +108,36 @@ function mcpJson(): string {
  * 이 한 줄이 유일한 방아쇠다 — 로컬에 문서가 없는 게 이 구조의 정상 상태라,
  * 이게 없으면 에이전트는 "문서가 없네" 하고 그냥 지나간다.
  */
-function agentsSnippet(slug: string): string {
-  return `## 문서
+function agentsSnippet(slug: string, t: SnippetCopy): string {
+  return `## ${t.agentsHeading}
 
-이 프로젝트의 문서(스펙·ADR·런북·회의록 등)는 레포가 아니라 Cushion의 \`${slug}\` 라이브러리에 있다.
-MCP 서버 \`cushion\`의 \`doc_*\` 툴로 읽고 쓴다. 사용법은 \`cushion\` 스킬에 있다.
+${t.agentsBody.replace("{slug}", slug)}
 `;
 }
 
-export function setupFiles(slug: string): { name: string; content: string }[] {
+/**
+ * 문구는 호출부(서버 액션)가 요청 언어로 골라 넘긴다.
+ *
+ * `@/lib/i18n.en`의 `Dict`를 직접 가져오지 않고 구조로 받는 이유: 이 파일은 `node --test`가
+ * 확장자까지 쓴 상대 경로로 직접 실행하는 순수 모듈이라 `@/` 별칭을 모른다 (D-008).
+ *
+ * ⚠️ 이 스니펫은 **사람이 자기 레포에 커밋하는 파일**이다. 에이전트가 읽는 텍스트지만
+ *    영어로 고정하지 않는다 — 한국어 팀의 `AGENTS.md`에 영어 문단이 끼어들 이유가 없고,
+ *    복사하는 사람이 곧 그 레포의 주인이라 그 사람의 언어가 맞다.
+ */
+export interface SnippetCopy {
+  mcpJsonName: string;
+  agentsName: string;
+  agentsHeading: string;
+  /** `{slug}` 자리표시자를 쓴다 */
+  agentsBody: string;
+}
+
+export function setupFiles(slug: string, t: SnippetCopy): { name: string; content: string }[] {
   return [
     // 개인 연결은 /settings/tokens의 온보딩(붙여넣기 두 번)이면 끝난다. 이 파일까지 두면
     // 프로젝트 스코프가 user 스코프를 덮어 `CUSHION_TOKEN` 없이는 그 안에서만 401이 난다.
-    {
-      name: ".mcp.json (팀 전체에 배포할 때만 쓰세요. 개인은 /settings/tokens 온보딩으로 충분해요)",
-      content: mcpJson(),
-    },
-    {
-      name: "AGENTS.md 에 덧붙이세요 (에이전트가 Cushion을 찾게 만드는 유일한 줄이에요)",
-      content: agentsSnippet(slug),
-    },
+    { name: t.mcpJsonName, content: mcpJson() },
+    { name: t.agentsName, content: agentsSnippet(slug, t) },
   ];
 }

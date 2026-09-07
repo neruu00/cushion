@@ -16,12 +16,15 @@ import { ChangeCard, type ChangeEvent } from "@/components/ChangeCard";
 import { PageHeader } from "@/components/PageHeader";
 import { PageShell } from "@/components/PageShell";
 import { getMemberLibrary, getSessionEmail } from "@/lib/authz";
+import { getDict } from "@/lib/i18n";
+import { fill } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 
 const LIMIT = 100;
 
 export default async function ChangesPage({ params }: PageProps<"/libraries/[library]/changes">) {
   const { library: slug } = await params;
+  const t = (await getDict()).changes;
 
   const email = await getSessionEmail();
   if (!email) {
@@ -50,16 +53,16 @@ export default async function ChangesPage({ params }: PageProps<"/libraries/[lib
             {library.slug}
           </Link>
         }
-        title="변경 내역"
+        title={t.title}
         description={
           events.length === LIMIT
-            ? `가장 최근 ${LIMIT}건을 보여 줘요.`
-            : `모두 ${events.length}건이에요.`
+            ? fill(t.latest, { count: LIMIT })
+            : fill(t.total, { count: events.length })
         }
       />
 
       {events.length === 0 ? (
-        <p className="text-sm text-muted-foreground">아직 변경 기록이 없어요.</p>
+        <p className="text-sm text-muted-foreground">{t.empty}</p>
       ) : (
         <ul className="divide-y rounded-lg border">
           {events.map((event) => (

@@ -13,7 +13,9 @@ import type { SaveResult } from "@/lib/action.type";
 import { getMemberLibrary, getSessionEmail, isAdmin } from "@/lib/authz";
 import { deleteDocument, putDocument } from "@/lib/document";
 import { deleteDocumentSchema, putDocumentSchema, restoreSchema } from "@/lib/document.schema";
+import { getDict, translateIssue } from "@/lib/i18n";
 import { supabase } from "@/lib/supabase";
+import { fill } from "@/lib/utils";
 
 /**
  * 저장 성공 후 화면이 새 sha를 들고 있어야 연속 편집이 된다.
@@ -23,11 +25,18 @@ export async function saveDocument(
   _prev: SaveResult | null,
   formData: FormData,
 ): Promise<SaveResult> {
+  const t = await getDict();
+
   const email = await getSessionEmail();
-  if (!email) return { success: false, error: "로그인이 필요해요." };
+  if (!email) return { success: false, error: t.errors.signInRequired };
 
   const parsed = putDocumentSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return { success: false, error: parsed.error.issues[0].message };
+  if (!parsed.success) {
+    return {
+      success: false,
+      error: translateIssue(parsed.error.issues[0].message, t),
+    };
+  }
 
   const result = await putDocument({
     email,
@@ -42,9 +51,14 @@ export async function saveDocument(
   if (!result.ok) {
     return {
       success: false,
-      error: result.message,
+      error: fill(t.errors[result.reason], result.params ?? {}),
       ...(result.currentSha !== undefined && result.currentContent !== undefined
-        ? { conflict: { sha: result.currentSha, content: result.currentContent } }
+        ? {
+            conflict: {
+              sha: result.currentSha,
+              content: result.currentContent,
+            },
+          }
         : {}),
     };
   }
@@ -68,7 +82,7 @@ export async function removeDocument(formData: FormData): Promise<void> {
     baseSha: parsed.data.base_sha,
     note: parsed.data.note,
   });
-  if (!result.ok) console.error("removeDocument", result.code, result.message);
+  if (!result.ok) console.error("removeDocument", result.code, result.reason);
 
   revalidatePath(`/libraries/${parsed.data.library}`);
 }
@@ -120,9 +134,12 @@ export async function restoreVersion(formData: FormData): Promise<void> {
     path: parsed.data.path,
     content: version.content,
     baseSha: current?.content_sha,
-    note: `${version.created_at.slice(0, 19)} 버전으로 되돌렸어요`,
+    // 되돌린 사람의 언어로 남긴다 — 이 메모는 이력·알림에 그대로 실린다
+    note: fill((await getDict()).history.restoredNote, {
+      when: version.created_at.slice(0, 19),
+    }),
   });
-  if (!result.ok) console.error("restoreVersion", result.code, result.message);
+  if (!result.ok) console.error("restoreVersion", result.code, result.reason);
 
   revalidatePath(`/libraries/${parsed.data.library}/${parsed.data.path}`);
   revalidatePath(`/libraries/${parsed.data.library}/history/${parsed.data.path}`);

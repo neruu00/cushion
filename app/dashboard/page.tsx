@@ -10,8 +10,12 @@ import { PageShell } from "@/components/PageShell";
 import { NewLibraryDialog } from "@/components/NewLibraryDialog";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getMemberLibraries, getSessionEmail } from "@/lib/authz";
+import { getDict } from "@/lib/i18n";
+import { fill } from "@/lib/utils";
 
 export default async function DashboardPage() {
+  const t = await getDict();
+
   const email = await getSessionEmail();
   if (!email) redirect("/api/auth/signin?callbackUrl=%2Fdashboard");
 
@@ -21,20 +25,22 @@ export default async function DashboardPage() {
   return (
     <PageShell className="space-y-6">
       <PageHeader
-        title="대시보드"
-        description="라이브러리를 만들면 에이전트가 MCP로 그 문서를 읽고 써요."
+        title={t.dashboard.title}
+        description={t.dashboard.description}
         // 비어 있으면 아래 빈 상태가 곧 CTA다 — 버튼이 두 군데면 눈이 갈린다
-        action={repos.length > 0 ? <NewLibraryDialog /> : undefined}
+        action={
+          repos.length > 0 ? <NewLibraryDialog t={t.newLibrary} common={t.common} /> : undefined
+        }
       />
 
       {repos.length === 0 ? (
         <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed px-6 py-12 text-center">
           <p className="text-sm text-muted-foreground">
-            아직 라이브러리가 없어요.
+            {t.dashboard.emptyLine1}
             <br />
-            새로 만들거나 팀원에게 초대를 요청하세요.
+            {t.dashboard.emptyLine2}
           </p>
-          <NewLibraryDialog />
+          <NewLibraryDialog t={t.newLibrary} common={t.common} />
         </div>
       ) : (
         <ul className="space-y-3">
@@ -49,7 +55,9 @@ export default async function DashboardPage() {
                       {library.github_repos.length > 0
                         ? ` · ${library.github_repos.slice(0, 2).join(", ")}${
                             library.github_repos.length > 2
-                              ? ` 외 ${library.github_repos.length - 2}`
+                              ? ` ${fill(t.dashboard.andMore, {
+                                  count: library.github_repos.length - 2,
+                                })}`
                               : ""
                           }`
                         : ""}

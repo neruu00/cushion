@@ -65,8 +65,10 @@ export async function recordRequestLog(input: RequestLogInput): Promise<void> {
 export type LogStatusFilter = "all" | "2xx" | "4xx" | "5xx";
 
 export const LOG_STATUS_FILTERS: { value: LogStatusFilter; label: string }[] = [
-  { value: "all", label: "전체" },
-  { value: "2xx", label: "성공" },
+  // 라벨은 사전 키다. 화면(`/admin/logs`)이 요청 언어로 바꾼다 — 이 모듈은 DB 조회라
+  // 언어를 알 이유가 없다
+  { value: "all", label: "filterAll" },
+  { value: "2xx", label: "filterOk" },
   { value: "4xx", label: "4xx" },
   { value: "5xx", label: "5xx" },
 ];

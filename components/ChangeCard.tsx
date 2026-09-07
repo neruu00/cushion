@@ -14,6 +14,7 @@
  */
 import { formatDate } from "@/lib/datetime";
 import { RowCard } from "@/components/RowCard";
+import { getDict } from "@/lib/i18n";
 
 export interface ChangeEvent {
   id: number;
@@ -29,7 +30,8 @@ interface ChangeCardProps {
   librarySlug: string;
 }
 
-export function ChangeCard({ event, librarySlug }: ChangeCardProps) {
+export async function ChangeCard({ event, librarySlug }: ChangeCardProps) {
+  const t = (await getDict()).changes;
   const paths = [...(event.changed_paths ?? []), ...(event.deleted_paths ?? [])];
   const [headline, ...rest] = (event.summary ?? "").split("\n");
 
@@ -40,7 +42,7 @@ export function ChangeCard({ event, librarySlug }: ChangeCardProps) {
           ? `/libraries/${librarySlug}/history/${paths[0]}`
           : `/libraries/${librarySlug}/changes`
       }
-      title={headline || paths.join(", ") || "요약 없음"}
+      title={headline || paths.join(", ") || t.noSummary}
       subtitle={
         rest.length > 0
           ? // 둘째 줄 끝에 " — 작성자"가 붙어 있다. 오른쪽에 이미 있으므로 떼어낸다

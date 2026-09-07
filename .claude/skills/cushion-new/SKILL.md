@@ -1,72 +1,78 @@
 ---
 name: cushion-new
-description: Cushion에 새 문서를 관례에 맞게 만든다(ADR·런북·회의록 등). 사용자가 /cushion-new [종류] [제목] 으로 부를 때만.
+description: Create a new document in Cushion following the existing conventions (ADR, runbook, meeting notes, and so on). Only when the user asks with /cushion-new [kind] [title].
 ---
 
-# 새 문서를 관례대로 만들기
+# Creating a document the way this library does it
 
-`doc_put`은 아무 경로에나 만들 수 있다. 그래서 매번 "ADR 다음 번호가 뭐지",
-"회의록은 어디 두지"를 재발명하게 된다. 이 스킬이 그걸 없앤다.
+`doc_put` will happily create anything anywhere. That is exactly why you end up reinventing
+"what is the next ADR number" and "where do meeting notes go" every single time. This skill
+removes that.
 
-## 1. 관례부터 읽는다
+## 1. Read the conventions first
 
 ```
 doc_outline(library:"<slug>")
 ```
 
-**있는 관례를 따른다.** 새로 만들지 않는다. 흔한 모양:
+**Follow what is already there.** Do not invent a new scheme. The usual shapes:
 
 ```
-adr/0007-token-rotation.md      번호 + 케밥케이스
-runbook/deploy.md               절차
-meetings/2026-08-14.md          날짜
-glossary.md                     한 장짜리
+adr/0007-token-rotation.md      number + kebab-case
+runbook/deploy.md               procedures
+meetings/2026-08-14.md          dates
+glossary.md                     a single page
 ```
 
-- 같은 접두사의 문서가 이미 있으면 **그 형식을 그대로 흉내낸다**
-- 번호가 붙는 종류(`adr/` 등)는 **기존 최대 번호 + 1**. 목록에서 직접 센다
-- 관례가 아예 없으면(첫 문서) 위 모양을 제안하고 **사용자에게 확인받는다**
+- If documents with the same prefix already exist, **copy their shape exactly**
+- For numbered kinds (`adr/` and friends) use **the highest existing number + 1**. Count it
+  off the list yourself
+- If there is no convention at all (the first document), propose one of the shapes above and
+  **get the user to confirm it**
 
-## 2. 템플릿이 있으면 쓴다
+## 2. Use a template if there is one
 
-라이브러리에 `templates/<종류>.md`가 있으면 그게 뼈대다:
+If the library has `templates/<kind>.md`, that is your skeleton:
 
 ```
 doc_get(library:"<slug>", path:"templates/adr.md")
 ```
 
-없으면 최소 골격만 만든다 — **빈 섹션을 남발하지 않는다.** 채울 내용이 없는 헤딩은
-다음 사람에게 "여긴 안 쓰는 칸"이라고 가르칠 뿐이다.
+Otherwise build the smallest skeleton that works — **do not scatter empty sections around.**
+A heading with nothing under it only teaches the next person that this field goes unused.
 
-ADR이면 이 정도면 족하다:
+For an ADR this is plenty:
 
 ```markdown
-# 0007. 제목
+# 0007. Title
 
-## 맥락
-무엇이 문제인가.
+## Context
+What is the problem.
 
-## 결정
-무엇을 하기로 했나.
+## Decision
+What we decided to do.
 
-## 근거
-왜. 무엇을 기각했고 그 이유는.
+## Rationale
+Why. What was rejected, and for what reason.
 
-## 재검토 조건
-어떤 상황이 오면 다시 볼 것인가.
+## Revisit when
+What would make us look at this again.
 ```
 
-## 3. 만든다
+## 3. Create it
 
 ```
 doc_put(library:"<slug>", path:"adr/0007-….md", content:"…", note:"…")
 ```
 
-- **새 문서는 `base_sha`가 없다.** 있으면 그건 기존 문서를 덮는 것이다
-- 응답이 `이미 있다`류면 **덮지 말고 멈춘다.** 경로가 겹쳤다는 뜻이고,
-  덮으면 남의 문서가 사라진다. 사용자에게 알리고 다른 경로를 제안한다
-- 아는 만큼만 채운다. 모르는 칸은 비워 두고 **무엇이 비었는지 보고한다**
+- **A new document has no `base_sha`.** If you are passing one, you are overwriting something
+  that already exists
+- If the response says the document already exists, **stop rather than overwrite.** It means
+  the path collided, and overwriting destroys somebody's document. Tell the user and propose
+  another path
+- Fill in only what you actually know. Leave the rest empty and **report what you left empty**
 
-## 4. 보고
+## 4. Report
 
-만든 경로 한 줄, 채우지 못한 칸 한 줄. 본문을 다시 출력하지 않는다.
+One line for the path you created, one line for what you could not fill in. Do not print the
+body back out.

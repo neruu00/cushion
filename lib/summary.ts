@@ -10,6 +10,18 @@
  * 섹션 이름은 오히려 **정확해졌다**. diff의 hunk 위치를 되짚을 필요가 없기 때문이다.
  *
  * 순수 함수만 둔다 — DB도 fetch도 없다.
+ *
+ * ⚠️ **이어주는 낱말은 영어다.** 이 문자열은 `sync_events.summary`에 **저장**되고, 저장된
+ *    그 한 벌을 세 곳이 나눠 쓴다 — 팀 채널 알림(한국어), 에이전트의 `doc_changes_since`
+ *    델타(영어 한 벌), 그리고 웹 타임라인(보는 사람의 언어). 한 문자열이 세 언어를 만족할
+ *    수 없으므로 어느 쪽으로든 골라야 했고, 중립인 영어를 골랐다.
+ *
+ *    비용이 크지 않은 이유: 이 줄의 대부분은 애초에 번역 대상이 아니다 — 경로, 문서가 쓴
+ *    `##` 헤딩, 증감 숫자, 사람이 직접 적은 편집 메모다. 우리가 정하는 낱말은 여기 셋뿐이다.
+ *
+ *    제대로 고치려면 요약을 **문자열로 저장하지 말고** 구조(경로·섹션·증감)로 저장하고
+ *    소비하는 쪽마다 문장을 만들어야 한다. `sync_events`에 컬럼을 더하는 마이그레이션이라
+ *    사람이 실행해야 한다 — 그때까지의 절충이다.
  */
 // `@/` 별칭이 아니라 확장자까지 쓴 상대 경로다. 이 파일은 `node --test`가 직접 실행하는
 // 순수 모듈이고, plain Node는 tsconfig의 paths를 모른다 (D-008).
@@ -94,13 +106,13 @@ export function summarizeEdit(edit: DocumentEdit): string {
   const lines: string[] = [];
 
   if (edit.after === null) {
-    lines.push(`삭제: ${edit.path}`);
+    lines.push(`deleted: ${edit.path}`);
   } else if (edit.before === null) {
-    lines.push(`${edit.path} 새 문서 (+${countLines(edit.after)})`);
+    lines.push(`${edit.path} new document (+${countLines(edit.after)})`);
   } else {
     const sections = changedSections(edit.before, edit.after);
     const shown = sections.slice(0, MAX_SECTIONS).join(", ");
-    const rest = sections.length > MAX_SECTIONS ? ` 외 ${sections.length - MAX_SECTIONS}개` : "";
+    const rest = sections.length > MAX_SECTIONS ? ` +${sections.length - MAX_SECTIONS} more` : "";
     const { added, removed } = lineDelta(edit.before, edit.after);
     lines.push(
       `${edit.path}${sections.length ? ` — ${shown}${rest}` : ""} (+${added} −${removed})`,

@@ -21,14 +21,16 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import type { Dict } from "@/lib/i18n.en";
 
 interface UserMenuProps {
   email: string;
   isAdmin: boolean;
   signOutAction: () => Promise<void>;
+  t: Dict["nav"] & Pick<Dict["common"], "signOut">;
 }
 
-export function UserMenu({ email, isAdmin, signOutAction }: UserMenuProps) {
+export function UserMenu({ email, isAdmin, signOutAction, t }: UserMenuProps) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger className="flex cursor-pointer items-center gap-1 rounded-md outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 aria-expanded:text-foreground">
@@ -41,11 +43,11 @@ export function UserMenu({ email, isAdmin, signOutAction }: UserMenuProps) {
       <DropdownMenuContent align="end" className="min-w-44">
         {isAdmin && (
           <DropdownMenuItem render={<Link href="/admin" />}>
-            <ShieldCheck /> 관리
+            <ShieldCheck /> {t.admin}
           </DropdownMenuItem>
         )}
         <DropdownMenuItem render={<Link href="/settings/tokens" />}>
-          <KeyRound /> 토큰
+          <KeyRound /> {t.tokens}
         </DropdownMenuItem>
 
         <DropdownMenuSeparator />
@@ -57,7 +59,7 @@ export function UserMenu({ email, isAdmin, signOutAction }: UserMenuProps) {
             nativeButton
             render={<button type="submit" className="w-full" />}
           >
-            <LogOut /> 로그아웃
+            <LogOut /> {t.signOut}
           </DropdownMenuItem>
         </form>
       </DropdownMenuContent>

@@ -16,9 +16,11 @@ import { PageHeader } from "@/components/PageHeader";
 import { PageShell } from "@/components/PageShell";
 import { Button } from "@/components/ui/button";
 import { getMemberLibrary, getSessionEmail, libraryFromInviteToken } from "@/lib/authz";
+import { getDict } from "@/lib/i18n";
 
 export default async function InvitePage({ params }: PageProps<"/invite/[token]">) {
   const { token } = await params;
+  const t = (await getDict()).invite;
 
   const email = await getSessionEmail();
   if (!email) {
@@ -29,10 +31,8 @@ export default async function InvitePage({ params }: PageProps<"/invite/[token]"
   if (!library) {
     return (
       <PageShell className="space-y-4">
-        <PageHeader title="유효하지 않은 링크예요" />
-        <p className="text-sm text-muted-foreground">
-          이미 무효화됐거나 잘못된 링크예요. 소유자에게 새 링크를 요청하세요.
-        </p>
+        <PageHeader title={t.invalidTitle} />
+        <p className="text-sm text-muted-foreground">{t.invalidBody}</p>
       </PageShell>
     );
   }
@@ -43,7 +43,7 @@ export default async function InvitePage({ params }: PageProps<"/invite/[token]"
   return (
     <PageShell className="space-y-4">
       <PageHeader
-        title="라이브러리 초대"
+        title={t.title}
         description={
           <>
             <span className="font-mono">{library.slug}</span> · {library.name}
@@ -53,19 +53,17 @@ export default async function InvitePage({ params }: PageProps<"/invite/[token]"
 
       {alreadyMember ? (
         <div className="space-y-3">
-          <p className="text-sm text-muted-foreground">이미 이 라이브러리의 멤버예요.</p>
+          <p className="text-sm text-muted-foreground">{t.already}</p>
           <Button render={<Link href={`/libraries/${library.slug}`} />} nativeButton={false}>
-            라이브러리로 이동
+            {t.goToLibrary}
           </Button>
         </div>
       ) : (
         <div className="space-y-3">
-          <p className="text-sm text-muted-foreground">
-            참여하면 이 라이브러리의 문서를 읽고 쓸 수 있어요.
-          </p>
+          <p className="text-sm text-muted-foreground">{t.body}</p>
           <form action={joinLibrary}>
             <input type="hidden" name="token" value={token} />
-            <Button type="submit">참여하기</Button>
+            <Button type="submit">{t.join}</Button>
           </form>
         </div>
       )}

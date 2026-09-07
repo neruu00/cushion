@@ -1,72 +1,74 @@
 ---
 name: cushion-use
-description: 이 프로젝트가 쓸 Cushion 라이브러리를 정해 AGENTS.md에 기록한다. 사용자가 /cushion-use [slug] 로 부를 때만.
+description: Decide which Cushion library this project uses and record it in AGENTS.md. Only when the user asks with /cushion-use [slug].
 ---
 
-# 이 프로젝트의 문서 라이브러리 정하기
+# Deciding this project's document library
 
-인자로 slug가 오면 그걸 쓴다. **없으면 아래 순서로 알아서 고른다.**
+If a slug came in as an argument, use it. **Otherwise work it out in this order.**
 
-## 1. 고르기
+## 1. Pick one
 
 ```
 doc_outline(depth:"libraries")
 ```
 
-응답의 괄호 안이 **그 라이브러리를 보는 GitHub 레포**다:
+What is in the parentheses is **the GitHub repos that use that library**:
 
 ```
-cushion — Cushion 문서 (neruu00/cushion) · 문서 2
-platform — 플랫폼 문서 (acme/*) · 문서 14
+cushion — Cushion docs (neruu00/cushion) · 2 docs
+platform — Platform docs (acme/*) · 14 docs
 ```
 
-1. `git remote get-url origin`에서 `org/repo`를 뽑는다
+1. Get `org/repo` from `git remote get-url origin`
    (`https://github.com/acme/web.git` → `acme/web`)
-2. 괄호 안 목록과 대조한다. **완전 일치**(`acme/web`)거나 **조직 와일드카드**(`acme/*`)면 그 라이브러리다
-3. 여러 개가 맞으면 완전 일치를 우선한다. 그래도 남으면 4번
-4. 하나도 안 맞거나 둘 이상 남으면 **묻는다.** 목록을 보여주고 고르게 한다 —
-   틀린 라이브러리를 박아 두면 이후 모든 세션이 엉뚱한 문서를 읽는다
+2. Compare it against the parenthesised lists. An **exact match** (`acme/web`) or an
+   **organisation wildcard** (`acme/*`) is your library
+3. If several match, prefer the exact one. Still more than one? Go to 4
+4. If nothing matches, or more than one still does, **ask.** Show the list and let them
+   choose — pinning the wrong library means every later session reads the wrong docs
 
-git 원격이 없거나 GitHub이 아니면 바로 4번으로 간다.
+No git remote, or not GitHub? Go straight to 4.
 
-### 쓸 라이브러리가 아예 없다면
+### If there is no library to use at all
 
-`접근 가능한 라이브러리가 없다`가 오거나 목록에 맞는 게 하나도 없으면, **만들 것을 제안한다**
-(멋대로 만들지 않는다 — slug는 나중에 못 바꾼다):
+If you get `No libraries you can reach`, or nothing in the list matches, **propose creating
+one** (do not just create it — a slug cannot be changed later):
 
 ```
-library_create(slug:"<제안>", name:"<제안>", github_repos:["<git remote의 org/repo>"])
+library_create(slug:"<proposed>", name:"<proposed>", github_repos:["<org/repo from git remote>"])
 ```
 
-- slug 후보는 git 레포 이름에서 뽑는다. 소문자·숫자·하이픈만 남긴다
-- `github_repos`에 지금 레포를 넣어 두면 **다음부터 이 과정이 자동으로 맞아떨어진다**
-- 조직 전체가 한 라이브러리를 볼 거면 `acme/*` 한 줄을 권한다
-- 만든 사람이 첫 멤버가 된다. 팀원은 웹의 라이브러리 화면에서 초대한다
+- Take the slug candidate from the git repo name. Keep only lowercase letters, digits and hyphens
+- Putting the current repo in `github_repos` means **this whole step resolves itself next time**
+- If a whole organisation will share one library, suggest a single `acme/*` line
+- Whoever creates it becomes the first member. Teammates get invited from the library screen on the web
 
-**슬러그 이름이 비슷하다는 이유로 고르지 않는다.** 그건 추측이고, 위 대조는 근거다.
+**Do not pick a library because the slug looks similar.** That is a guess; the comparison
+above is evidence.
 
-## 2. AGENTS.md에 기록
+## 2. Record it in AGENTS.md
 
-세션 메모리가 아니라 **파일에 남긴다.** 다음 세션에도 남고, 커밋되니 팀원 전원이
-같은 라이브러리를 본다. `AGENTS.md`가 없으면 만든다.
+Put it **in a file**, not in session memory. It survives into the next session, and being
+committed it points the whole team at the same library. Create `AGENTS.md` if it does not exist.
 
-이미 Cushion을 언급하는 줄이 있으면 그 slug만 고치고, 없으면 문서 맨 앞
-(제목 바로 아래)에 넣는다:
+If a line mentioning Cushion is already there, change only the slug. Otherwise add it at the
+top of the document, right below the title:
 
 ```markdown
-## 문서
+## Docs
 
-이 프로젝트의 문서(스펙·ADR·런북·회의록 등)는 레포가 아니라 Cushion의
-`<slug>` 라이브러리에 있다. MCP 서버 `cushion`의 `doc_*` 툴로 읽고 쓴다.
-자세한 사용법은 `cushion` 스킬에 있다.
+This project's docs (specs, ADRs, runbooks, meeting notes) live in the `<slug>` library on
+Cushion, not in this repo. Read and write them with the `doc_*` tools on the `cushion` MCP
+server. The `cushion` skill explains how.
 ```
 
-`CLAUDE.md`가 `AGENTS.md`를 import 하고 있으면 그쪽은 건드리지 않는다.
+If `CLAUDE.md` imports `AGENTS.md`, leave `CLAUDE.md` alone.
 
-## 3. 보고
+## 3. Report
 
-무엇을 골랐고 **왜 그걸 골랐는지**(인자 / `acme/web` 일치 / `acme/*` 일치 / 사용자 선택)
-한 줄, 그리고 `AGENTS.md`의 어디를 고쳤는지 한 줄. 그게 전부다.
+One line on what you picked and **why** (argument / `acme/web` matched / `acme/*` matched /
+the user chose), and one line on what you changed in `AGENTS.md`. That is all.
 
-고른 라이브러리의 GitHub 목록에 이 레포가 **없으면** 한 줄 덧붙인다 — 웹의 라이브러리
-설정에서 추가해 두면 다음부터 이 과정이 자동으로 맞아떨어진다고.
+If the chosen library's GitHub list does **not** include this repo, add one line: adding it in
+the library settings on the web makes this step resolve itself next time.

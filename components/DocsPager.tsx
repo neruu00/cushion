@@ -8,22 +8,22 @@
 import Link from "next/link";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 
-import { DOCS_PAGES } from "@/lib/docs";
+import { docsNeighbours } from "@/lib/docs";
+import { getDict } from "@/lib/i18n";
 
 interface DocsPagerProps {
-  /** 이 페이지의 href. `DOCS_PAGES`의 값과 정확히 같아야 한다 */
+  /** 이 페이지의 href. `lib/docs.ts`의 목차 값과 정확히 같아야 한다 */
   current: string;
 }
 
-export function DocsPager({ current }: DocsPagerProps) {
-  const index = DOCS_PAGES.findIndex((page) => page.href === current);
-  const previous = index > 0 ? DOCS_PAGES[index - 1] : null;
-  const next = index >= 0 && index < DOCS_PAGES.length - 1 ? DOCS_PAGES[index + 1] : null;
+export async function DocsPager({ current }: DocsPagerProps) {
+  const t = (await getDict()).docsNav;
+  const { previous, next } = docsNeighbours(current, t);
 
   if (!previous && !next) return null;
 
   return (
-    <nav aria-label="이전·다음 문서" className="mt-14 flex gap-3 border-t pt-6">
+    <nav aria-label={t.pagerLabel} className="mt-14 flex gap-3 border-t pt-6">
       {previous && (
         <Link
           href={previous.href}
@@ -31,7 +31,7 @@ export function DocsPager({ current }: DocsPagerProps) {
           className="group flex flex-1 flex-col gap-1 rounded-lg border p-4 text-sm hover:bg-muted/50"
         >
           <span className="flex items-center gap-1 text-xs text-muted-foreground">
-            <ArrowLeft className="size-3" /> 이전
+            <ArrowLeft className="size-3" /> {t.previous}
           </span>
           <span className="font-medium">{previous.title}</span>
         </Link>
@@ -43,7 +43,7 @@ export function DocsPager({ current }: DocsPagerProps) {
           className="group flex flex-1 flex-col items-end gap-1 rounded-lg border p-4 text-sm hover:bg-muted/50"
         >
           <span className="flex items-center gap-1 text-xs text-muted-foreground">
-            다음 <ArrowRight className="size-3" />
+            {t.next} <ArrowRight className="size-3" />
           </span>
           <span className="font-medium">{next.title}</span>
         </Link>

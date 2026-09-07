@@ -19,6 +19,8 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useUiCopy } from "@/components/UiCopyProvider";
+import type { Dict } from "@/lib/i18n.en";
 
 interface DocumentFormProps {
   library: string;
@@ -27,15 +29,16 @@ interface DocumentFormProps {
   content: string;
   /** 새 문서면 빈 문자열 */
   sha: string;
+  /** 서버 페이지가 고른 언어 조각. 버튼 같은 공용 문구는 컨텍스트에서 온다 */
+  t: Dict["doc"];
 }
 
-export function DocumentForm({ library, path, content, sha }: DocumentFormProps) {
+export function DocumentForm({ library, path, content, sha, t }: DocumentFormProps) {
+  const { common } = useUiCopy();
   const [state, formAction, pending] = useActionState(saveDocument, null);
   const [draft, setDraft] = useState(content);
 
-  const currentSha = state?.success
-    ? (state.data?.sha ?? sha)
-    : (state?.conflict?.sha ?? sha);
+  const currentSha = state?.success ? (state.data?.sha ?? sha) : (state?.conflict?.sha ?? sha);
 
   return (
     <form action={formAction} className="space-y-4">
@@ -46,13 +49,13 @@ export function DocumentForm({ library, path, content, sha }: DocumentFormProps)
         <input type="hidden" name="path" value={path} />
       ) : (
         <Label className="grid gap-1.5">
-          <span className="text-sm">경로</span>
+          <span className="text-sm">{t.path}</span>
           <Input name="path" placeholder=".specs/api.md" required />
         </Label>
       )}
 
       <Label className="grid gap-1.5">
-        <span className="text-sm">내용</span>
+        <span className="text-sm">{t.content}</span>
         <textarea
           name="content"
           value={draft}
@@ -65,16 +68,16 @@ export function DocumentForm({ library, path, content, sha }: DocumentFormProps)
       </Label>
 
       <Label className="grid gap-1.5">
-        <span className="text-sm">무엇을 왜 바꿨나</span>
-        <Input name="note" placeholder="세션 만료 정책 변경" />
+        <span className="text-sm">{t.note}</span>
+        <Input name="note" placeholder={t.notePlaceholder} />
       </Label>
 
       <div className="flex items-center gap-3">
         <Button type="submit" disabled={pending}>
-          {pending ? "저장 중…" : "저장"}
+          {pending ? common.saving : common.save}
         </Button>
         {state?.success ? (
-          <span className="text-sm text-muted-foreground">저장했어요</span>
+          <span className="text-sm text-muted-foreground">{common.saved}</span>
         ) : null}
       </div>
 
@@ -86,13 +89,10 @@ export function DocumentForm({ library, path, content, sha }: DocumentFormProps)
             <AlertDescription className="space-y-2">
               {/* 병합하지 않는다. 사람이 두 본문을 보고 정한다 — 그게 유일하게 안전한 방법이다.
                   base_sha는 이미 갱신됐으므로 지금 그대로 저장하면 내 내용이 이긴다. */}
-              <p>
-                쓰던 내용은 그대로 뒀어요. 아래 서버 본문과 비교해 보세요. 이대로 저장하면
-                서버 내용을 덮어써요.
-              </p>
+              <p>{t.conflictBody}</p>
               <details className="rounded-lg border bg-background/50">
                 <summary className="cursor-pointer px-3 py-1.5 text-sm">
-                  서버의 현재 내용 보기
+                  {t.conflictShowServer}
                 </summary>
                 <pre className="max-h-80 overflow-auto px-3 pb-3 font-mono text-xs leading-relaxed">
                   {state.conflict.content}
@@ -104,7 +104,7 @@ export function DocumentForm({ library, path, content, sha }: DocumentFormProps)
                 size="sm"
                 onClick={() => setDraft(state.conflict?.content ?? draft)}
               >
-                서버 내용으로 바꾸기 (내가 쓴 내용은 버리기)
+                {t.conflictTakeServer}
               </Button>
             </AlertDescription>
           ) : null}

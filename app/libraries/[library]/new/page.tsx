@@ -9,12 +9,15 @@ import { PageHeader } from "@/components/PageHeader";
 import { PageShell } from "@/components/PageShell";
 import { DocumentForm } from "@/components/DocumentForm";
 import { getMemberLibrary, getSessionEmail } from "@/lib/authz";
+import { getDict } from "@/lib/i18n";
 
 export default async function NewDocumentPage({ params }: PageProps<"/libraries/[library]/new">) {
   const { library: slug } = await params;
+  const t = (await getDict()).doc;
 
   const email = await getSessionEmail();
-  if (!email) redirect(`/api/auth/signin?callbackUrl=${encodeURIComponent(`/libraries/${slug}/new`)}`);
+  if (!email)
+    redirect(`/api/auth/signin?callbackUrl=${encodeURIComponent(`/libraries/${slug}/new`)}`);
 
   const library = await getMemberLibrary(email, slug);
   if (!library) notFound();
@@ -27,10 +30,10 @@ export default async function NewDocumentPage({ params }: PageProps<"/libraries/
             {library.slug}
           </Link>
         }
-        title="새 문서"
+        title={t.newTitle}
       />
 
-      <DocumentForm library={library.slug} path="" content="" sha="" />
+      <DocumentForm library={library.slug} path="" content="" sha="" t={t} />
     </PageShell>
   );
 }

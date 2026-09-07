@@ -15,6 +15,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatDateTime } from "@/lib/datetime";
+import { getDict } from "@/lib/i18n";
 import type { RequestLogRow } from "@/lib/logs.db";
 import { cn } from "@/lib/utils";
 
@@ -28,18 +29,20 @@ interface LogTableProps {
 
 const fmt = (n: number) => n.toLocaleString();
 
-export function LogTable({ logs, showActor = true, fullError = false }: LogTableProps) {
+export async function LogTable({ logs, showActor = true, fullError = false }: LogTableProps) {
+  const t = (await getDict()).logs;
+
   return (
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead>시각</TableHead>
-          <TableHead>상태</TableHead>
-          <TableHead>요청</TableHead>
-          <TableHead>라이브러리</TableHead>
-          {showActor && <TableHead>누가</TableHead>}
+          <TableHead>{t.colTime}</TableHead>
+          <TableHead>{t.colStatus}</TableHead>
+          <TableHead>{t.colRequest}</TableHead>
+          <TableHead>{t.colLibrary}</TableHead>
+          {showActor && <TableHead>{t.colActor}</TableHead>}
           <TableHead className="text-right">ms</TableHead>
-          <TableHead>에러</TableHead>
+          <TableHead>{t.colError}</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
