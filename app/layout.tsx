@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import localFont from "next/font/local";
+import { Analytics } from "@vercel/analytics/next";
 
 import { setLocale } from "@/actions/locale";
 import { LocaleSwitch } from "@/components/LocaleSwitch";
@@ -76,6 +77,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         </header>
         {/* 공용 문구(버튼·복사·확인)만 내려 준다. 화면별 문구는 각 페이지가 props로 준다 */}
         <UiCopyProvider value={{ common: t.common, form: t.form }}>{children}</UiCopyProvider>
+        <Analytics />
       </body>
     </html>
   );
